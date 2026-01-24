@@ -221,7 +221,28 @@ docker push mazhewitt/recipe-vault
 ```
 
 ### 4. Running the MCP Server via Docker
-To use the MCP server with Claude Desktop or Gemini without installing Rust locally:
+
+**Method 1: If API Server is Running (Recommended)**
+If you are already running the API server with Docker Compose (step 2), the best way to run the MCP server is to execute it inside the running container. This avoids file locking issues with the SQLite database.
+
+```json
+{
+  "mcpServers": {
+    "recipe-vault": {
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "recipe-vault-api-1",
+        "recipe-vault-mcp"
+      ]
+    }
+  }
+}
+```
+
+**Method 2: Standalone Container**
+If you are *not* running the API server, or if you need to run it in a separate container (ensure the API server is stopped to avoid locks):
 
 ```json
 {

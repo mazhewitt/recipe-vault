@@ -40,9 +40,10 @@ echo "Recipe created via API."
 
 echo "=== 6. Testing MCP Server via Docker ==="
 # Run MCP list_recipes to verify it sees the same DB
-# We need to mount the same volume. Docker Compose created 'recipe-vault_recipe-data'.
+# We use 'docker exec' to run inside the existing container, avoiding file locking issues
+# that can occur when mounting the same sqlite volume in two different containers simultaneously.
 RESPONSE=$(echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"list_recipes","arguments":{}},"id":1}' | \
-    docker run -i --rm -v recipe-vault_recipe-data:/app/data mazhewitt/recipe-vault:latest recipe-vault-mcp)
+    docker exec -i recipe-vault-api-1 recipe-vault-mcp)
 
 echo "MCP Response: $RESPONSE"
 
