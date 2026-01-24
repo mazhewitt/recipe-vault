@@ -1,9 +1,3 @@
-mod config;
-mod db;
-mod error;
-mod handlers;
-mod models;
-
 use axum::{
     routing::{delete, get, post, put},
     Router,
@@ -15,7 +9,7 @@ use tower_http::{
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{config::Config, handlers::recipes};
+use recipe_vault::{config::Config, db, handlers::recipes};
 
 #[tokio::main]
 async fn main() {
