@@ -5,7 +5,7 @@ use crate::{
     error::{ApiError, ApiResult},
     models::{
         recipe::{CreateIngredientInput, CreateRecipeInput, CreateStepInput, UpdateRecipeInput},
-        Ingredient, Recipe, RecipeWithDetails, Step,
+        RecipeIngredient, Recipe, RecipeWithDetails, Step,
     },
 };
 
@@ -101,7 +101,7 @@ pub async fn get_recipe(pool: &SqlitePool, recipe_id: &str) -> ApiResult<RecipeW
     let recipe = recipe.ok_or_else(|| ApiError::NotFound(recipe_id.to_string()))?;
 
     // Fetch ingredients
-    let ingredients: Vec<Ingredient> = sqlx::query_as(
+    let ingredients: Vec<RecipeIngredient> = sqlx::query_as(
         "SELECT * FROM ingredients WHERE recipe_id = ? ORDER BY position"
     )
     .bind(recipe_id)

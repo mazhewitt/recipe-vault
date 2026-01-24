@@ -3,5 +3,5 @@ pub mod ingredient;
 pub mod step;
 
 pub use recipe::Recipe;
-pub use ingredient::Ingredient;
+pub use ingredient::RecipeIngredient;
 pub use step::{Step, TemperatureUnit};

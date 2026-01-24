@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{Ingredient, Step};
+use super::{RecipeIngredient, Step};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Recipe {
@@ -24,7 +24,7 @@ pub struct Recipe {
 pub struct RecipeWithDetails {
     #[serde(flatten)]
     pub recipe: Recipe,
-    pub ingredients: Vec<Ingredient>,
+    pub ingredients: Vec<RecipeIngredient>,
     pub steps: Vec<Step>,
 }
 
