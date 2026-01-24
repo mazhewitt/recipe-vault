@@ -41,24 +41,26 @@ pub async fn run_server(pool: SqlitePool) -> io::Result<()> {
             }
         };
 
-        info!("Received request: method={}, id={}", request.method, request.id);
+        info!("Received request: method={}, id={:?}", request.method, request.id);
 
         // Handle the request
         let response = handle_request(&pool, request).await;
 
-        // Write response
-        write_response(&mut stdout, &response)?;
+        // Write response only if it's not a notification (has an ID)
+        if let Some(response) = response {
+            write_response(&mut stdout, &response)?;
+        }
     }
 
     info!("MCP server shutting down");
     Ok(())
 }
 
-/// Handle a JSON-RPC request and return a response
-async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> JsonRpcResponse {
-    let request_id = request.id;
+/// Handle a JSON-RPC request and return a response (None for notifications)
+async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> Option<JsonRpcResponse> {
+    let request_id = request.id?;
 
-    match request.method.as_str() {
+    Some(match request.method.as_str() {
         "initialize" => {
             // MCP initialization handshake
             JsonRpcResponse::success(
@@ -90,10 +92,10 @@ async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> JsonRpcRe
             let tool_name = match request.params.get("name").and_then(|v| v.as_str()) {
                 Some(name) => name,
                 None => {
-                    return JsonRpcResponse::error(
+                    return Some(JsonRpcResponse::error(
                         request_id,
                         JsonRpcError::invalid_params("Missing tool name in tools/call"),
-                    );
+                    ));
                 }
             };
 
@@ -106,10 +108,10 @@ async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> JsonRpcRe
                 "update_recipe" => tools::handle_update_recipe(pool, arguments).await,
                 "delete_recipe" => tools::handle_delete_recipe(pool, arguments).await,
                 _ => {
-                    return JsonRpcResponse::error(
+                    return Some(JsonRpcResponse::error(
                         request_id,
                         JsonRpcError::method_not_found(tool_name),
-                    );
+                    ));
                 }
             };
 
@@ -130,7 +132,7 @@ async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> JsonRpcRe
             warn!("Unknown method: {}", request.method);
             JsonRpcResponse::error(request_id, JsonRpcError::method_not_found(request.method))
         }
-    }
+    })
 }
 
 /// Write a JSON-RPC response to stdout

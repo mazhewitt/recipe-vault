@@ -6,8 +6,10 @@ use serde_json::Value as JsonValue;
 pub struct JsonRpcRequest {
     pub jsonrpc: String,
     pub method: String,
+    #[serde(default)]
     pub params: JsonValue,
-    pub id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<u64>,
 }
 
 /// JSON-RPC 2.0 response structure
