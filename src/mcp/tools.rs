@@ -19,7 +19,7 @@ pub fn get_all_tools() -> Vec<ToolDefinition> {
 pub fn list_recipes_tool() -> ToolDefinition {
     ToolDefinition::new(
         "list_recipes",
-        "List all recipes in the database. Returns recipe ID, title, and description for each recipe.",
+        "List all saved recipes. Use this to search for existing recipes, check if a recipe exists (e.g., 'do I have...'), or browse available options.",
         json!({
             "type": "object",
             "properties": {}
@@ -49,7 +49,7 @@ pub fn get_recipe_tool() -> ToolDefinition {
 pub fn create_recipe_tool() -> ToolDefinition {
     ToolDefinition::new(
         "create_recipe",
-        "Create a new recipe with ingredients and cooking steps. Returns the created recipe with generated ID.",
+        "Create and save a new recipe to the database. Use this when the user asks to 'save', 'store', or 'remember' a recipe.",
         json!({
             "type": "object",
             "properties": {
