@@ -26,7 +26,11 @@ Use the following pattern for ALL MCP interactions:
    - Args: `{"title": "...", "description": "...", "ingredients": [...], "steps": [...]}`
    - Usage: Parse user's natural language request into this structured format.
 
-4. `delete_recipe`: Delete a recipe.
+4. `update_recipe`: Update an existing recipe.
+   - Args: `{"recipe_id": "UUID", "title": "...", "ingredients": [...]}`
+   - Usage: Parse user's request for modification. Supports partial updates.
+
+5. `delete_recipe`: Delete a recipe.
    - Args: `{"recipe_id": "UUID"}`
    - Usage: Use when user explicitly asks to delete/remove a recipe.
 

@@ -51,6 +51,7 @@ async fn send_json_rpc_request(pool: &SqlitePool, method: &str, params: serde_js
                 "list_recipes" => tools::handle_list_recipes(pool, arguments).await,
                 "get_recipe" => tools::handle_get_recipe(pool, arguments).await,
                 "create_recipe" => tools::handle_create_recipe(pool, arguments).await,
+                "update_recipe" => tools::handle_update_recipe(pool, arguments).await,
                 "delete_recipe" => tools::handle_delete_recipe(pool, arguments).await,
                 _ => {
                     return json!({
@@ -120,7 +121,7 @@ async fn test_mcp_tools_list(#[future] pool: SqlitePool) {
     assert_eq!(response["id"], 1);
 
     let tools = response["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 4);
+    assert_eq!(tools.len(), 5);
 
     let tool_names: Vec<&str> = tools
         .iter()
@@ -130,6 +131,7 @@ async fn test_mcp_tools_list(#[future] pool: SqlitePool) {
     assert!(tool_names.contains(&"list_recipes"));
     assert!(tool_names.contains(&"get_recipe"));
     assert!(tool_names.contains(&"create_recipe"));
+    assert!(tool_names.contains(&"update_recipe"));
     assert!(tool_names.contains(&"delete_recipe"));
 }
 
@@ -473,4 +475,115 @@ async fn test_unknown_tool(#[future] pool: SqlitePool) {
     assert_eq!(response["jsonrpc"], "2.0");
     assert!(response["result"].is_null());
     assert_eq!(response["error"]["code"], -32601); // Method not found
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_update_recipe_title_only(#[future] pool: SqlitePool) {
+    let pool = pool.await;
+    // Create a recipe first
+    let create_response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "create_recipe",
+            "arguments": {
+                "title": "Old Title",
+                "description": "To be updated"
+            }
+        })
+    ).await;
+
+    let create_content = create_response["result"]["content"][0]["text"].as_str().unwrap();
+    let created_recipe: serde_json::Value = serde_json::from_str(create_content).unwrap();
+    let recipe_id = created_recipe["id"].as_str().unwrap();
+
+    // Update title
+    let update_response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "update_recipe",
+            "arguments": {
+                "recipe_id": recipe_id,
+                "title": "New Title"
+            }
+        })
+    ).await;
+
+    assert!(update_response["error"].is_null());
+    let update_content = update_response["result"]["content"][0]["text"].as_str().unwrap();
+    let updated_recipe: serde_json::Value = serde_json::from_str(update_content).unwrap();
+    
+    assert_eq!(updated_recipe["title"], "New Title");
+    assert_eq!(updated_recipe["description"], "To be updated");
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_update_recipe_replace_ingredients(#[future] pool: SqlitePool) {
+    let pool = pool.await;
+    // Create a recipe
+    let create_response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "create_recipe",
+            "arguments": {
+                "title": "Salad",
+                "description": "Simple salad",
+                "ingredients": [
+                    {"name": "lettuce", "quantity": 1.0}
+                ]
+            }
+        })
+    ).await;
+
+    let create_content = create_response["result"]["content"][0]["text"].as_str().unwrap();
+    let created_recipe: serde_json::Value = serde_json::from_str(create_content).unwrap();
+    let recipe_id = created_recipe["id"].as_str().unwrap();
+
+    // Update ingredients
+    let update_response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "update_recipe",
+            "arguments": {
+                "recipe_id": recipe_id,
+                "ingredients": [
+                    {"name": "spinach", "quantity": 2.0},
+                    {"name": "tomatoes", "quantity": 3.0}
+                ]
+            }
+        })
+    ).await;
+
+    assert!(update_response["error"].is_null());
+    let update_content = update_response["result"]["content"][0]["text"].as_str().unwrap();
+    let updated_recipe: serde_json::Value = serde_json::from_str(update_content).unwrap();
+    
+    let ingredients = updated_recipe["ingredients"].as_array().unwrap();
+    assert_eq!(ingredients.len(), 2);
+    assert_eq!(ingredients[0]["name"], "spinach");
+    assert_eq!(ingredients[1]["name"], "tomatoes");
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_update_non_existent_recipe(#[future] pool: SqlitePool) {
+    let pool = pool.await;
+    let response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "update_recipe",
+            "arguments": {
+                "recipe_id": "invalid-uuid",
+                "title": "New Title"
+            }
+        })
+    ).await;
+
+    assert_eq!(response["error"]["code"], -32001); // Not found
 }

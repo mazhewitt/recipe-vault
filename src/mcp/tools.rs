@@ -1,6 +1,6 @@
 use crate::db::queries;
 use crate::error::ApiError;
-use crate::models::recipe::{CreateRecipeInput, CreateIngredientInput, CreateStepInput};
+use crate::models::recipe::{CreateRecipeInput, CreateIngredientInput, CreateStepInput, UpdateRecipeInput};
 use crate::mcp::protocol::{JsonRpcError, ToolDefinition};
 use serde_json::{json, Value as JsonValue};
 use sqlx::SqlitePool;
@@ -11,6 +11,7 @@ pub fn get_all_tools() -> Vec<ToolDefinition> {
         list_recipes_tool(),
         get_recipe_tool(),
         create_recipe_tool(),
+        update_recipe_tool(),
         delete_recipe_tool(),
     ]
 }
@@ -106,6 +107,71 @@ pub fn create_recipe_tool() -> ToolDefinition {
     )
 }
 
+/// Tool definition for updating a recipe
+pub fn update_recipe_tool() -> ToolDefinition {
+    ToolDefinition::new(
+        "update_recipe",
+        "Update an existing recipe. Supports partial updates (e.g., just title) or full replacements of ingredients/steps.",
+        json!({
+            "type": "object",
+            "properties": {
+                "recipe_id": {
+                    "type": "string",
+                    "description": "The UUID of the recipe to update"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "New recipe title (optional)"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "New description (optional)"
+                },
+                "servings": {
+                    "type": "integer",
+                    "description": "New number of servings (optional)"
+                },
+                "prep_time_minutes": {
+                    "type": "integer",
+                    "description": "New prep time (optional)"
+                },
+                "cook_time_minutes": {
+                    "type": "integer",
+                    "description": "New cook time (optional)"
+                },
+                "ingredients": {
+                    "type": "array",
+                    "description": "New list of ingredients (replaces all existing)",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "quantity": {"type": "number"},
+                            "unit": {"type": "string"},
+                            "notes": {"type": "string"}
+                        },
+                        "required": ["name"]
+                    }
+                },
+                "steps": {
+                    "type": "array",
+                    "description": "New cooking instructions (replaces all existing)",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "instruction": {"type": "string"},
+                            "duration_minutes": {"type": "integer"},
+                            "temperature_celsius": {"type": "integer"}
+                        },
+                        "required": ["instruction"]
+                    }
+                }
+            },
+            "required": ["recipe_id"]
+        })
+    )
+}
+
 /// Tool definition for deleting a recipe
 pub fn delete_recipe_tool() -> ToolDefinition {
     ToolDefinition::new(
@@ -144,6 +210,95 @@ pub async fn handle_get_recipe(pool: &SqlitePool, params: JsonValue) -> Result<J
         .await
         .map_err(|e| match e {
             ApiError::NotFound(msg) => JsonRpcError::not_found(msg),
+            ApiError::Validation(msg) => JsonRpcError::invalid_params(msg),
+            _ => JsonRpcError::internal_error(format!("Database error: {}", e)),
+        })?;
+
+    Ok(serde_json::to_value(recipe).map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+}
+
+/// Handle update_recipe tool call
+pub async fn handle_update_recipe(pool: &SqlitePool, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+    let recipe_id = params
+        .get("recipe_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid recipe_id parameter"))?;
+
+    // Parse ingredients if provided
+    let ingredients = if let Some(ingredients_array) = params.get("ingredients").and_then(|v| v.as_array()) {
+        Some(ingredients_array
+            .iter()
+            .enumerate()
+            .map(|(idx, ing)| {
+                let name = ing
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| JsonRpcError::invalid_params(format!("Ingredient {} missing name", idx)))?
+                    .to_string();
+
+                let quantity = ing.get("quantity").and_then(|v| v.as_f64());
+                let unit = ing.get("unit").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let notes = ing.get("notes").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+                Ok(CreateIngredientInput {
+                    name,
+                    quantity,
+                    unit,
+                    notes,
+                })
+            })
+            .collect::<Result<Vec<_>, JsonRpcError>>()?)
+    } else {
+        None
+    };
+
+    // Parse steps if provided
+    let steps = if let Some(steps_array) = params.get("steps").and_then(|v| v.as_array()) {
+        Some(steps_array
+            .iter()
+            .enumerate()
+            .map(|(idx, step)| {
+                let instruction = step
+                    .get("instruction")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| JsonRpcError::invalid_params(format!("Step {} missing instruction", idx)))?
+                    .to_string();
+
+                let duration_minutes = step.get("duration_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
+                let temperature_value = step.get("temperature_celsius").and_then(|v| v.as_i64()).map(|v| v as i32);
+                let temperature_unit = if temperature_value.is_some() {
+                    Some("Celsius".to_string())
+                } else {
+                    None
+                };
+
+                Ok(CreateStepInput {
+                    instruction,
+                    duration_minutes,
+                    temperature_value,
+                    temperature_unit,
+                })
+            })
+            .collect::<Result<Vec<_>, JsonRpcError>>()?)
+    } else {
+        None
+    };
+
+    let update_input = UpdateRecipeInput {
+        title: params.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        description: params.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        servings: params.get("servings").and_then(|v| v.as_i64()).map(|v| v as i32),
+        prep_time_minutes: params.get("prep_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32),
+        cook_time_minutes: params.get("cook_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32),
+        ingredients,
+        steps,
+    };
+
+    let recipe = queries::update_recipe(pool, recipe_id, update_input)
+        .await
+        .map_err(|e| match e {
+            ApiError::NotFound(msg) => JsonRpcError::not_found(msg),
+            ApiError::Conflict(msg) => JsonRpcError::conflict(msg),
             ApiError::Validation(msg) => JsonRpcError::invalid_params(msg),
             _ => JsonRpcError::internal_error(format!("Database error: {}", e)),
         })?;
@@ -322,6 +477,18 @@ mod tests {
     }
 
     #[test]
+    fn test_update_recipe_tool_schema() {
+        let tool = update_recipe_tool();
+        assert_eq!(tool.name, "update_recipe");
+        let required = tool.input_schema
+            .get("required")
+            .and_then(|v| v.as_array())
+            .unwrap();
+        assert!(required.iter().any(|v| v.as_str() == Some("recipe_id")));
+        assert!(tool.input_schema.get("properties").unwrap().get("title").is_some());
+    }
+
+    #[test]
     fn test_delete_recipe_tool_schema() {
         let tool = delete_recipe_tool();
         assert_eq!(tool.name, "delete_recipe");
@@ -335,10 +502,11 @@ mod tests {
     #[test]
     fn test_get_all_tools() {
         let tools = get_all_tools();
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 5);
         assert_eq!(tools[0].name, "list_recipes");
         assert_eq!(tools[1].name, "get_recipe");
         assert_eq!(tools[2].name, "create_recipe");
-        assert_eq!(tools[3].name, "delete_recipe");
+        assert_eq!(tools[3].name, "update_recipe");
+        assert_eq!(tools[4].name, "delete_recipe");
     }
 }
