@@ -4,7 +4,7 @@ This document provides detailed information about the Model Context Protocol (MC
 
 ## Overview
 
-Recipe Vault exposes three MCP tools that enable natural language interaction with your recipe database through Claude Desktop. These tools wrap the existing database operations and provide structured interfaces for recipe management.
+Recipe Vault exposes four MCP tools that enable natural language interaction with your recipe database through Claude Desktop. These tools wrap the existing database operations and provide structured interfaces for recipe management.
 
 ## Tools
 
@@ -279,6 +279,33 @@ Claude will use the recipe context to provide relevant answers.
 
 ---
 
+### delete_recipe
+
+**Purpose:** Delete a recipe by ID. Permanently removes the recipe and all associated data (ingredients and steps).
+
+**Parameters:**
+- `recipe_id` (string, required): The UUID of the recipe to delete
+
+**Returns:** Success message with status and ID
+
+**Example Prompts:**
+- "Delete the banana bread recipe"
+- "Remove the recipe with ID [uuid]"
+
+**Example Response:**
+```json
+{
+  "status": "success",
+  "message": "Recipe 123-abc deleted"
+}
+```
+
+**Error Scenarios:**
+- Recipe not found → Returns error code -32001 with "Recipe not found: {id}" message
+- Invalid UUID format → Returns error code -32602 with "Missing or invalid recipe_id parameter"
+
+---
+
 ## Natural Language Tips
 
 ### Discovery
@@ -339,7 +366,7 @@ All tools return standard JSON-RPC 2.0 error codes:
 Ask Claude:
 > "What recipe tools do you have available?"
 
-Expected response: Claude lists the three tools (list_recipes, get_recipe, create_recipe)
+Expected response: Claude lists the four tools (list_recipes, get_recipe, create_recipe, delete_recipe)
 
 ### 2. Test Empty Database
 
@@ -444,7 +471,6 @@ Claude will retrieve recipes and analyze them based on your criteria.
 
 Tools not yet implemented but planned:
 - `update_recipe` - Modify existing recipes
-- `delete_recipe` - Remove recipes
 - `search_recipes` - Server-side search by keywords
 - `start_cooking_session` - Interactive cooking guidance
 - `import_recipe_from_url` - Extract recipes from websites

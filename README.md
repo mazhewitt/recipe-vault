@@ -139,7 +139,7 @@ In Claude Desktop, you should see the Recipe Vault tools available. You can veri
 
 > "What recipe tools do you have available?"
 
-Claude should list three tools: `list_recipes`, `get_recipe`, and `create_recipe`.
+Claude should list four tools: `list_recipes`, `get_recipe`, `create_recipe`, and `delete_recipe`.
 
 ### Example Usage
 
@@ -191,6 +191,15 @@ Creates a new recipe with ingredients and cooking steps.
 
 **Returns:** Created recipe with generated ID
 
+### delete_recipe
+
+Deletes a recipe by ID. Permanently removes the recipe and all associated data (ingredients and steps).
+
+**Parameters:**
+- `recipe_id` (string, required): The UUID of the recipe to delete
+
+**Returns:** Success message
+
 ## Development
 
 ### Run Tests
@@ -208,8 +217,8 @@ cargo test --lib                    # Unit tests
 ### Test Coverage
 
 - **13 REST API integration tests** - Testing HTTP endpoints and database operations
-- **12 MCP integration tests** - Testing JSON-RPC protocol and tool handlers
-- **4 MCP unit tests** - Testing tool schema definitions
+- **14 MCP integration tests** - Testing JSON-RPC protocol and tool handlers
+- **5 MCP unit tests** - Testing tool schema definitions
 
 ### Project Structure
 
