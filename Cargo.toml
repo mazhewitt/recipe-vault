@@ -16,6 +16,11 @@ tower-http = { version = "0.6", features = ["cors", "trace"] }
 dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+[[bin]]
+name = "recipe-vault-mcp"
+path = "src/bin/recipe_vault_mcp.rs"
 
 [dev-dependencies]
 rstest = "0.23"
