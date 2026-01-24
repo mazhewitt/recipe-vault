@@ -1,0 +1,9 @@
+target/
+.git/
+.env
+*.log
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+docker-compose.override.yml

@@ -200,6 +200,49 @@ Deletes a recipe by ID. Permanently removes the recipe and all associated data (
 
 **Returns:** Success message
 
+## Docker Deployment
+
+You can run Recipe Vault using Docker, which simplifies setup by including all dependencies and binaries in a single image.
+
+### 1. Build the Image
+```bash
+docker build -t mazhewitt/recipe-vault .
+```
+
+### 2. Run API Server with Docker Compose
+```bash
+docker compose up -d
+```
+The server will be available at `http://localhost:3000`. Data is persisted in a Docker volume named `recipe-data`.
+
+### 3. Push to Docker Hub
+```bash
+docker push mazhewitt/recipe-vault
+```
+
+### 4. Running the MCP Server via Docker
+To use the MCP server with Claude Desktop or Gemini without installing Rust locally:
+
+```json
+{
+  "mcpServers": {
+    "recipe-vault": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "recipe-vault_recipe-data:/app/data",
+        "mazhewitt/recipe-vault",
+        "recipe-vault-mcp"
+      ]
+    }
+  }
+}
+```
+**Note**: Ensure the volume name (`recipe-vault_recipe-data`) matches the one created by Docker Compose. You can check your volumes with `docker volume ls`.
+
 ## Development
 
 ### Run Tests

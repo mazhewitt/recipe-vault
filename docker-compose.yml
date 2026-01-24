@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    image: mazhewitt/recipe-vault:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - recipe-data:/app/data
+    environment:
+      - RUST_LOG=info,recipe_vault=debug
+
+volumes:
+  recipe-data:
