@@ -58,3 +58,9 @@ impl IntoResponse for ApiError {
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;
+
+impl From<String> for ApiError {
+    fn from(msg: String) -> Self {
+        ApiError::Validation(msg)
+    }
+}
