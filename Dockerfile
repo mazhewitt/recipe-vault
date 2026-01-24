@@ -1,5 +1,5 @@
 # Builder stage
-FROM rust:1.84-slim-bookworm AS builder
+FROM rustlang/rust:nightly-slim AS builder
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ COPY --from=builder /app/target/release/recipe-vault-mcp /usr/local/bin/recipe-v
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
-ENV DATABASE_URL=sqlite:///app/data/recipes.db
+ENV DATABASE_URL=sqlite:///app/data/recipes.db?mode=rwc
 ENV BIND_ADDRESS=0.0.0.0:3000
 
 EXPOSE 3000

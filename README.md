@@ -243,6 +243,13 @@ To use the MCP server with Claude Desktop or Gemini without installing Rust loca
 ```
 **Note**: Ensure the volume name (`recipe-vault_recipe-data`) matches the one created by Docker Compose. You can check your volumes with `docker volume ls`.
 
+### 5. Running Docker Tests
+You can run the automated end-to-end test for the Docker setup:
+```bash
+./tests/docker_test.sh
+```
+This will build the image, start the API server, verify functionality, and clean up.
+
 ## Development
 
 ### Run Tests
