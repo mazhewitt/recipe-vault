@@ -45,6 +45,7 @@ async fn send_json_rpc_request(pool: &SqlitePool, method: &str, params: serde_js
                 "list_recipes" => tools::handle_list_recipes(pool, arguments).await,
                 "get_recipe" => tools::handle_get_recipe(pool, arguments).await,
                 "create_recipe" => tools::handle_create_recipe(pool, arguments).await,
+                "delete_recipe" => tools::handle_delete_recipe(pool, arguments).await,
                 _ => {
                     return json!({
                         "jsonrpc": "2.0",
@@ -92,6 +93,61 @@ async fn send_json_rpc_request(pool: &SqlitePool, method: &str, params: serde_js
 }
 
 #[tokio::test]
+async fn test_delete_recipe() {
+    let pool = create_test_db().await;
+
+    // Create a recipe first
+    let create_response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "create_recipe",
+            "arguments": {
+                "title": "To Delete",
+                "description": "Delete me"
+            }
+        })
+    ).await;
+
+    assert!(create_response["error"].is_null());
+
+    let create_content = create_response["result"]["content"][0]["text"].as_str().unwrap();
+    let created_recipe: serde_json::Value = serde_json::from_str(create_content).unwrap();
+    let recipe_id = created_recipe["id"].as_str().unwrap();
+
+    // Delete the recipe
+    let delete_response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "delete_recipe",
+            "arguments": {
+                "recipe_id": recipe_id
+            }
+        })
+    ).await;
+
+    assert!(delete_response["error"].is_null());
+    let delete_content = delete_response["result"]["content"][0]["text"].as_str().unwrap();
+    let delete_result: serde_json::Value = serde_json::from_str(delete_content).unwrap();
+    assert_eq!(delete_result["status"], "success");
+
+    // Try to get it again (should fail)
+    let get_response = send_json_rpc_request(
+        &pool,
+        "tools/call",
+        json!({
+            "name": "get_recipe",
+            "arguments": {
+                "recipe_id": recipe_id
+            }
+        })
+    ).await;
+
+    assert_eq!(get_response["error"]["code"], -32001); // Not found
+}
+
+#[tokio::test]
 async fn test_mcp_initialize() {
     let pool = create_test_db().await;
 
@@ -113,7 +169,7 @@ async fn test_mcp_tools_list() {
     assert_eq!(response["id"], 1);
 
     let tools = response["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 3);
+    assert_eq!(tools.len(), 4);
 
     let tool_names: Vec<&str> = tools
         .iter()
@@ -123,6 +179,7 @@ async fn test_mcp_tools_list() {
     assert!(tool_names.contains(&"list_recipes"));
     assert!(tool_names.contains(&"get_recipe"));
     assert!(tool_names.contains(&"create_recipe"));
+    assert!(tool_names.contains(&"delete_recipe"));
 }
 
 #[tokio::test]

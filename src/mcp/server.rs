@@ -103,6 +103,7 @@ async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> JsonRpcRe
                 "list_recipes" => tools::handle_list_recipes(pool, arguments).await,
                 "get_recipe" => tools::handle_get_recipe(pool, arguments).await,
                 "create_recipe" => tools::handle_create_recipe(pool, arguments).await,
+                "delete_recipe" => tools::handle_delete_recipe(pool, arguments).await,
                 _ => {
                     return JsonRpcResponse::error(
                         request_id,

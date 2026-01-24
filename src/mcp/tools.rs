@@ -11,6 +11,7 @@ pub fn get_all_tools() -> Vec<ToolDefinition> {
         list_recipes_tool(),
         get_recipe_tool(),
         create_recipe_tool(),
+        delete_recipe_tool(),
     ]
 }
 
@@ -105,6 +106,24 @@ pub fn create_recipe_tool() -> ToolDefinition {
     )
 }
 
+/// Tool definition for deleting a recipe
+pub fn delete_recipe_tool() -> ToolDefinition {
+    ToolDefinition::new(
+        "delete_recipe",
+        "Delete a recipe by ID. Permanently removes the recipe and all associated data.",
+        json!({
+            "type": "object",
+            "properties": {
+                "recipe_id": {
+                    "type": "string",
+                    "description": "The UUID of the recipe to delete"
+                }
+            },
+            "required": ["recipe_id"]
+        })
+    )
+}
+
 /// Handle list_recipes tool call
 pub async fn handle_list_recipes(pool: &SqlitePool, _params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let recipes = queries::list_recipes(pool)
@@ -130,6 +149,23 @@ pub async fn handle_get_recipe(pool: &SqlitePool, params: JsonValue) -> Result<J
         })?;
 
     Ok(serde_json::to_value(recipe).map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+}
+
+/// Handle delete_recipe tool call
+pub async fn handle_delete_recipe(pool: &SqlitePool, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+    let recipe_id = params
+        .get("recipe_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid recipe_id parameter"))?;
+
+    queries::delete_recipe(pool, recipe_id)
+        .await
+        .map_err(|e| match e {
+            ApiError::NotFound(msg) => JsonRpcError::not_found(msg),
+            _ => JsonRpcError::internal_error(format!("Database error: {}", e)),
+        })?;
+
+    Ok(json!({ "status": "success", "message": format!("Recipe {} deleted", recipe_id) }))
 }
 
 /// Handle create_recipe tool call
@@ -205,7 +241,7 @@ pub async fn handle_create_recipe(pool: &SqlitePool, params: JsonValue) -> Resul
                 let duration_minutes = step.get("duration_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
                 let temperature_value = step.get("temperature_celsius").and_then(|v| v.as_i64()).map(|v| v as i32);
                 let temperature_unit = if temperature_value.is_some() {
-                    Some("celsius".to_string())
+                    Some("Celsius".to_string())
                 } else {
                     None
                 };
@@ -286,11 +322,23 @@ mod tests {
     }
 
     #[test]
+    fn test_delete_recipe_tool_schema() {
+        let tool = delete_recipe_tool();
+        assert_eq!(tool.name, "delete_recipe");
+        let required = tool.input_schema
+            .get("required")
+            .and_then(|v| v.as_array())
+            .unwrap();
+        assert!(required.iter().any(|v| v.as_str() == Some("recipe_id")));
+    }
+
+    #[test]
     fn test_get_all_tools() {
         let tools = get_all_tools();
-        assert_eq!(tools.len(), 3);
+        assert_eq!(tools.len(), 4);
         assert_eq!(tools[0].name, "list_recipes");
         assert_eq!(tools[1].name, "get_recipe");
         assert_eq!(tools[2].name, "create_recipe");
+        assert_eq!(tools[3].name, "delete_recipe");
     }
 }
