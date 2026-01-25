@@ -2,9 +2,17 @@
 
 # Environment files
 .env
+.env.*
 
 # SQLite database files
 *.db
 *.db-shm
 *.db-wal
 *.log
+
+# Secret files - NEVER commit these
+.api_key
+*.key
+*.pem
+secrets/
+credentials/

@@ -1,15 +1,22 @@
 use axum::{
+    middleware,
     routing::{delete, get, post, put},
     Router,
 };
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tower_http::{
     cors::CorsLayer,
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use recipe_vault::{config::Config, db, handlers::recipes};
+use recipe_vault::{
+    auth::{api_key_auth, load_or_generate_api_key, ApiKeyState},
+    config::Config,
+    db,
+    handlers::recipes,
+};
 
 #[tokio::main]
 async fn main() {
@@ -32,6 +39,12 @@ async fn main() {
     tracing::debug!("Database URL: {}", config.database_url);
     tracing::debug!("Bind address: {}", config.bind_address);
 
+    // Load or generate API key
+    let api_key = load_or_generate_api_key();
+    let api_key_state = ApiKeyState {
+        key: Arc::new(api_key),
+    };
+
     // Create database connection pool
     let pool = db::create_pool(&config.database_url)
         .await
@@ -44,19 +57,26 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
-    // Build router
+    // Build router with API key authentication on /api/* routes
+    let api_routes = Router::new()
+        .route("/recipes", post(recipes::create_recipe))
+        .route("/recipes", get(recipes::list_recipes))
+        .route("/recipes/:id", get(recipes::get_recipe))
+        .route("/recipes/:id", put(recipes::update_recipe))
+        .route("/recipes/:id", delete(recipes::delete_recipe))
+        .route_layer(middleware::from_fn_with_state(
+            api_key_state.clone(),
+            api_key_auth,
+        ))
+        .with_state(pool);
+
     let app = Router::new()
-        .route("/api/recipes", post(recipes::create_recipe))
-        .route("/api/recipes", get(recipes::list_recipes))
-        .route("/api/recipes/:id", get(recipes::get_recipe))
-        .route("/api/recipes/:id", put(recipes::update_recipe))
-        .route("/api/recipes/:id", delete(recipes::delete_recipe))
+        .nest("/api", api_routes)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         )
-        .layer(CorsLayer::permissive())
-        .with_state(pool);
+        .layer(CorsLayer::permissive());
 
     // Parse bind address
     let addr: SocketAddr = config
@@ -65,6 +85,7 @@ async fn main() {
         .expect("Invalid bind address");
 
     tracing::info!("Listening on http://{}", addr);
+    tracing::info!("API key authentication enabled");
 
     // Start server
     let listener = tokio::net::TcpListener::bind(addr)

@@ -30,8 +30,21 @@ fn main() {
 
     tracing::info!("API Base URL: {}", api_base_url);
 
+    // Get API key from environment (optional, but required for auth)
+    let api_key = match env::var("API_KEY") {
+        Ok(key) => {
+            tracing::info!("API key configured");
+            Some(key)
+        }
+        Err(_) => {
+            tracing::warn!("API_KEY environment variable not set - requests will fail if server requires authentication");
+            eprintln!("Warning: API_KEY not set. Set API_KEY environment variable for authenticated access.");
+            None
+        }
+    };
+
     // Create API client
-    let client = match ApiClient::new(api_base_url) {
+    let client = match ApiClient::new(api_base_url, api_key) {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("Failed to create API client: {}", e);
