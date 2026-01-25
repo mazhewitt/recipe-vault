@@ -29,7 +29,7 @@ pub struct RecipeWithDetails {
 }
 
 /// Input for creating a recipe
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateRecipeInput {
     pub title: String,
     #[serde(default)]
@@ -46,7 +46,7 @@ pub struct CreateRecipeInput {
     pub steps: Vec<CreateStepInput>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateIngredientInput {
     pub name: String,
     #[serde(default)]
@@ -57,7 +57,7 @@ pub struct CreateIngredientInput {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateStepInput {
     pub instruction: String,
     #[serde(default)]
@@ -69,7 +69,7 @@ pub struct CreateStepInput {
 }
 
 /// Input for updating a recipe
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateRecipeInput {
     #[serde(default)]
     pub title: Option<String>,

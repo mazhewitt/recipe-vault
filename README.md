@@ -9,21 +9,38 @@ A recipe management system built with Rust, featuring both a REST API and Claude
 - **SQLite Database**: Lightweight, file-based storage
 - **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, and servings
 - **Unique Titles**: Automatic enforcement of unique recipe titles
+- **Remote Access**: Run API server on one machine, use MCP from another
 
 ## Architecture
 
 Recipe Vault consists of two binaries:
 
-1. **recipe-vault** - REST API server (Axum)
+1. **recipe-vault** - REST API server (Axum) with SQLite database
 2. **recipe-vault-mcp** - MCP server for Claude Desktop (stdio/JSON-RPC 2.0)
 
-Both share the same database and business logic.
+The MCP server communicates with the API server via HTTP, enabling remote usage scenarios:
+
+```
+┌─────────────────┐       HTTP        ┌─────────────────────────────┐
+│  MCP Server     │ ───────────────▶  │  Docker Container           │
+│  (local binary) │                   │  ┌─────────────────────┐   │
+│                 │                   │  │  API Server         │   │
+│  stdio ↕        │                   │  │  (recipe-vault)     │   │
+│                 │                   │  └──────────┬──────────┘   │
+└─────────────────┘                   │             │              │
+        ↕                             │  ┌──────────▼──────────┐   │
+┌─────────────────┐                   │  │  SQLite             │   │
+│ Claude Desktop  │                   │  │  /app/data/         │   │
+└─────────────────┘                   │  └─────────────────────┘   │
+                                      └─────────────────────────────┘
+```
 
 ## Prerequisites
 
 - Rust 1.75+ (2024 edition)
 - SQLite 3
 - Claude Desktop (for MCP integration)
+- Docker (for containerized deployment)
 
 ## Getting Started
 
@@ -120,14 +137,29 @@ Add the MCP server configuration:
     "recipe-vault": {
       "command": "/absolute/path/to/recipe-vault/target/release/recipe-vault-mcp",
       "env": {
-        "DATABASE_URL": "sqlite:///absolute/path/to/recipe-vault/recipes.db"
+        "API_BASE_URL": "http://localhost:3000"
       }
     }
   }
 }
 ```
 
-**Important**: Use absolute paths, not relative paths.
+**For remote API server** (e.g., running on another machine):
+
+```json
+{
+  "mcpServers": {
+    "recipe-vault": {
+      "command": "/absolute/path/to/recipe-vault/target/release/recipe-vault-mcp",
+      "env": {
+        "API_BASE_URL": "http://192.168.1.100:3000"
+      }
+    }
+  }
+}
+```
+
+**Important**: Use absolute paths for the command, not relative paths.
 
 ### 3. Restart Claude Desktop
 
@@ -139,7 +171,7 @@ In Claude Desktop, you should see the Recipe Vault tools available. You can veri
 
 > "What recipe tools do you have available?"
 
-Claude should list four tools: `list_recipes`, `get_recipe`, `create_recipe`, and `delete_recipe`.
+Claude should list five tools: `list_recipes`, `get_recipe`, `create_recipe`, `update_recipe`, and `delete_recipe`.
 
 ### Example Usage
 
@@ -191,6 +223,22 @@ Creates a new recipe with ingredients and cooking steps.
 
 **Returns:** Created recipe with generated ID
 
+### update_recipe
+
+Updates an existing recipe. Supports partial updates or full replacement of ingredients/steps.
+
+**Parameters:**
+- `recipe_id` (string, required): The UUID of the recipe to update
+- `title` (string, optional): New recipe title
+- `description` (string, optional): New description
+- `servings` (integer, optional): New number of servings
+- `prep_time_minutes` (integer, optional): New prep time
+- `cook_time_minutes` (integer, optional): New cook time
+- `ingredients` (array, optional): New list of ingredients (replaces all existing)
+- `steps` (array, optional): New cooking instructions (replaces all existing)
+
+**Returns:** Updated recipe
+
 ### delete_recipe
 
 Deletes a recipe by ID. Permanently removes the recipe and all associated data (ingredients and steps).
@@ -202,17 +250,18 @@ Deletes a recipe by ID. Permanently removes the recipe and all associated data (
 
 ## Docker Deployment
 
-You can run Recipe Vault using Docker, which simplifies setup by including all dependencies and binaries in a single image.
+You can run the Recipe Vault API server using Docker.
 
 ### 1. Build the Image
 ```bash
 docker build -t mazhewitt/recipe-vault .
 ```
 
-### 2. Run API Server with Docker Compose
+### 2. Run the API Server
 ```bash
-docker compose up -d
+docker run -d -p 3000:3000 -v recipe-data:/app/data mazhewitt/recipe-vault
 ```
+
 The server will be available at `http://localhost:3000`. Data is persisted in a Docker volume named `recipe-data`.
 
 ### 3. Push to Docker Hub
@@ -220,49 +269,30 @@ The server will be available at `http://localhost:3000`. Data is persisted in a 
 docker push mazhewitt/recipe-vault
 ```
 
-### 4. Running the MCP Server via Docker
+### 4. Remote Setup (e.g., Mac Studio as Server)
 
-**Method 1: If API Server is Running (Recommended)**
-If you are already running the API server with Docker Compose (step 2), the best way to run the MCP server is to execute it inside the running container. This avoids file locking issues with the SQLite database.
+To run the API server on one machine (e.g., Mac Studio) and use Claude Desktop from another (e.g., laptop):
 
+**On the server machine:**
+```bash
+docker run -d -p 3000:3000 -v recipe-data:/app/data mazhewitt/recipe-vault
+```
+
+**On the client machine:**
+1. Build the MCP binary locally: `cargo build --release --bin recipe-vault-mcp`
+2. Configure Claude Desktop with the server's IP:
 ```json
 {
   "mcpServers": {
     "recipe-vault": {
-      "command": "docker",
-      "args": [
-        "exec",
-        "-i",
-        "recipe-vault-api-1",
-        "recipe-vault-mcp"
-      ]
+      "command": "/path/to/recipe-vault-mcp",
+      "env": {
+        "API_BASE_URL": "http://<server-ip>:3000"
+      }
     }
   }
 }
 ```
-
-**Method 2: Standalone Container**
-If you are *not* running the API server, or if you need to run it in a separate container (ensure the API server is stopped to avoid locks):
-
-```json
-{
-  "mcpServers": {
-    "recipe-vault": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-v",
-        "recipe-vault_recipe-data:/app/data",
-        "mazhewitt/recipe-vault",
-        "recipe-vault-mcp"
-      ]
-    }
-  }
-}
-```
-**Note**: Ensure the volume name (`recipe-vault_recipe-data`) matches the one created by Docker Compose. You can check your volumes with `docker volume ls`.
 
 ### 5. Running Docker Tests
 You can run the automated end-to-end test for the Docker setup:
@@ -281,15 +311,13 @@ cargo test
 
 # Run specific test suite
 cargo test --test recipes_test      # REST API tests
-cargo test --test mcp_server_test   # MCP protocol tests
 cargo test --lib                    # Unit tests
 ```
 
 ### Test Coverage
 
 - **13 REST API integration tests** - Testing HTTP endpoints and database operations
-- **14 MCP integration tests** - Testing JSON-RPC protocol and tool handlers
-- **5 MCP unit tests** - Testing tool schema definitions
+- **12 MCP/HTTP client unit tests** - Testing tool schemas and error mapping
 
 ### Project Structure
 
@@ -304,6 +332,7 @@ recipe-vault/
 │   ├── handlers/
 │   │   └── recipes.rs             # HTTP handlers
 │   ├── mcp/
+│   │   ├── http_client.rs         # HTTP client for API calls
 │   │   ├── protocol.rs            # JSON-RPC types
 │   │   ├── server.rs              # MCP server loop
 │   │   └── tools.rs               # Tool definitions and handlers
@@ -327,13 +356,19 @@ recipe-vault/
 1. Check Claude Desktop logs for errors
 2. Verify absolute paths in configuration
 3. Ensure the binary is executable: `chmod +x target/release/recipe-vault-mcp`
-4. Test the binary manually: `echo '{"test": true}' | ./target/release/recipe-vault-mcp`
+4. Test that the API server is reachable from the MCP server machine
+
+### API Server Unreachable
+
+1. Ensure the API server is running: `curl http://localhost:3000/api/recipes`
+2. Check firewall settings if accessing remotely
+3. Verify the `API_BASE_URL` in Claude Desktop config
 
 ### Database Errors
 
-1. Ensure the database directory exists
+1. Ensure the database directory exists (for local development)
 2. Check file permissions
-3. Verify DATABASE_URL in .env or Claude Desktop config
+3. Verify DATABASE_URL in .env file
 
 ### Port Already in Use
 

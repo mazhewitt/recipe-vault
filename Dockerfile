@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
 # Copy source code
 COPY . .
 
-# Build release binaries
-RUN cargo build --release --bin recipe-vault --bin recipe-vault-mcp
+# Build release binary (MCP server runs locally, not in container)
+RUN cargo build --release --bin recipe-vault
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -26,9 +26,8 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binaries from builder
+# Copy binary from builder
 COPY --from=builder /app/target/release/recipe-vault /usr/local/bin/recipe-vault
-COPY --from=builder /app/target/release/recipe-vault-mcp /usr/local/bin/recipe-vault-mcp
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data

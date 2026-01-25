@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::{
     error::{ApiError, ApiResult},
     models::{
-        recipe::{CreateIngredientInput, CreateRecipeInput, CreateStepInput, UpdateRecipeInput},
+        recipe::{CreateRecipeInput, UpdateRecipeInput},
         RecipeIngredient, Recipe, RecipeWithDetails, Step,
     },
 };

@@ -1,12 +1,12 @@
+use crate::mcp::http_client::ApiClient;
 use crate::mcp::protocol::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 use crate::mcp::tools;
-use serde_json::{json, Value as JsonValue};
-use sqlx::SqlitePool;
+use serde_json::json;
 use std::io::{self, BufRead, Write};
 use tracing::{error, info, warn};
 
 /// Run the MCP server, reading JSON-RPC requests from stdin and writing responses to stdout
-pub async fn run_server(pool: SqlitePool) -> io::Result<()> {
+pub fn run_server(client: ApiClient) -> io::Result<()> {
     info!("MCP server starting, listening on stdin...");
 
     let stdin = io::stdin();
@@ -44,7 +44,7 @@ pub async fn run_server(pool: SqlitePool) -> io::Result<()> {
         info!("Received request: method={}, id={:?}", request.method, request.id);
 
         // Handle the request
-        let response = handle_request(&pool, request).await;
+        let response = handle_request(&client, request);
 
         // Write response only if it's not a notification (has an ID)
         if let Some(response) = response {
@@ -57,7 +57,7 @@ pub async fn run_server(pool: SqlitePool) -> io::Result<()> {
 }
 
 /// Handle a JSON-RPC request and return a response (None for notifications)
-async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> Option<JsonRpcResponse> {
+fn handle_request(client: &ApiClient, request: JsonRpcRequest) -> Option<JsonRpcResponse> {
     let request_id = request.id?;
 
     Some(match request.method.as_str() {
@@ -102,11 +102,11 @@ async fn handle_request(pool: &SqlitePool, request: JsonRpcRequest) -> Option<Js
             let arguments = request.params.get("arguments").cloned().unwrap_or(json!({}));
 
             let result = match tool_name {
-                "list_recipes" => tools::handle_list_recipes(pool, arguments).await,
-                "get_recipe" => tools::handle_get_recipe(pool, arguments).await,
-                "create_recipe" => tools::handle_create_recipe(pool, arguments).await,
-                "update_recipe" => tools::handle_update_recipe(pool, arguments).await,
-                "delete_recipe" => tools::handle_delete_recipe(pool, arguments).await,
+                "list_recipes" => tools::handle_list_recipes(client, arguments),
+                "get_recipe" => tools::handle_get_recipe(client, arguments),
+                "create_recipe" => tools::handle_create_recipe(client, arguments),
+                "update_recipe" => tools::handle_update_recipe(client, arguments),
+                "delete_recipe" => tools::handle_delete_recipe(client, arguments),
                 _ => {
                     return Some(JsonRpcResponse::error(
                         request_id,

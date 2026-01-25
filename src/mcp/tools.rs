@@ -1,9 +1,7 @@
-use crate::db::queries;
-use crate::error::ApiError;
-use crate::models::recipe::{CreateRecipeInput, CreateIngredientInput, CreateStepInput, UpdateRecipeInput};
+use crate::mcp::http_client::ApiClient;
 use crate::mcp::protocol::{JsonRpcError, ToolDefinition};
+use crate::models::recipe::{CreateIngredientInput, CreateRecipeInput, CreateStepInput, UpdateRecipeInput};
 use serde_json::{json, Value as JsonValue};
-use sqlx::SqlitePool;
 
 /// Get all available MCP tool definitions
 pub fn get_all_tools() -> Vec<ToolDefinition> {
@@ -191,34 +189,25 @@ pub fn delete_recipe_tool() -> ToolDefinition {
 }
 
 /// Handle list_recipes tool call
-pub async fn handle_list_recipes(pool: &SqlitePool, _params: JsonValue) -> Result<JsonValue, JsonRpcError> {
-    let recipes = queries::list_recipes(pool)
-        .await
-        .map_err(|e| JsonRpcError::internal_error(format!("Database error: {}", e)))?;
-
+pub fn handle_list_recipes(client: &ApiClient, _params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+    let recipes = client.list_recipes()?;
     Ok(json!(recipes))
 }
 
 /// Handle get_recipe tool call
-pub async fn handle_get_recipe(pool: &SqlitePool, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+pub fn handle_get_recipe(client: &ApiClient, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let recipe_id = params
         .get("recipe_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid recipe_id parameter"))?;
 
-    let recipe = queries::get_recipe(pool, recipe_id)
-        .await
-        .map_err(|e| match e {
-            ApiError::NotFound(msg) => JsonRpcError::not_found(msg),
-            ApiError::Validation(msg) => JsonRpcError::invalid_params(msg),
-            _ => JsonRpcError::internal_error(format!("Database error: {}", e)),
-        })?;
-
-    Ok(serde_json::to_value(recipe).map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+    let recipe = client.get_recipe(recipe_id)?;
+    Ok(serde_json::to_value(recipe)
+        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
 }
 
 /// Handle update_recipe tool call
-pub async fn handle_update_recipe(pool: &SqlitePool, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+pub fn handle_update_recipe(client: &ApiClient, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let recipe_id = params
         .get("recipe_id")
         .and_then(|v| v.as_str())
@@ -226,60 +215,14 @@ pub async fn handle_update_recipe(pool: &SqlitePool, params: JsonValue) -> Resul
 
     // Parse ingredients if provided
     let ingredients = if let Some(ingredients_array) = params.get("ingredients").and_then(|v| v.as_array()) {
-        Some(ingredients_array
-            .iter()
-            .enumerate()
-            .map(|(idx, ing)| {
-                let name = ing
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| JsonRpcError::invalid_params(format!("Ingredient {} missing name", idx)))?
-                    .to_string();
-
-                let quantity = ing.get("quantity").and_then(|v| v.as_f64());
-                let unit = ing.get("unit").and_then(|v| v.as_str()).map(|s| s.to_string());
-                let notes = ing.get("notes").and_then(|v| v.as_str()).map(|s| s.to_string());
-
-                Ok(CreateIngredientInput {
-                    name,
-                    quantity,
-                    unit,
-                    notes,
-                })
-            })
-            .collect::<Result<Vec<_>, JsonRpcError>>()?)
+        Some(parse_ingredients(ingredients_array)?)
     } else {
         None
     };
 
     // Parse steps if provided
     let steps = if let Some(steps_array) = params.get("steps").and_then(|v| v.as_array()) {
-        Some(steps_array
-            .iter()
-            .enumerate()
-            .map(|(idx, step)| {
-                let instruction = step
-                    .get("instruction")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| JsonRpcError::invalid_params(format!("Step {} missing instruction", idx)))?
-                    .to_string();
-
-                let duration_minutes = step.get("duration_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
-                let temperature_value = step.get("temperature_celsius").and_then(|v| v.as_i64()).map(|v| v as i32);
-                let temperature_unit = if temperature_value.is_some() {
-                    Some("Celsius".to_string())
-                } else {
-                    None
-                };
-
-                Ok(CreateStepInput {
-                    instruction,
-                    duration_minutes,
-                    temperature_value,
-                    temperature_unit,
-                })
-            })
-            .collect::<Result<Vec<_>, JsonRpcError>>()?)
+        Some(parse_steps(steps_array)?)
     } else {
         None
     };
@@ -294,38 +237,24 @@ pub async fn handle_update_recipe(pool: &SqlitePool, params: JsonValue) -> Resul
         steps,
     };
 
-    let recipe = queries::update_recipe(pool, recipe_id, update_input)
-        .await
-        .map_err(|e| match e {
-            ApiError::NotFound(msg) => JsonRpcError::not_found(msg),
-            ApiError::Conflict(msg) => JsonRpcError::conflict(msg),
-            ApiError::Validation(msg) => JsonRpcError::invalid_params(msg),
-            _ => JsonRpcError::internal_error(format!("Database error: {}", e)),
-        })?;
-
-    Ok(serde_json::to_value(recipe).map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+    let recipe = client.update_recipe(recipe_id, update_input)?;
+    Ok(serde_json::to_value(recipe)
+        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
 }
 
 /// Handle delete_recipe tool call
-pub async fn handle_delete_recipe(pool: &SqlitePool, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+pub fn handle_delete_recipe(client: &ApiClient, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let recipe_id = params
         .get("recipe_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid recipe_id parameter"))?;
 
-    queries::delete_recipe(pool, recipe_id)
-        .await
-        .map_err(|e| match e {
-            ApiError::NotFound(msg) => JsonRpcError::not_found(msg),
-            _ => JsonRpcError::internal_error(format!("Database error: {}", e)),
-        })?;
-
+    client.delete_recipe(recipe_id)?;
     Ok(json!({ "status": "success", "message": format!("Recipe {} deleted", recipe_id) }))
 }
 
 /// Handle create_recipe tool call
-pub async fn handle_create_recipe(pool: &SqlitePool, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
-    // Parse the CreateRecipe from params
+pub fn handle_create_recipe(client: &ApiClient, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let title = params
         .get("title")
         .and_then(|v| v.as_str())
@@ -338,77 +267,27 @@ pub async fn handle_create_recipe(pool: &SqlitePool, params: JsonValue) -> Resul
         .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid description parameter"))?
         .to_string();
 
-    let servings = params
-        .get("servings")
-        .and_then(|v| v.as_i64())
-        .map(|v| v as i32);
+    let servings = params.get("servings").and_then(|v| v.as_i64()).map(|v| v as i32);
+    let prep_time_minutes = params.get("prep_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
+    let cook_time_minutes = params.get("cook_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
 
-    let prep_time_minutes = params
-        .get("prep_time_minutes")
-        .and_then(|v| v.as_i64())
-        .map(|v| v as i32);
-
-    let cook_time_minutes = params
-        .get("cook_time_minutes")
-        .and_then(|v| v.as_i64())
-        .map(|v| v as i32);
+    // Validate servings if provided
+    if let Some(s) = servings {
+        if s <= 0 {
+            return Err(JsonRpcError::invalid_params("Servings must be greater than 0"));
+        }
+    }
 
     // Parse ingredients
     let ingredients = if let Some(ingredients_array) = params.get("ingredients").and_then(|v| v.as_array()) {
-        ingredients_array
-            .iter()
-            .enumerate()
-            .map(|(idx, ing)| {
-                let name = ing
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| JsonRpcError::invalid_params(format!("Ingredient {} missing name", idx)))?
-                    .to_string();
-
-                let quantity = ing.get("quantity").and_then(|v| v.as_f64());
-                let unit = ing.get("unit").and_then(|v| v.as_str()).map(|s| s.to_string());
-                let notes = ing.get("notes").and_then(|v| v.as_str()).map(|s| s.to_string());
-
-                Ok(CreateIngredientInput {
-                    name,
-                    quantity,
-                    unit,
-                    notes,
-                })
-            })
-            .collect::<Result<Vec<_>, JsonRpcError>>()?
+        parse_ingredients(ingredients_array)?
     } else {
         vec![]
     };
 
     // Parse steps
     let steps = if let Some(steps_array) = params.get("steps").and_then(|v| v.as_array()) {
-        steps_array
-            .iter()
-            .enumerate()
-            .map(|(idx, step)| {
-                let instruction = step
-                    .get("instruction")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| JsonRpcError::invalid_params(format!("Step {} missing instruction", idx)))?
-                    .to_string();
-
-                let duration_minutes = step.get("duration_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
-                let temperature_value = step.get("temperature_celsius").and_then(|v| v.as_i64()).map(|v| v as i32);
-                let temperature_unit = if temperature_value.is_some() {
-                    Some("Celsius".to_string())
-                } else {
-                    None
-                };
-
-                Ok(CreateStepInput {
-                    instruction,
-                    duration_minutes,
-                    temperature_value,
-                    temperature_unit,
-                })
-            })
-            .collect::<Result<Vec<_>, JsonRpcError>>()?
+        parse_steps(steps_array)?
     } else {
         vec![]
     };
@@ -423,23 +302,65 @@ pub async fn handle_create_recipe(pool: &SqlitePool, params: JsonValue) -> Resul
         steps,
     };
 
-    // Validate servings if provided
-    if let Some(s) = create_recipe.servings {
-        if s <= 0 {
-            return Err(JsonRpcError::invalid_params("Servings must be greater than 0"));
-        }
-    }
+    let recipe = client.create_recipe(create_recipe)?;
+    Ok(serde_json::to_value(recipe)
+        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+}
 
-    // Create the recipe
-    let recipe = queries::create_recipe(pool, create_recipe)
-        .await
-        .map_err(|e| match e {
-            ApiError::Conflict(msg) => JsonRpcError::conflict(msg),
-            ApiError::Validation(msg) => JsonRpcError::invalid_params(msg),
-            _ => JsonRpcError::internal_error(format!("Database error: {}", e)),
-        })?;
+/// Parse ingredients from JSON array
+fn parse_ingredients(ingredients_array: &[JsonValue]) -> Result<Vec<CreateIngredientInput>, JsonRpcError> {
+    ingredients_array
+        .iter()
+        .enumerate()
+        .map(|(idx, ing)| {
+            let name = ing
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError::invalid_params(format!("Ingredient {} missing name", idx)))?
+                .to_string();
 
-    Ok(serde_json::to_value(recipe).map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+            let quantity = ing.get("quantity").and_then(|v| v.as_f64());
+            let unit = ing.get("unit").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let notes = ing.get("notes").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+            Ok(CreateIngredientInput {
+                name,
+                quantity,
+                unit,
+                notes,
+            })
+        })
+        .collect()
+}
+
+/// Parse steps from JSON array
+fn parse_steps(steps_array: &[JsonValue]) -> Result<Vec<CreateStepInput>, JsonRpcError> {
+    steps_array
+        .iter()
+        .enumerate()
+        .map(|(idx, step)| {
+            let instruction = step
+                .get("instruction")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError::invalid_params(format!("Step {} missing instruction", idx)))?
+                .to_string();
+
+            let duration_minutes = step.get("duration_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
+            let temperature_value = step.get("temperature_celsius").and_then(|v| v.as_i64()).map(|v| v as i32);
+            let temperature_unit = if temperature_value.is_some() {
+                Some("Celsius".to_string())
+            } else {
+                None
+            };
+
+            Ok(CreateStepInput {
+                instruction,
+                duration_minutes,
+                temperature_value,
+                temperature_unit,
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -508,5 +429,33 @@ mod tests {
         assert_eq!(tools[2].name, "create_recipe");
         assert_eq!(tools[3].name, "update_recipe");
         assert_eq!(tools[4].name, "delete_recipe");
+    }
+
+    #[test]
+    fn test_parse_ingredients() {
+        let ingredients = vec![
+            json!({"name": "flour", "quantity": 2.0, "unit": "cups"}),
+            json!({"name": "salt"}),
+        ];
+        let parsed = parse_ingredients(&ingredients).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].name, "flour");
+        assert_eq!(parsed[0].quantity, Some(2.0));
+        assert_eq!(parsed[1].name, "salt");
+        assert_eq!(parsed[1].quantity, None);
+    }
+
+    #[test]
+    fn test_parse_steps() {
+        let steps = vec![
+            json!({"instruction": "Mix ingredients", "duration_minutes": 5}),
+            json!({"instruction": "Bake", "duration_minutes": 30, "temperature_celsius": 180}),
+        ];
+        let parsed = parse_steps(&steps).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].instruction, "Mix ingredients");
+        assert_eq!(parsed[0].duration_minutes, Some(5));
+        assert_eq!(parsed[1].temperature_value, Some(180));
+        assert_eq!(parsed[1].temperature_unit, Some("Celsius".to_string()));
     }
 }
