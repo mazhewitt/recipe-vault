@@ -16,3 +16,9 @@
 *.pem
 secrets/
 credentials/
+
+.claude/commands/opsx/
+.claude/skills/
+.gemini/commands/opsx/
+.gemini/skills/
+.github/

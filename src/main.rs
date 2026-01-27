@@ -15,7 +15,7 @@ use recipe_vault::{
     auth::{api_key_auth, load_or_generate_api_key, ApiKeyState},
     config::Config,
     db,
-    handlers::recipes,
+    handlers::{chat, recipes, ui},
 };
 
 #[tokio::main]
@@ -41,6 +41,7 @@ async fn main() {
 
     // Load or generate API key
     let api_key = load_or_generate_api_key();
+    let api_key_for_chat = api_key.clone();
     let api_key_state = ApiKeyState {
         key: Arc::new(api_key),
     };
@@ -57,20 +58,35 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
-    // Build router with API key authentication on /api/* routes
-    let api_routes = Router::new()
+    // Create chat state with AI agent
+    let chat_state = chat::ChatState::new(config.clone(), api_key_for_chat);
+
+    // Build recipe routes with database state
+    let recipe_routes = Router::new()
         .route("/recipes", post(recipes::create_recipe))
         .route("/recipes", get(recipes::list_recipes))
         .route("/recipes/:id", get(recipes::get_recipe))
         .route("/recipes/:id", put(recipes::update_recipe))
         .route("/recipes/:id", delete(recipes::delete_recipe))
+        .with_state(pool);
+
+    // Build chat routes with chat state
+    let chat_routes = Router::new()
+        .route("/chat", post(chat::chat))
+        .route("/chat/reset", post(chat::reset_conversation))
+        .with_state(chat_state);
+
+    // Combine API routes with authentication
+    let api_routes = Router::new()
+        .merge(recipe_routes)
+        .merge(chat_routes)
         .route_layer(middleware::from_fn_with_state(
             api_key_state.clone(),
             api_key_auth,
-        ))
-        .with_state(pool);
+        ));
 
     let app = Router::new()
+        .route("/chat", get(ui::chat_page))
         .nest("/api", api_routes)
         .layer(
             TraceLayer::new_for_http()

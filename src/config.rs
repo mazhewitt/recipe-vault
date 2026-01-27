@@ -4,6 +4,8 @@ use std::env;
 pub struct Config {
     pub database_url: String,
     pub bind_address: String,
+    pub anthropic_api_key: String,
+    pub ai_model: String,
 }
 
 impl Config {
@@ -14,9 +16,17 @@ impl Config {
         let bind_address = env::var("BIND_ADDRESS")
             .unwrap_or_else(|_| "127.0.0.1:3000".to_string());
 
+        let anthropic_api_key = env::var("ANTHROPIC_API_KEY")
+            .map_err(|_| "ANTHROPIC_API_KEY must be set".to_string())?;
+
+        let ai_model = env::var("AI_MODEL")
+            .unwrap_or_else(|_| "claude-sonnet-4-5".to_string());
+
         Ok(Config {
             database_url,
             bind_address,
+            anthropic_api_key,
+            ai_model,
         })
     }
 }

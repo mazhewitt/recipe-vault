@@ -11,6 +11,47 @@ A recipe management system built with Rust, featuring both a REST API and Claude
 - **Unique Titles**: Automatic enforcement of unique recipe titles
 - **Remote Access**: Run API server on one machine, use MCP from another
 - **API Key Authentication**: Secure API access with auto-generated keys
+- **Web Chat Interface**: Browser-based chat with AI assistant (Claude/OpenAI)
+
+## Web Chat Interface
+
+Recipe Vault includes a web-based chat interface that lets you manage recipes through natural language conversation, just like Claude Desktop but in your browser.
+
+### Setup
+
+1. **Set your Anthropic API key** in `.env`:
+   ```
+   ANTHROPIC_API_KEY=your-anthropic-api-key-here
+   AI_MODEL=claude-sonnet-4-5  # Optional, defaults to claude-sonnet-4-5
+   ```
+
+2. **Build and run** the server:
+   ```bash
+   cargo build --release
+   ./target/release/recipe-vault
+   ```
+
+3. **Open** `http://localhost:3000/chat` in your browser
+
+4. **Enter your API key** when prompted (the Recipe Vault API key, not Anthropic)
+
+### Features
+
+- **Real-time streaming** - Responses stream as they're generated
+- **Tool use indicators** - See when the AI is searching or creating recipes
+- **Conversation context** - Follow-up questions understand previous context
+- **Mobile responsive** - Works on phones and tablets
+- **Model agnostic** - Supports both Anthropic Claude and OpenAI (configure via `AI_MODEL`)
+
+### Example Conversations
+
+> "What recipes do I have?"
+
+> "Show me the chocolate chip cookies recipe"
+
+> "Create a new recipe for banana bread with 3 bananas, 2 cups flour, and 1 cup sugar"
+
+> "How long does it take to make?" (follows up on previous recipe)
 
 ## Architecture
 
@@ -388,13 +429,19 @@ cargo test --lib                    # Unit tests
 ```
 recipe-vault/
 ├── src/
+│   ├── ai/
+│   │   ├── client.rs              # AI agent with MCP integration
+│   │   ├── llm.rs                 # LLM provider abstraction (Anthropic/OpenAI)
+│   │   └── mod.rs                 # AI module exports
 │   ├── bin/
 │   │   └── recipe_vault_mcp.rs    # MCP server binary
 │   ├── db/
 │   │   ├── connection.rs          # Database connection
 │   │   └── queries.rs             # Database queries
 │   ├── handlers/
-│   │   └── recipes.rs             # HTTP handlers
+│   │   ├── chat.rs                # Chat API with SSE streaming
+│   │   ├── recipes.rs             # Recipe CRUD handlers
+│   │   └── ui.rs                  # Web UI pages
 │   ├── mcp/
 │   │   ├── http_client.rs         # HTTP client for API calls
 │   │   ├── protocol.rs            # JSON-RPC types
@@ -404,6 +451,7 @@ recipe-vault/
 │   │   ├── recipe.rs              # Recipe models
 │   │   ├── ingredient.rs          # Ingredient models
 │   │   └── step.rs                # Step models
+│   ├── auth.rs                    # API key authentication
 │   ├── config.rs                  # Configuration
 │   ├── error.rs                   # Error types
 │   ├── lib.rs                     # Library exports
