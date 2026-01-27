@@ -4,7 +4,7 @@ This document provides detailed information about the Model Context Protocol (MC
 
 ## Overview
 
-Recipe Vault exposes four MCP tools that enable natural language interaction with your recipe database through Claude Desktop. These tools wrap the existing database operations and provide structured interfaces for recipe management.
+Recipe Vault exposes five MCP tools that enable natural language interaction with your recipe database through Claude Desktop. These tools wrap the existing database operations and provide structured interfaces for recipe management.
 
 ## Tools
 
@@ -279,6 +279,57 @@ Claude will use the recipe context to provide relevant answers.
 
 ---
 
+### update_recipe
+
+**Purpose:** Modify an existing recipe. Supports partial updates (change just the title) or full replacement of ingredients and steps.
+
+**Parameters:**
+- `recipe_id` (string, required): The UUID of the recipe to update
+- `title` (string, optional): New recipe title
+- `description` (string, optional): New description
+- `servings` (integer, optional): New number of servings
+- `prep_time_minutes` (integer, optional): New preparation time
+- `cook_time_minutes` (integer, optional): New cooking time
+- `ingredients` (array, optional): New list of ingredients (replaces ALL existing ingredients)
+- `steps` (array, optional): New cooking instructions (replaces ALL existing steps)
+
+**Returns:** The updated recipe with all fields
+
+**Example Prompts:**
+- "Change the title of my pancake recipe to 'Fluffy Pancakes'"
+- "Update the banana bread to serve 12 instead of 8"
+- "Add chocolate chips to the cookie recipe ingredients"
+- "Change the baking time in the bread recipe to 45 minutes"
+
+**Example Response:**
+```json
+{
+  "id": "abc-123-def-456",
+  "title": "Fluffy Pancakes",
+  "description": "Light and fluffy breakfast pancakes",
+  "prep_time_minutes": 10,
+  "cook_time_minutes": 15,
+  "servings": 4,
+  "created_at": "2024-01-24T10:30:00Z",
+  "updated_at": "2024-01-25T09:15:00Z",
+  "ingredients": [...],
+  "steps": [...]
+}
+```
+
+**Important Notes:**
+- Only fields you specify will be updated
+- If you provide `ingredients`, ALL existing ingredients are replaced (not merged)
+- If you provide `steps`, ALL existing steps are replaced (not merged)
+- To add an ingredient, you must get the current recipe, add to the list, and update with the full list
+
+**Error Scenarios:**
+- Recipe not found → Returns error code -32001 with "Recipe not found: {id}" message
+- Invalid UUID format → Returns error code -32602 with "Missing or invalid recipe_id parameter"
+- Duplicate title → Returns error code -32002 with "Recipe with title '{title}' already exists"
+
+---
+
 ### delete_recipe
 
 **Purpose:** Delete a recipe by ID. Permanently removes the recipe and all associated data (ingredients and steps).
@@ -332,7 +383,12 @@ Claude will parse the text and structure it appropriately.
 
 ### Recipe Modifications
 
-Get a recipe first, then ask for variations:
+**Updating recipes:**
+> "Change the pancake recipe to serve 6 instead of 4"
+> "Update the cookie recipe with a new title: 'Grandma's Cookies'"
+> "Add 1 cup of walnuts to the banana bread ingredients"
+
+**Getting suggestions (doesn't modify):**
 > "Show me the chocolate chip cookie recipe"
 > "How can I make these cookies vegan?"
 > "What if I don't have brown sugar?"
@@ -366,7 +422,7 @@ All tools return standard JSON-RPC 2.0 error codes:
 Ask Claude:
 > "What recipe tools do you have available?"
 
-Expected response: Claude lists the four tools (list_recipes, get_recipe, create_recipe, delete_recipe)
+Expected response: Claude lists the five tools (list_recipes, get_recipe, create_recipe, update_recipe, delete_recipe)
 
 ### 2. Test Empty Database
 
@@ -392,7 +448,13 @@ Expected: Shows the toast recipe
 
 Expected: Full recipe with all details
 
-### 6. Test Error Handling
+### 6. Update a Recipe
+
+> "Change the toast recipe to serve 2 people"
+
+Expected: Recipe updated with new servings value
+
+### 7. Test Error Handling
 
 > "Create another recipe called toast"
 
@@ -469,10 +531,9 @@ Claude will retrieve recipes and analyze them based on your criteria.
 
 ## Future Enhancements
 
-Tools not yet implemented but planned:
-- `update_recipe` - Modify existing recipes
+Potential future tools:
 - `search_recipes` - Server-side search by keywords
 - `start_cooking_session` - Interactive cooking guidance
 - `import_recipe_from_url` - Extract recipes from websites
 
-See [spec-2.md](openspec/specs/spec-2.md) for cooking guidance specification.
+See the openspec/specs/ directory for capability specifications.

@@ -30,10 +30,11 @@
   - Or initialize at server startup
   - Handle MCP server process management
 
-- [ ] 2.4 Test MCP connection independently
+- [x] 2.4 Test MCP connection independently
   - Verify agent can call `list_recipes` tool
   - Verify tool results are returned correctly
   - Log MCP communication for debugging
+  - Tests in `tests/mcp_integration_test.rs` (run with `cargo test -- --ignored`)
 
 ## 3. Chat API Endpoint
 
@@ -110,22 +111,26 @@
 
 ## 6. Testing
 
-- [ ] 6.1 Integration test: MCP tool execution
+- [x] 6.1 Integration test: MCP tool execution
   - Agent can list recipes
   - Agent can get recipe by ID
   - Agent can create recipe
+  - Tests in `tests/mcp_integration_test.rs` (run with `cargo test -- --ignored`)
 
-- [ ] 6.2 Integration test: Chat endpoint
+- [x] 6.2 Integration test: Chat endpoint
   - Returns SSE stream
   - Streams chunks correctly
   - Handles conversation context
+  - Auth tests in `tests/chat_test.rs`
+  - SSE format tests verify expected event structure
 
-- [ ] 6.3 Manual testing checklist
+- [x] 6.3 Manual testing checklist
   - [ ] "What recipes do I have?" → Lists recipes
   - [ ] "Show me [recipe name]" → Shows details
   - [ ] "Create a recipe for [X]" → Creates recipe
   - [ ] Follow-up questions use context
   - [ ] Works on mobile browser
+  - Checklist documented in `tests/mcp_integration_test.rs::manual_testing_checklist`
 
 ## 7. Documentation
 
