@@ -12,11 +12,11 @@ RUN apt-get update && apt-get install -y \
 # Copy source code
 COPY . .
 
-# Build release binary (MCP server runs locally, not in container)
-RUN cargo build --release --bin recipe-vault
+# Build release binaries (both API server and MCP server)
+RUN cargo build --release --bin recipe-vault --bin recipe-vault-mcp
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Runtime stage - use same base as builder for glibc compatibility
+FROM debian:trixie-slim
 
 WORKDIR /app
 
@@ -26,13 +26,15 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binary from builder
+# Copy binaries from builder
 COPY --from=builder /app/target/release/recipe-vault /usr/local/bin/recipe-vault
+COPY --from=builder /app/target/release/recipe-vault-mcp /usr/local/bin/recipe-vault-mcp
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
 ENV DATABASE_URL=sqlite:///app/data/recipes.db?mode=rwc
 ENV BIND_ADDRESS=0.0.0.0:3000
+ENV MCP_BINARY_PATH=/usr/local/bin/recipe-vault-mcp
 
 EXPOSE 3000
 

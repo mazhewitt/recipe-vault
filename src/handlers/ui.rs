@@ -15,6 +15,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
     <title>Recipe Vault - Chat</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -97,6 +98,64 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .message.streaming {
             opacity: 0.8;
+        }
+
+        /* Markdown styles for assistant messages */
+        .message.assistant h1,
+        .message.assistant h2,
+        .message.assistant h3,
+        .message.assistant h4 {
+            margin: 0.75rem 0 0.5rem 0;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .message.assistant h1:first-child,
+        .message.assistant h2:first-child,
+        .message.assistant h3:first-child,
+        .message.assistant h4:first-child {
+            margin-top: 0;
+        }
+
+        .message.assistant h1 { font-size: 1.3rem; }
+        .message.assistant h2 { font-size: 1.15rem; }
+        .message.assistant h3 { font-size: 1.05rem; }
+        .message.assistant h4 { font-size: 1rem; }
+
+        .message.assistant p {
+            margin: 0.5rem 0;
+        }
+
+        .message.assistant p:first-child {
+            margin-top: 0;
+        }
+
+        .message.assistant p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message.assistant ul,
+        .message.assistant ol {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .message.assistant li {
+            margin: 0.25rem 0;
+        }
+
+        .message.assistant strong {
+            font-weight: 600;
+        }
+
+        .message.assistant em {
+            font-style: italic;
+        }
+
+        .message.assistant hr {
+            border: none;
+            border-top: 1px solid #ccc;
+            margin: 0.75rem 0;
         }
 
         .input-area {
@@ -271,11 +330,36 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             messages.scrollTop = messages.scrollHeight;
         }
 
+        function renderMarkdown(text) {
+            try {
+                if (typeof marked !== 'undefined' && marked.parse) {
+                    return marked.parse(text);
+                }
+            } catch (e) {
+                console.error('Markdown parsing error:', e);
+            }
+            // Fallback: basic markdown rendering
+            return text
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+                .replace(/\n/g, '<br>');
+        }
+
         function addMessage(content, role, isStreaming = false) {
             const messages = document.getElementById('messages');
             const div = document.createElement('div');
             div.className = `message ${role}` + (isStreaming ? ' streaming' : '');
-            div.textContent = content;
+            // Use markdown rendering for assistant messages, plain text for user
+            if (role === 'assistant') {
+                div.innerHTML = renderMarkdown(content);
+            } else {
+                div.textContent = content;
+            }
             if (isStreaming) {
                 div.id = 'streaming-message';
             }
@@ -287,7 +371,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         function updateStreamingMessage(content) {
             let msg = document.getElementById('streaming-message');
             if (msg) {
-                msg.textContent = content;
+                msg.innerHTML = renderMarkdown(content);
             } else {
                 msg = addMessage(content, 'assistant', true);
             }

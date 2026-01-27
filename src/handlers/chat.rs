@@ -45,7 +45,8 @@ impl ChatState {
             );
 
             let agent_config = AiAgentConfig {
-                mcp_binary_path: "./target/release/recipe-vault-mcp".to_string(),
+                mcp_binary_path: std::env::var("MCP_BINARY_PATH")
+                    .unwrap_or_else(|_| "./target/release/recipe-vault-mcp".to_string()),
                 api_base_url: format!(
                     "http://127.0.0.1:{}",
                     self.config.bind_address.split(':').last().unwrap_or("3000")
@@ -54,8 +55,23 @@ impl ChatState {
                 system_prompt: Some(
                     "You are a helpful cooking assistant with access to a recipe database. \
                      You can list recipes, get recipe details, create new recipes, update existing ones, \
-                     and delete recipes. Use the available tools to help users manage their recipes. \
-                     Be concise and helpful in your responses."
+                     and delete recipes. Use the available tools to help users manage their recipes.\n\n\
+                     ## Formatting Guidelines\n\n\
+                     Always use markdown formatting for clear, readable responses:\n\n\
+                     **When listing multiple recipes:**\n\
+                     1. **Recipe Title** - Brief description\n\
+                        - Prep: X min | Cook: Y min | Servings: Z\n\n\
+                     **When showing a single recipe's details:**\n\
+                     ## Recipe Title\n\n\
+                     Description of the dish.\n\n\
+                     **Prep Time:** X min | **Cook Time:** Y min | **Servings:** Z\n\n\
+                     ### Ingredients\n\
+                     - Quantity unit ingredient (notes)\n\
+                     - Quantity unit ingredient\n\n\
+                     ### Instructions\n\
+                     1. First step\n\
+                     2. Second step\n\n\
+                     Use **bold** for emphasis, bullet lists for ingredients, and numbered lists for steps."
                         .to_string(),
                 ),
             };
