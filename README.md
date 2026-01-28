@@ -82,6 +82,7 @@ Create a `.env` file:
 ```bash
 # Required for web chat
 ANTHROPIC_API_KEY=your-anthropic-api-key
+FAMILY_PASSWORD=your-secret-family-password
 
 # Optional
 DATABASE_URL=sqlite://recipes.db
@@ -105,13 +106,14 @@ The web chat provides a browser-based AI assistant for managing recipes through 
 
 ### Setup
 
-1. Set `ANTHROPIC_API_KEY` in `.env`
+1. Set `ANTHROPIC_API_KEY` and `FAMILY_PASSWORD` in `.env`
 2. Start the server
 3. Open `http://localhost:3000/chat`
-4. Enter your Recipe Vault API key when prompted
+4. Log in with your family password
 
 ### Features
 
+- **Secure Access** - Password-protected access for the whole family
 - **Real-time streaming** - Responses stream as they're generated
 - **Tool use indicators** - See when the AI is searching or creating recipes
 - **Conversation context** - Follow-up questions understand previous context
@@ -139,7 +141,10 @@ AI: [Calls create_recipe] I've created a new Pancakes recipe for you...
 
 ### Authentication
 
-All `/api/*` endpoints require the `X-API-Key` header.
+All `/api/*` endpoints require authentication.
+
+1.  **API Key**: Include the `X-API-Key` header (Standard for API clients/MCP).
+2.  **Session Cookie**: Include a valid `rv_session` cookie (Standard for Web UI).
 
 **First startup**: The server generates a 32-character API key and prints it to stdout.
 

@@ -1474,6 +1474,7 @@ dependencies = [
  "rstest_reuse",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "thiserror",
  "tokio",

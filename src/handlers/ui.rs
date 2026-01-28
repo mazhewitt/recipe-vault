@@ -1,11 +1,325 @@
 use axum::{
-    response::{Html, IntoResponse},
+    extract::State,
+    http::{header::SET_COOKIE, HeaderMap, StatusCode},
+    response::{Html, IntoResponse, Redirect, Response},
+    Form,
 };
+use serde::Deserialize;
+use std::sync::Arc;
 
-/// GET /chat - Render the chat page
-pub async fn chat_page() -> impl IntoResponse {
-    Html(CHAT_PAGE_HTML)
+use crate::auth::{clear_session_cookie, create_session_cookie, validate_session_cookie};
+
+/// Shared state for UI handlers
+#[derive(Clone)]
+pub struct UiState {
+    pub family_password: Option<Arc<String>>,
 }
+
+#[derive(Deserialize)]
+pub struct LoginForm {
+    password: String,
+}
+
+/// GET /chat - Render the chat page or login form
+pub async fn chat_page(
+    State(state): State<UiState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    // Check if user has valid session
+    let has_valid_session = if let Some(ref password) = state.family_password {
+        headers
+            .get("Cookie")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|cookies| extract_cookie(cookies, "rv_session"))
+            .map(|session| validate_session_cookie(&session, password))
+            .unwrap_or(false)
+    } else {
+        // No family password configured - web auth disabled
+        false
+    };
+
+    if has_valid_session {
+        Html(CHAT_PAGE_HTML)
+    } else if state.family_password.is_some() {
+        Html(LOGIN_PAGE_HTML)
+    } else {
+        // No family password configured - show message
+        Html(NO_AUTH_CONFIGURED_HTML)
+    }
+}
+
+/// POST /login - Validate password and set session cookie
+pub async fn login(
+    State(state): State<UiState>,
+    Form(form): Form<LoginForm>,
+) -> Response {
+    let Some(ref password) = state.family_password else {
+        return (StatusCode::SERVICE_UNAVAILABLE, "Family password not configured").into_response();
+    };
+
+    if form.password == **password {
+        // Valid password - set cookie and redirect
+        let cookie = create_session_cookie(password);
+        let mut headers = HeaderMap::new();
+        headers.insert(SET_COOKIE, cookie.parse().unwrap());
+        (headers, Redirect::to("/chat")).into_response()
+    } else {
+        // Invalid password - show login form with error
+        Html(LOGIN_PAGE_ERROR_HTML).into_response()
+    }
+}
+
+/// POST /logout - Clear session cookie
+pub async fn logout() -> Response {
+    let cookie = clear_session_cookie();
+    let mut headers = HeaderMap::new();
+    headers.insert(SET_COOKIE, cookie.parse().unwrap());
+    (headers, Redirect::to("/chat")).into_response()
+}
+
+/// Extract a cookie value by name from the Cookie header
+fn extract_cookie(cookie_header: &str, name: &str) -> Option<String> {
+    for cookie in cookie_header.split(';') {
+        let cookie = cookie.trim();
+        if let Some((key, value)) = cookie.split_once('=') {
+            if key.trim() == name {
+                return Some(value.trim().to_string());
+            }
+        }
+    }
+    None
+}
+
+const LOGIN_PAGE_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Vault - Login</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 500; }
+        .container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .login-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .login-form h2 {
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+            text-align: center;
+        }
+        .login-form input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+        .login-form input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .login-form button {
+            width: 100%;
+            padding: 0.75rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        .login-form button:hover { background: #2980b9; }
+        .error { color: #e74c3c; margin-bottom: 1rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Recipe Vault</h1>
+    </div>
+    <div class="container">
+        <form class="login-form" method="POST" action="/login">
+            <h2>Family Login</h2>
+            <input type="password" name="password" placeholder="Family password" autofocus required>
+            <button type="submit">Enter</button>
+        </form>
+    </div>
+</body>
+</html>
+"#;
+
+const LOGIN_PAGE_ERROR_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Vault - Login</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 500; }
+        .container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .login-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .login-form h2 {
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+            text-align: center;
+        }
+        .login-form input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+        .login-form input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .login-form button {
+            width: 100%;
+            padding: 0.75rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        .login-form button:hover { background: #2980b9; }
+        .error { color: #e74c3c; margin-bottom: 1rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Recipe Vault</h1>
+    </div>
+    <div class="container">
+        <form class="login-form" method="POST" action="/login">
+            <h2>Family Login</h2>
+            <p class="error">Incorrect password. Please try again.</p>
+            <input type="password" name="password" placeholder="Family password" autofocus required>
+            <button type="submit">Enter</button>
+        </form>
+    </div>
+</body>
+</html>
+"#;
+
+const NO_AUTH_CONFIGURED_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Vault - Setup Required</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 500; }
+        .container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .message {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .message h2 { margin-bottom: 1rem; color: #2c3e50; }
+        .message p { color: #7f8c8d; line-height: 1.6; }
+        .message code {
+            background: #ecf0f1;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Recipe Vault</h1>
+    </div>
+    <div class="container">
+        <div class="message">
+            <h2>Setup Required</h2>
+            <p>Web authentication is not configured. Set <code>FAMILY_PASSWORD</code> in your environment variables and restart the server.</p>
+        </div>
+    </div>
+</body>
+</html>
+"#;
 
 const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 <html lang="en">
@@ -35,12 +349,29 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             background: #2c3e50;
             color: white;
             padding: 1rem;
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .header h1 {
             font-size: 1.5rem;
             font-weight: 500;
+        }
+
+        .header .logout-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .header .logout-btn:hover {
+            background: rgba(255,255,255,0.1);
         }
 
         .container {
@@ -225,37 +556,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             to { transform: rotate(360deg); }
         }
 
-        .api-key-form {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            max-width: 400px;
-            margin: 2rem auto;
-        }
-
-        .api-key-form h2 {
-            margin-bottom: 1rem;
-            color: #2c3e50;
-        }
-
-        .api-key-form input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-        }
-
-        .api-key-form button {
-            width: 100%;
-            padding: 0.75rem;
-            background: #3498db;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
         @media (max-width: 600px) {
             .container {
                 padding: 0.5rem 0.5rem 0.25rem 0.5rem;
@@ -274,15 +574,12 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 <body>
     <div class="header">
         <h1>Recipe Vault Chat</h1>
+        <form method="POST" action="/logout" style="margin: 0;">
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
     </div>
 
     <div class="container">
-        <div id="api-key-form" class="api-key-form" style="display: none;">
-            <h2>Enter API Key</h2>
-            <input type="password" id="api-key-input" placeholder="Your API key">
-            <button onclick="saveApiKey()">Save</button>
-        </div>
-
         <div id="chat-container" style="display: flex; flex-direction: column; flex: 1;">
             <div id="messages" class="messages">
                 <div class="message assistant">
@@ -307,23 +604,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
     <script>
         let conversationId = null;
-        let apiKey = localStorage.getItem('recipe_vault_api_key');
-
-        // Check for API key
-        if (!apiKey) {
-            document.getElementById('api-key-form').style.display = 'block';
-            document.getElementById('chat-container').style.display = 'none';
-        }
-
-        function saveApiKey() {
-            const key = document.getElementById('api-key-input').value;
-            if (key) {
-                localStorage.setItem('recipe_vault_api_key', key);
-                apiKey = key;
-                document.getElementById('api-key-form').style.display = 'none';
-                document.getElementById('chat-container').style.display = 'flex';
-            }
-        }
 
         function scrollToBottom() {
             const messages = document.getElementById('messages');
@@ -402,7 +682,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             const input = document.getElementById('message-input');
             const message = input.value.trim();
 
-            if (!message || !apiKey) return;
+            if (!message) return;
 
             input.value = '';
             addMessage(message, 'user');
@@ -414,9 +694,9 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': apiKey
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'same-origin',
                     body: JSON.stringify({
                         message: message,
                         conversation_id: conversationId
@@ -424,9 +704,8 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
                 });
 
                 if (response.status === 401) {
-                    addMessage('Invalid API key. Please refresh and try again.', 'error');
-                    localStorage.removeItem('recipe_vault_api_key');
-                    setLoading(false);
+                    // Session expired - redirect to login
+                    window.location.href = '/chat';
                     return;
                 }
 

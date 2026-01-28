@@ -18,6 +18,7 @@ use recipe_vault::auth::{api_key_auth, ApiKeyState};
 fn create_auth_test_app(api_key: &str) -> Router {
     let api_key_state = ApiKeyState {
         key: Arc::new(api_key.to_string()),
+        family_password: None,
     };
 
     // Simple handler that returns OK if auth passes
@@ -55,16 +56,16 @@ async fn send_auth_request(
     (status, body)
 }
 
-// ==== Scenario: Missing API key returns 401 ====
+// ==== Scenario: Missing authentication returns 401 ====
 #[rstest]
 #[tokio::test]
-async fn test_chat_missing_api_key_returns_401() {
+async fn test_chat_missing_auth_returns_401() {
     let app = create_auth_test_app("test-api-key-12345");
 
     let (status, body) = send_auth_request(&app, None).await;
 
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    assert!(body.contains("Missing API key"));
+    assert!(body.contains("Authentication required"));
 }
 
 // ==== Scenario: Invalid API key returns 401 ====

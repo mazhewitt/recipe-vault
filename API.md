@@ -16,6 +16,17 @@ cargo run
 
 Server will start on `http://127.0.0.1:3000` by default.
 
+### Authentication
+
+Authentication is required for all API endpoints.
+
+**Method 1: API Key (Recommended for scripts/MCP)**
+Include the `X-API-Key` header with every request.
+The key is generated on first startup and stored in `data/.api_key`.
+
+**Method 2: Session Cookie (Web UI)**
+The Web UI uses the `rv_session` cookie, which is set via the `/login` endpoint using the `FAMILY_PASSWORD`.
+
 ### API Endpoints
 
 #### Create Recipe
@@ -106,9 +117,12 @@ DELETE /api/recipes/{id}
 ### Example cURL Commands
 
 ```bash
+export API_KEY="your-api-key"
+
 # Create a recipe
 curl -X POST http://localhost:3000/api/recipes \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
   -d '{
     "title": "Simple Pasta",
     "ingredients": [{"name": "pasta", "quantity": 200, "unit": "g"}],
@@ -116,18 +130,19 @@ curl -X POST http://localhost:3000/api/recipes \
   }'
 
 # List all recipes
-curl http://localhost:3000/api/recipes
+curl -H "X-API-Key: $API_KEY" http://localhost:3000/api/recipes
 
 # Get specific recipe
-curl http://localhost:3000/api/recipes/{recipe-id}
+curl -H "X-API-Key: $API_KEY" http://localhost:3000/api/recipes/{recipe-id}
 
 # Update recipe
 curl -X PUT http://localhost:3000/api/recipes/{recipe-id} \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
   -d '{"title": "Updated Simple Pasta"}'
 
 # Delete recipe
-curl -X DELETE http://localhost:3000/api/recipes/{recipe-id}
+curl -X DELETE -H "X-API-Key: $API_KEY" http://localhost:3000/api/recipes/{recipe-id}
 ```
 
 ### Error Responses

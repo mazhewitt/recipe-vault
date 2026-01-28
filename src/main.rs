@@ -15,7 +15,7 @@ use recipe_vault::{
     auth::{api_key_auth, load_or_generate_api_key, ApiKeyState},
     config::Config,
     db,
-    handlers::{chat, recipes, ui},
+    handlers::{chat, recipes, ui::{self, UiState}},
 };
 
 #[tokio::main]
@@ -42,8 +42,22 @@ async fn main() {
     // Load or generate API key
     let api_key = load_or_generate_api_key();
     let api_key_for_chat = api_key.clone();
+
+    // Get family password for web auth
+    let family_password = config.family_password.clone().map(Arc::new);
+    if family_password.is_some() {
+        tracing::info!("Family password authentication enabled for web UI");
+    } else {
+        tracing::warn!("FAMILY_PASSWORD not set - web UI authentication disabled");
+    }
+
     let api_key_state = ApiKeyState {
         key: Arc::new(api_key),
+        family_password: family_password.clone(),
+    };
+
+    let ui_state = UiState {
+        family_password,
     };
 
     // Create database connection pool
@@ -85,8 +99,15 @@ async fn main() {
             api_key_auth,
         ));
 
-    let app = Router::new()
+    // UI routes with session authentication
+    let ui_routes = Router::new()
         .route("/chat", get(ui::chat_page))
+        .route("/login", post(ui::login))
+        .route("/logout", post(ui::logout))
+        .with_state(ui_state);
+
+    let app = Router::new()
+        .merge(ui_routes)
         .nest("/api", api_routes)
         .layer(
             TraceLayer::new_for_http()

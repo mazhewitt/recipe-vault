@@ -6,6 +6,7 @@ pub struct Config {
     pub bind_address: String,
     pub anthropic_api_key: String,
     pub ai_model: String,
+    pub family_password: Option<String>,
 }
 
 impl Config {
@@ -22,11 +23,14 @@ impl Config {
         let ai_model = env::var("AI_MODEL")
             .unwrap_or_else(|_| "claude-sonnet-4-5".to_string());
 
+        let family_password = env::var("FAMILY_PASSWORD").ok();
+
         Ok(Config {
             database_url,
             bind_address,
             anthropic_api_key,
             ai_model,
+            family_password,
         })
     }
 }
