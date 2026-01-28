@@ -50,7 +50,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             width: 100%;
             display: flex;
             flex-direction: column;
-            padding: 1rem;
+            padding: 1rem 1rem 0.5rem 1rem;
         }
 
         .messages {
@@ -61,7 +61,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             border-radius: 8px;
             margin-bottom: 1rem;
             min-height: 400px;
-            max-height: calc(100vh - 250px);
+            max-height: calc(100vh - 150px);
         }
 
         .message {
@@ -162,7 +162,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             display: flex;
             gap: 0.5rem;
             background: white;
-            padding: 1rem;
+            padding: 0.75rem;
             border-radius: 8px;
         }
 
@@ -258,7 +258,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         @media (max-width: 600px) {
             .container {
-                padding: 0.5rem;
+                padding: 0.5rem 0.5rem 0.25rem 0.5rem;
             }
 
             .messages {
