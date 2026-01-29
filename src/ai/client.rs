@@ -1,4 +1,4 @@
-use crate::ai::llm::{LlmError, LlmProvider, LlmResponse, Message, ToolCall, ToolDefinition, ToolResult};
+use crate::ai::llm::{LlmError, LlmProvider, LlmResponse, Message, ToolCall, ToolDefinition, ToolResult, tools};
 use serde::{Deserialize, Serialize};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -51,22 +51,19 @@ impl Default for AiAgentConfig {
                 "You are a helpful cooking assistant with access to a recipe database. \
                  You can list recipes, get recipe details, create new recipes, update existing ones, \
                  and delete recipes. Use the available tools to help users manage their recipes.\n\n\
+                 ## Recipe Display Strategy (CRITICAL)\n\n\
+                 The interface has a side panel for displaying structured recipes. \
+                 - **`get_recipe` vs `display_recipe`**: \
+                   - `get_recipe` returns text for YOUR internal knowledge only. It does NOT show anything to the user.\n\
+                   - `display_recipe` renders the visual card for the USER. \
+                 - NEVER render full ingredient lists or step-by-step instructions in the chat box.\n\
+                 - When the user asks to see a recipe, wants to cook something, or you are providing recipe details, \
+                   ALWAYS call the `display_recipe` tool with the appropriate `recipe_id`.\n\
+                 - **IMPORTANT**: Always use the exact `recipe_id` returned by the `list_recipes` or `get_recipe` tools. Do not guess IDs.\n\
+                 - After calling the tool, provide a brief (1-3 sentence) summary or helpful tip in the chat.\n\
+                 - Example chat response: \"I've pulled up that Pork Pie recipe in the side panel for you. It's a classic! Make sure to keep your pastry warm while working with it.\"\n\n\
                  ## Formatting Guidelines\n\n\
-                 Always use markdown formatting for clear, readable responses:\n\n\
-                 **When listing multiple recipes:**\n\
-                 1. **Recipe Title** - Brief description\n\
-                    - Prep: X min | Cook: Y min | Servings: Z\n\n\
-                 **When showing a single recipe's details:**\n\
-                 ## Recipe Title\n\n\
-                 Description of the dish.\n\n\
-                 **Prep Time:** X min | **Cook Time:** Y min | **Servings:** Z\n\n\
-                 ### Ingredients\n\
-                 - Quantity unit ingredient (notes)\n\
-                 - Quantity unit ingredient\n\n\
-                 ### Instructions\n\
-                 1. First step\n\
-                 2. Second step\n\n\
-                 Use **bold** for emphasis, bullet lists for ingredients, and numbered lists for steps."
+                 Use markdown for clear responses. When listing recipes, keep it concise (Title, Description, Times). You don't need to show IDs to the user, but remember them for tool calls."
                     .to_string(),
             ),
         }
@@ -185,7 +182,7 @@ impl AiAgent {
         let mcp_tools: Vec<serde_json::Value> =
             serde_json::from_value(tools_value).unwrap_or_default();
 
-        let tool_definitions: Vec<ToolDefinition> = mcp_tools
+        let mut tool_definitions: Vec<ToolDefinition> = mcp_tools
             .into_iter()
             .filter_map(|t| {
                 let name = t.get("name")?.as_str()?.to_string();
@@ -201,6 +198,9 @@ impl AiAgent {
                 })
             })
             .collect();
+
+        // Add native tools (not MCP)
+        tool_definitions.push(tools::display_recipe_tool());
 
         let mut tools_guard = self.tools.lock().await;
         *tools_guard = tool_definitions;
@@ -270,7 +270,31 @@ impl AiAgent {
         Ok(())
     }
 
-    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<String, AiError> {
+    /// Execute a tool call. Returns (result_text, optional_recipe_id).
+    /// If the tool is display_recipe, returns the recipe_id for the chat handler to emit SSE.
+    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>), AiError> {
+        // Handle native tools (not MCP)
+        if tool_call.name == "display_recipe" {
+            tracing::info!("Tool call detected: display_recipe with args: {:?}", tool_call.arguments);
+            let recipe_id = tool_call
+                .arguments
+                .get("recipe_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            if let Some(id) = recipe_id {
+                tracing::info!("Successfully extracted recipe_id: {}", id);
+                return Ok((
+                    "Recipe displayed in side panel. STOP. Do not read the recipe out loud. Do not call get_recipe. Just provide a brief summary.".to_string(),
+                    Some(id),
+                ));
+            } else {
+                tracing::warn!("Failed to extract valid recipe_id from args: {:?}", tool_call.arguments);
+                return Ok(("Error: Invalid recipe_id provided.".to_string(), None));
+            }
+        }
+
+        // MCP tools
         let result = self
             .call_mcp(
                 "tools/call",
@@ -294,16 +318,18 @@ impl AiAgent {
             });
 
         if content.is_empty() {
-            Ok(serde_json::to_string_pretty(&result)?)
+            Ok((serde_json::to_string_pretty(&result)?, None))
         } else {
-            Ok(content.to_string())
+            Ok((content.to_string(), None))
         }
     }
 
+    /// Chat with the AI agent.
+    /// Returns (response_text, tools_used, recipe_ids_to_display).
     pub async fn chat(
         &self,
         conversation: &[ChatMessage],
-    ) -> Result<(String, Vec<String>), AiError> {
+    ) -> Result<(String, Vec<String>, Vec<String>), AiError> {
         // Ensure MCP is running
         {
             let process_guard = self.mcp_process.lock().await;
@@ -330,6 +356,7 @@ impl AiAgent {
             .collect();
 
         let mut tool_uses: Vec<String> = Vec::new();
+        let mut recipe_ids: Vec<String> = Vec::new();
         let mut final_text = String::new();
 
         // Agent loop: keep going until we get a text-only response
@@ -354,10 +381,18 @@ impl AiAgent {
                     for call in &tool_calls {
                         tool_uses.push(call.name.clone());
                         let result = self.execute_tool(call).await;
-                        let is_error = result.is_err();
+                        let (content, is_error) = match result {
+                            Ok((text, maybe_recipe_id)) => {
+                                if let Some(rid) = maybe_recipe_id {
+                                    recipe_ids.push(rid);
+                                }
+                                (text, false)
+                            }
+                            Err(e) => (format!("Error: {}", e), true),
+                        };
                         tool_results.push(ToolResult {
                             tool_use_id: call.id.clone(),
-                            content: result.unwrap_or_else(|e| format!("Error: {}", e)),
+                            content,
                             is_error,
                         });
                     }
@@ -377,10 +412,18 @@ impl AiAgent {
                     for call in &tool_calls {
                         tool_uses.push(call.name.clone());
                         let result = self.execute_tool(call).await;
-                        let is_error = result.is_err();
+                        let (content, is_error) = match result {
+                            Ok((text, maybe_recipe_id)) => {
+                                if let Some(rid) = maybe_recipe_id {
+                                    recipe_ids.push(rid);
+                                }
+                                (text, false)
+                            }
+                            Err(e) => (format!("Error: {}", e), true),
+                        };
                         tool_results.push(ToolResult {
                             tool_use_id: call.id.clone(),
-                            content: result.unwrap_or_else(|e| format!("Error: {}", e)),
+                            content,
                             is_error,
                         });
                     }
@@ -397,6 +440,6 @@ impl AiAgent {
             }
         }
 
-        Ok((final_text, tool_uses))
+        Ok((final_text, tool_uses, recipe_ids))
     }
 }

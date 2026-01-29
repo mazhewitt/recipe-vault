@@ -406,3 +406,26 @@ impl LlmProvider {
         }
     }
 }
+
+/// Built-in tool definitions for the chat interface
+pub mod tools {
+    use super::ToolDefinition;
+
+    /// Creates the display_recipe tool definition for showing recipes in the artifact panel
+    pub fn display_recipe_tool() -> ToolDefinition {
+        ToolDefinition {
+            name: "display_recipe".to_string(),
+            description: "The ONLY way to visually show a recipe to the user. Renders the full recipe (ingredients, steps, timer) in a persistent side panel. Use this WHENEVER the user wants to see, read, or cook a recipe. `get_recipe` is only for your internal knowledge; `display_recipe` is for the user.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "recipe_id": {
+                        "type": "string",
+                        "description": "The UUID of the recipe to display in the side panel"
+                    }
+                },
+                "required": ["recipe_id"]
+            }),
+        }
+    }
+}
