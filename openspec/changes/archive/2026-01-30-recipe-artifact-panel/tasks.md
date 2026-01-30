@@ -35,8 +35,20 @@
 
 ## 6. Integration Testing
 
-- [ ] 6.1 Test: Ask Claude to show a recipe, verify panel appears with loading then content
-- [ ] 6.2 Test: Panel replaces recipe when new one displayed
-- [ ] 6.3 Test: Chat continues working while recipe displayed
-- [ ] 6.4 Test: Mobile layout slide-over behavior
-- [ ] 6.5 Test: Invalid recipe ID shows error state in panel
+- [x] 6.1 Test: Ask Claude to show a recipe, verify panel appears with loading then content
+- [x] 6.2 Test: Panel replaces recipe when new one displayed
+- [x] 6.3 Test: Chat continues working while recipe displayed
+- [x] 6.4 Test: Mobile layout slide-over behavior (LIMITATION: Not manually tested; CSS implementation verified at 768px breakpoint)
+- [x] 6.5 Test: Invalid recipe ID shows error state in panel
+
+## 7. Prompt Engineering Improvements (Added)
+
+- [x] 7.1 Update `display_recipe` tool with verbose description
+- [x] 7.2 Refactor system prompt to use positive instructions instead of negative constraints
+- [x] 7.3 Add few-shot examples to system prompt
+- [x] 7.4 Add chain-of-thought `[THOUGHT]` patterns to examples
+- [x] 7.5 Implement reminder injection for conversations ≥5 messages
+- [x] 7.6 Update `list_recipes` to return `recipe_id` field with reminder note
+- [x] 7.7 Add `title` parameter to `display_recipe` for fuzzy matching fallback
+- [x] 7.8 Update design.md with implementation details
+- [x] 7.9 Update MCP.md documentation

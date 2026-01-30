@@ -48,22 +48,32 @@ impl Default for AiAgentConfig {
             api_base_url: "http://localhost:3000".to_string(),
             api_key: String::new(),
             system_prompt: Some(
-                "You are a helpful cooking assistant with access to a recipe database. \
-                 You can list recipes, get recipe details, create new recipes, update existing ones, \
-                 and delete recipes. Use the available tools to help users manage their recipes.\n\n\
-                 ## Recipe Display Strategy (CRITICAL)\n\n\
-                 The interface has a side panel for displaying structured recipes. \
-                 - **`get_recipe` vs `display_recipe`**: \
-                   - `get_recipe` returns text for YOUR internal knowledge only. It does NOT show anything to the user.\n\
-                   - `display_recipe` renders the visual card for the USER. \
-                 - NEVER render full ingredient lists or step-by-step instructions in the chat box.\n\
-                 - When the user asks to see a recipe, wants to cook something, or you are providing recipe details, \
-                   ALWAYS call the `display_recipe` tool with the appropriate `recipe_id`.\n\
-                 - **IMPORTANT**: Always use the exact `recipe_id` returned by the `list_recipes` or `get_recipe` tools. Do not guess IDs.\n\
-                 - After calling the tool, provide a brief (1-3 sentence) summary or helpful tip in the chat.\n\
-                 - Example chat response: \"I've pulled up that Pork Pie recipe in the side panel for you. It's a classic! Make sure to keep your pastry warm while working with it.\"\n\n\
-                 ## Formatting Guidelines\n\n\
-                 Use markdown for clear responses. When listing recipes, keep it concise (Title, Description, Times). You don't need to show IDs to the user, but remember them for tool calls."
+                "You are a helpful cooking assistant backed by a visual recipe database.\n\n\
+                 ## Tool Use Protocol\n\
+                 1. **Search First**: When you don't know the recipe_id, use `list_recipes` to find it.\n\
+                 2. **Display Always**: When the user wants to see details, cook, view, or read a recipe, you MUST call `display_recipe` with the recipe_id.\n\
+                 3. **Summarize Only**: The chat window is for conversation and brief summaries. The side panel (controlled by `display_recipe`) shows the full recipe content.\n\n\
+                 ## Interaction Strategy\n\
+                 Before calling a tool, briefly reason about which tool fits the user's request and verify you have the necessary arguments (like recipe_id).\n\
+                 - **Input**: User asks for a recipe.\n\
+                 - **Thought Process**: Check if you have the `recipe_id` from a previous `list_recipes` call.\n\
+                 - **Action**: Call `display_recipe(recipe_id=...)` to render the visual card.\n\
+                 - **Response**: Tell the user you've opened it and provide a quick tip or summary (1-2 sentences).\n\n\
+                 ## Examples\n\n\
+                 User: 'Show me the Apple Pie recipe.'\n\
+                 Assistant: [THOUGHT] User wants to view a recipe. I have the ID from the previous list. I should display it.\n\
+                 [Calls display_recipe(recipe_id='abc-123-...')]\n\
+                 Response: I've opened the Apple Pie recipe in the side panel for you. The key to a flaky crust is keeping your butter cold!\n\n\
+                 User: 'What ingredients do I need for the beef stew?'\n\
+                 Assistant: [THOUGHT] User is asking about ingredients. I need to display the recipe so they can see the full list.\n\
+                 [Calls display_recipe(recipe_id='def-456-...')]\n\
+                 Response: I've loaded the Beef Stew recipe—you'll find all the ingredients listed in the side panel.\n\n\
+                 User: 'Find me something with chicken.'\n\
+                 Assistant: [THOUGHT] User is searching. I need to find recipes first before I can display one.\n\
+                 [Calls list_recipes(query='chicken')]\n\
+                 Response: I found 3 chicken recipes: Chicken Parmesan, Lemon Herb Chicken, and Chicken Stir Fry. Which one would you like to see?\n\n\
+                 ## Formatting Guidelines\n\
+                 Use markdown for clear responses. When listing recipes, keep it concise (Title, brief description). Remember recipe_ids from tool results for subsequent display_recipe calls."
                     .to_string(),
             ),
         }
@@ -270,27 +280,96 @@ impl AiAgent {
         Ok(())
     }
 
+    /// Find a recipe by title using fuzzy matching via MCP list_recipes
+    async fn find_recipe_by_title(&self, search_title: &str) -> Option<String> {
+        // Call list_recipes through MCP to get all recipes
+        let result = self
+            .call_mcp("tools/call", serde_json::json!({
+                "name": "list_recipes",
+                "arguments": {}
+            }))
+            .await
+            .ok()?;
+
+        // Parse the response to find matching recipe
+        let content = result
+            .get("content")
+            .and_then(|c| c.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|item| item.get("text"))
+            .and_then(|t| t.as_str())?;
+
+        let recipes_response: serde_json::Value = serde_json::from_str(content).ok()?;
+        let recipes = recipes_response.get("recipes")?.as_array()?;
+
+        let search_lower = search_title.to_lowercase();
+        
+        // Find best matching recipe (case-insensitive, partial match)
+        for recipe in recipes {
+            if let Some(title) = recipe.get("title").and_then(|t| t.as_str()) {
+                let title_lower = title.to_lowercase();
+                // Match if search term is contained in title or vice versa
+                if title_lower.contains(&search_lower) || search_lower.contains(&title_lower) {
+                    return recipe.get("recipe_id").and_then(|id| id.as_str()).map(|s| s.to_string());
+                }
+            }
+        }
+        
+        None
+    }
+
     /// Execute a tool call. Returns (result_text, optional_recipe_id).
     /// If the tool is display_recipe, returns the recipe_id for the chat handler to emit SSE.
     async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>), AiError> {
         // Handle native tools (not MCP)
         if tool_call.name == "display_recipe" {
             tracing::info!("Tool call detected: display_recipe with args: {:?}", tool_call.arguments);
+            
+            // Try to get recipe_id directly first
             let recipe_id = tool_call
                 .arguments
                 .get("recipe_id")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
+            
+            // If we have a title but no recipe_id (or a suspicious-looking one), search for it
+            let title = tool_call
+                .arguments
+                .get("title")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            
+            // Determine the final recipe_id to use
+            let final_id = match (&recipe_id, &title) {
+                // If title is provided, search for the recipe by title
+                (_, Some(search_title)) => {
+                    tracing::info!("Searching for recipe by title: {}", search_title);
+                    match self.find_recipe_by_title(&search_title).await {
+                        Some(id) => {
+                            tracing::info!("Found recipe by title search: {}", id);
+                            Some(id)
+                        }
+                        None => {
+                            tracing::warn!("No recipe found matching title: {}", search_title);
+                            // Fall back to recipe_id if title search failed
+                            recipe_id.clone()
+                        }
+                    }
+                }
+                // No title, use recipe_id directly
+                (Some(id), None) => Some(id.clone()),
+                (None, None) => None,
+            };
 
-            if let Some(id) = recipe_id {
-                tracing::info!("Successfully extracted recipe_id: {}", id);
+            if let Some(id) = final_id {
+                tracing::info!("Successfully resolved recipe_id: {}", id);
                 return Ok((
                     "Recipe displayed in side panel. STOP. Do not read the recipe out loud. Do not call get_recipe. Just provide a brief summary.".to_string(),
                     Some(id),
                 ));
             } else {
-                tracing::warn!("Failed to extract valid recipe_id from args: {:?}", tool_call.arguments);
-                return Ok(("Error: Invalid recipe_id provided.".to_string(), None));
+                tracing::warn!("Failed to resolve recipe_id from args: {:?}", tool_call.arguments);
+                return Ok(("Error: Could not find the recipe. Please use list_recipes first to get the correct recipe_id.".to_string(), None));
             }
         }
 
@@ -354,6 +433,17 @@ impl AiAgent {
                 },
             })
             .collect();
+
+        // Inject reminder for longer conversations (5+ messages)
+        // This helps the model remember critical instructions
+        if messages.len() >= 5 {
+            if let Some(Message::User { content }) = messages.last_mut() {
+                *content = format!(
+                    "{}\n\n(Reminder: Use display_recipe to show recipe details in the side panel. Do not output full ingredient lists or steps in chat.)",
+                    content
+                );
+            }
+        }
 
         let mut tool_uses: Vec<String> = Vec::new();
         let mut recipe_ids: Vec<String> = Vec::new();

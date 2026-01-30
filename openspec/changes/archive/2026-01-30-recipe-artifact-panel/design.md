@@ -89,6 +89,14 @@ RecipeArtifactEvent {
 **Risk: Claude calls display_recipe at wrong times**
 → Mitigation: Clear system prompt guidance on when to use the tool ("when the user asks to see a recipe" or "when showing recipe details")
 
+**Risk: Claude fabricates/hallucinates recipe IDs**
+→ Mitigation: Multiple layers of defense:
+  1. Tool definitions emphasize that IDs must come from `list_recipes` results
+  2. `list_recipes` returns `recipe_id` field (not `id`) for clarity and includes a note reminding not to fabricate IDs
+  3. `display_recipe` accepts optional `title` parameter for fuzzy matching when exact ID is unknown
+  4. System prompt uses positive instructions with few-shot examples showing proper ID flow
+  5. Reminder injection for long conversations reinforces tool use patterns
+
 **Risk: Recipe ID doesn't exist**
 → Mitigation: Frontend handles 404 from `/api/recipes/:id` gracefully — shows error in panel or ignores. Tool result to Claude still says "displayed" (it's a display intent, not a data fetch).
 
@@ -97,6 +105,26 @@ RecipeArtifactEvent {
 
 **Risk: Race condition between LLM response and recipe fetch**
 → Mitigation: Frontend shows loading skeleton immediately on SSE event, then populates when fetch completes. User sees panel appear instantly with "Loading..." state.
+
+## Implementation Details
+
+### Prompt Engineering Best Practices
+
+The system prompt and tool definitions follow these best practices to maximize reliability:
+
+1. **Positive Instructions**: Uses "Summarize Only" and "Display Always" instead of "NEVER do X"
+2. **Few-Shot Examples**: Includes 3 example interactions showing proper tool flow
+3. **Chain of Thought**: Prompts include `[THOUGHT]` patterns encouraging reasoning before tool calls
+4. **Reminder Injection**: For conversations ≥5 messages, appends a reminder about using `display_recipe`
+5. **Verbose Tool Descriptions**: Tool descriptions explain when to use each tool and relationships between them
+
+### display_recipe Tool
+
+The `display_recipe` tool accepts two optional parameters:
+- `recipe_id`: The exact UUID from `list_recipes` (preferred)
+- `title`: Recipe title for fuzzy search (fallback)
+
+When `title` is provided, the backend searches recipes by case-insensitive partial match and resolves to the correct ID automatically. This prevents the common failure mode where the LLM remembers a recipe name but fabricates the ID.
 
 **Trade-off: Inline HTML vs template files**
 The current architecture embeds all UI in Rust strings. This change continues that pattern rather than introducing template files. Increases file size but maintains consistency.

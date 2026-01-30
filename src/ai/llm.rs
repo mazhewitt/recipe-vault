@@ -415,16 +415,19 @@ pub mod tools {
     pub fn display_recipe_tool() -> ToolDefinition {
         ToolDefinition {
             name: "display_recipe".to_string(),
-            description: "The ONLY way to visually show a recipe to the user. Renders the full recipe (ingredients, steps, timer) in a persistent side panel. Use this WHENEVER the user wants to see, read, or cook a recipe. `get_recipe` is only for your internal knowledge; `display_recipe` is for the user.".to_string(),
+            description: "Renders the visual recipe card in the side panel. MANDATORY when the user asks to see, view, read, or cook a recipe. Provide EITHER recipe_id (from list_recipes) OR title (for searching). If you have the exact recipe_id from a previous list_recipes call, use that. If you only know the recipe name, provide the title instead.".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "recipe_id": {
                         "type": "string",
-                        "description": "The UUID of the recipe to display in the side panel"
+                        "description": "The exact UUID from list_recipes. Use this if you have it."
+                    },
+                    "title": {
+                        "type": "string", 
+                        "description": "The recipe title to search for. Use this if you don't have the exact recipe_id."
                     }
-                },
-                "required": ["recipe_id"]
+                }
             }),
         }
     }
