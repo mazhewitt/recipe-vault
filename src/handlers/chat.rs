@@ -56,22 +56,19 @@ impl ChatState {
                     "You are a helpful cooking assistant with access to a recipe database. \
                      You can list recipes, get recipe details, create new recipes, update existing ones, \
                      and delete recipes. Use the available tools to help users manage their recipes.\n\n\
+                     ## Recipe Display Strategy (CRITICAL)\n\n\
+                     The interface has a side panel for displaying structured recipes. \
+                     - **`get_recipe` vs `display_recipe`**: \
+                       - `get_recipe` returns text for YOUR internal knowledge only. It does NOT show anything to the user.\n\
+                       - `display_recipe` renders the visual card for the USER. \
+                     - NEVER render full ingredient lists or step-by-step instructions in the chat box.\n\
+                     - When the user asks to see a recipe, wants to cook something, or you are providing recipe details, \
+                       ALWAYS call the `display_recipe` tool with the appropriate `recipe_id`.\n\
+                     - **IMPORTANT**: Always use the exact `recipe_id` returned by the `list_recipes` or `get_recipe` tools. Do not guess IDs.\n\
+                     - After calling the tool, provide a brief (1-3 sentence) summary or helpful tip in the chat.\n\
+                     - Example chat response: \"I've pulled up that Pork Pie recipe in the side panel for you. It's a classic! Make sure to keep your pastry warm while working with it.\"\n\n\
                      ## Formatting Guidelines\n\n\
-                     Always use markdown formatting for clear, readable responses:\n\n\
-                     **When listing multiple recipes:**\n\
-                     1. **Recipe Title** - Brief description\n\
-                        - Prep: X min | Cook: Y min | Servings: Z\n\n\
-                     **When showing a single recipe's details:**\n\
-                     ## Recipe Title\n\n\
-                     Description of the dish.\n\n\
-                     **Prep Time:** X min | **Cook Time:** Y min | **Servings:** Z\n\n\
-                     ### Ingredients\n\
-                     - Quantity unit ingredient (notes)\n\
-                     - Quantity unit ingredient\n\n\
-                     ### Instructions\n\
-                     1. First step\n\
-                     2. Second step\n\n\
-                     Use **bold** for emphasis, bullet lists for ingredients, and numbered lists for steps."
+                     Use markdown for clear responses. When listing recipes, keep it concise (Title, Description, Times). You don't need to show IDs to the user, but remember them for tool calls."
                         .to_string(),
                 ),
             };
@@ -125,6 +122,8 @@ pub enum SseEvent {
     Chunk { text: String },
     #[serde(rename = "tool_use")]
     ToolUse { tool: String, status: String },
+    #[serde(rename = "recipe_artifact")]
+    RecipeArtifact { recipe_id: String },
     #[serde(rename = "done")]
     Done {
         conversation_id: String,
@@ -174,7 +173,7 @@ pub async fn chat(
         let agent_guard = state.agent.read().await;
         if let Some(agent) = agent_guard.as_ref() {
             match agent.chat(&conversation).await {
-                Ok((response_text, tools_used)) => {
+                Ok((response_text, tools_used, recipe_ids)) => {
                     // Send tool use events
                     for tool in &tools_used {
                         yield Ok(Event::default()
@@ -182,6 +181,16 @@ pub async fn chat(
                             .data(serde_json::json!({
                                 "tool": tool,
                                 "status": "completed"
+                            }).to_string()));
+                    }
+
+                    // Send recipe artifact events (for display_recipe tool calls)
+                    for recipe_id in &recipe_ids {
+                        tracing::info!("Emitting recipe_artifact event for id: {}", recipe_id);
+                        yield Ok(Event::default()
+                            .event("recipe_artifact")
+                            .data(serde_json::json!({
+                                "recipe_id": recipe_id
                             }).to_string()));
                     }
 

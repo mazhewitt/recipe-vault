@@ -6,18 +6,25 @@ This document provides detailed information about the Model Context Protocol (MC
 
 Recipe Vault exposes five MCP tools that enable natural language interaction with your recipe database through Claude Desktop. These tools wrap the existing database operations and provide structured interfaces for recipe management.
 
+The web chat interface (`/chat`) also includes a `display_recipe` tool for visual recipe rendering in the side panel. This tool is not part of the standalone MCP server but is documented here for completeness.
+
 ## Tools
 
 ### list_recipes
 
-**Purpose:** Discover what recipes are available in your database.
+**Purpose:** Discover what recipes are available in your database. Returns recipe IDs that must be used with other tools. Returns recipe IDs that must be used with other tools.
 
 **Parameters:** None
 
-**Returns:** Array of recipe objects with:
-- `id` (string): UUID of the recipe
-- `title` (string): Recipe title
-- `description` (string): Brief description
+**Returns:** Object containing:
+- `recipes` (array): Array of recipe objects with:
+  - `recipe_id` (string): UUID of the recipe - **use this value for display_recipe, get_recipe, etc.**
+  - `title` (string): Recipe title
+  - `description` (string): Brief description
+  - `prep_time_minutes` (integer, optional): Preparation time
+  - `cook_time_minutes` (integer, optional): Cooking time
+  - `servings` (integer, optional): Number of servings
+- `note` (string): Reminder to use exact recipe_id values
 - `created_at` (string): Timestamp when recipe was created
 - `updated_at` (string): Timestamp when recipe was last modified
 
@@ -29,22 +36,27 @@ Recipe Vault exposes five MCP tools that enable natural language interaction wit
 
 **Example Response:**
 ```json
-[
-  {
-    "id": "abc-123-def-456",
-    "title": "Chocolate Chip Cookies",
-    "description": "Classic homemade cookies",
-    "created_at": "2024-01-24T10:30:00Z",
-    "updated_at": "2024-01-24T10:30:00Z"
-  },
-  {
-    "id": "xyz-789-uvw-012",
-    "title": "Banana Bread",
-    "description": "Moist and delicious banana bread",
-    "created_at": "2024-01-23T14:20:00Z",
-    "updated_at": "2024-01-23T14:20:00Z"
-  }
-]
+{
+  "recipes": [
+    {
+      "recipe_id": "abc-123-def-456",
+      "title": "Chocolate Chip Cookies",
+      "description": "Classic homemade cookies",
+      "prep_time_minutes": 15,
+      "cook_time_minutes": 12,
+      "servings": 24
+    },
+    {
+      "recipe_id": "xyz-789-uvw-012",
+      "title": "Banana Bread",
+      "description": "Moist and delicious banana bread",
+      "prep_time_minutes": 15,
+      "cook_time_minutes": 60,
+      "servings": 8
+    }
+  ],
+  "note": "Use the exact recipe_id values above when calling display_recipe or get_recipe. Do not fabricate IDs."
+}
 ```
 
 **Error Scenarios:**
@@ -354,6 +366,39 @@ Claude will use the recipe context to provide relevant answers.
 **Error Scenarios:**
 - Recipe not found → Returns error code -32001 with "Recipe not found: {id}" message
 - Invalid UUID format → Returns error code -32602 with "Missing or invalid recipe_id parameter"
+
+---
+
+### display_recipe (Web Chat Only)
+
+**Purpose:** Renders a recipe in the visual side panel of the web chat interface. This tool is only available in the web chat (`/chat`) and is not part of the standalone MCP server.
+
+**Note:** This is a "native" tool handled directly by the chat backend, not an MCP tool. It exists to signal when the AI should visually display a recipe to the user.
+
+**Parameters:**
+- `recipe_id` (string, optional): The exact UUID from `list_recipes`. Use this if you have it.
+- `title` (string, optional): The recipe title to search for. Use this if you don't have the exact `recipe_id`.
+
+At least one parameter should be provided. If `title` is provided, the system performs a case-insensitive fuzzy search to find the matching recipe.
+
+**Behavior:**
+1. The backend emits a `recipe_artifact` SSE event to the frontend
+2. The frontend fetches the full recipe from `/api/recipes/:id`
+3. The recipe is displayed in a persistent side panel
+4. The AI provides a brief summary in the chat
+
+**Example Prompts:**
+- "Show me the scrambled eggs recipe"
+- "Display the chicken curry"
+- "I want to cook the banana bread"
+
+**When Claude Uses This Tool:**
+- When a user asks to "see", "show", "display", or "view" a recipe
+- When a user says they want to "cook" or "make" a recipe
+- When providing recipe details that should be visually presented
+
+**Why This Tool Exists:**
+The chat window is for conversation. The side panel is for structured recipe data. This separation keeps the chat readable while providing a rich recipe viewing experience.
 
 ---
 

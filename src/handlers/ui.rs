@@ -374,6 +374,200 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             background: rgba(255,255,255,0.1);
         }
 
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 1rem 1rem 0.5rem 1rem;
+            transition: max-width 0.3s ease;
+        }
+
+        .main-content.has-recipe .chat-section {
+            max-width: 100%;
+            flex: 0 0 60%;
+        }
+
+        .recipe-panel {
+            display: none;
+            flex: 0 0 40%;
+            background: white;
+            border-left: 1px solid #ddd;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .main-content.has-recipe .recipe-panel {
+            display: block;
+        }
+
+        .recipe-panel .close-btn {
+            display: none;
+        }
+
+        /* Recipe panel content styles */
+        .recipe-loading {
+            padding: 2rem;
+            text-align: center;
+            color: #7f8c8d;
+        }
+
+        .recipe-loading .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .recipe-loading .skeleton-title { height: 2rem; width: 70%; }
+        .recipe-loading .skeleton-meta { height: 1rem; width: 50%; }
+        .recipe-loading .skeleton-line { height: 1rem; width: 100%; margin-bottom: 0.5rem; }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .recipe-error {
+            padding: 2rem;
+            text-align: center;
+            color: #e74c3c;
+        }
+
+        .recipe-content h2 {
+            margin: 0 0 0.5rem 0;
+            color: #2c3e50;
+        }
+
+        .recipe-content .recipe-meta {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .recipe-content .recipe-description {
+            margin-bottom: 1rem;
+            color: #555;
+        }
+
+        .recipe-content h3 {
+            margin: 1rem 0 0.5rem 0;
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        .recipe-content .ingredients-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .recipe-content .ingredients-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .recipe-content .ingredient-notes {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        .recipe-content .steps-list {
+            list-style: none;
+            padding: 0;
+            counter-reset: step-counter;
+        }
+
+        .recipe-content .steps-list li {
+            padding: 0.75rem 0 0.75rem 2.5rem;
+            border-bottom: 1px solid #f0f0f0;
+            position: relative;
+        }
+
+        .recipe-content .steps-list li::before {
+            content: counter(step-counter);
+            counter-increment: step-counter;
+            position: absolute;
+            left: 0;
+            top: 0.75rem;
+            width: 1.75rem;
+            height: 1.75rem;
+            background: #3498db;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .recipe-content .step-duration {
+            display: inline-block;
+            background: #e8f4fc;
+            color: #3498db;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .main-content.has-recipe .chat-section {
+                flex: 1;
+                max-width: 100%;
+            }
+
+            .recipe-panel {
+                position: fixed;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                max-width: 400px;
+                z-index: 100;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                border-left: none;
+                box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+            }
+
+            .main-content.has-recipe .recipe-panel {
+                transform: translateX(0);
+            }
+
+            .recipe-panel .close-btn {
+                display: block;
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                background: #f0f0f0;
+                border: none;
+                width: 2rem;
+                height: 2rem;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 1.2rem;
+                line-height: 1;
+            }
+
+            .recipe-panel .close-btn:hover {
+                background: #e0e0e0;
+            }
+        }
+
         .container {
             flex: 1;
             max-width: 800px;
@@ -579,25 +773,34 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         </form>
     </div>
 
-    <div class="container">
-        <div id="chat-container" style="display: flex; flex-direction: column; flex: 1;">
-            <div id="messages" class="messages">
-                <div class="message assistant">
-                    Hello! I'm your cooking assistant. I can help you manage your recipes -
-                    list them, get details, create new ones, or update existing recipes.
-                    What would you like to do?
+    <div id="main-content" class="main-content">
+        <div class="chat-section">
+            <div id="chat-container" style="display: flex; flex-direction: column; flex: 1;">
+                <div id="messages" class="messages">
+                    <div class="message assistant">
+                        Hello! I'm your cooking assistant. I can help you manage your recipes -
+                        list them, get details, create new ones, or update existing recipes.
+                        What would you like to do?
+                    </div>
+                </div>
+
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <span id="loading-text">Thinking...</span>
+                </div>
+
+                <div class="input-area">
+                    <input type="text" id="message-input" placeholder="Ask about your recipes..."
+                           onkeypress="if(event.key === 'Enter') sendMessage()">
+                    <button id="send-btn" onclick="sendMessage()">Send</button>
                 </div>
             </div>
+        </div>
 
-            <div id="loading" class="loading">
-                <div class="spinner"></div>
-                <span id="loading-text">Thinking...</span>
-            </div>
-
-            <div class="input-area">
-                <input type="text" id="message-input" placeholder="Ask about your recipes..."
-                       onkeypress="if(event.key === 'Enter') sendMessage()">
-                <button id="send-btn" onclick="sendMessage()">Send</button>
+        <div id="recipe-panel" class="recipe-panel">
+            <button class="close-btn" onclick="closeRecipePanel()">&times;</button>
+            <div id="recipe-panel-content">
+                <!-- Recipe content will be inserted here -->
             </div>
         </div>
     </div>
@@ -678,6 +881,105 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             input.disabled = loading;
         }
 
+        // Recipe Panel Functions
+        function showRecipeLoading() {
+            const mainContent = document.getElementById('main-content');
+            const panelContent = document.getElementById('recipe-panel-content');
+            mainContent.classList.add('has-recipe');
+            panelContent.innerHTML = `
+                <div class="recipe-loading">
+                    <div class="skeleton skeleton-title"></div>
+                    <div class="skeleton skeleton-meta"></div>
+                    <div class="skeleton skeleton-line"></div>
+                    <div class="skeleton skeleton-line"></div>
+                    <div class="skeleton skeleton-line"></div>
+                    <div class="skeleton skeleton-line"></div>
+                    <p style="margin-top: 1rem;">Loading recipe...</p>
+                </div>
+            `;
+        }
+
+        function showRecipeError(message) {
+            const panelContent = document.getElementById('recipe-panel-content');
+            panelContent.innerHTML = `
+                <div class="recipe-error">
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+
+        function closeRecipePanel() {
+            const mainContent = document.getElementById('main-content');
+            mainContent.classList.remove('has-recipe');
+        }
+
+        async function fetchAndDisplayRecipe(recipeId) {
+            showRecipeLoading();
+            try {
+                const response = await fetch(`/api/recipes/${recipeId}`, {
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        showRecipeError('Recipe not found');
+                    } else {
+                        showRecipeError('Failed to load recipe');
+                    }
+                    return;
+                }
+                const recipe = await response.json();
+                renderRecipe(recipe);
+            } catch (error) {
+                console.error('Error fetching recipe:', error);
+                showRecipeError('Failed to load recipe');
+            }
+        }
+
+        function renderRecipe(recipe) {
+            const panelContent = document.getElementById('recipe-panel-content');
+
+            // Build metadata string
+            const metaParts = [];
+            if (recipe.prep_time) metaParts.push(`Prep: ${recipe.prep_time} min`);
+            if (recipe.cook_time) metaParts.push(`Cook: ${recipe.cook_time} min`);
+            if (recipe.servings) metaParts.push(`Serves: ${recipe.servings}`);
+            const metaStr = metaParts.join(' | ');
+
+            // Build ingredients list
+            const ingredientsList = (recipe.ingredients || []).map(ing => {
+                const qty = ing.quantity ? `${ing.quantity} ` : '';
+                const unit = ing.unit ? `${ing.unit} ` : '';
+                const notes = ing.notes ? `<span class="ingredient-notes">(${ing.notes})</span>` : '';
+                return `<li>${qty}${unit}${ing.name} ${notes}</li>`;
+            }).join('');
+
+            // Build steps list
+            const stepsList = (recipe.steps || []).map(step => {
+                const duration = step.duration_minutes
+                    ? `<span class="step-duration">${step.duration_minutes} min</span>`
+                    : '';
+                return `<li>${step.instruction}${duration}</li>`;
+            }).join('');
+
+            panelContent.innerHTML = `
+                <div class="recipe-content">
+                    <h2>${recipe.title || 'Untitled Recipe'}</h2>
+                    ${metaStr ? `<div class="recipe-meta">${metaStr}</div>` : ''}
+                    ${recipe.description ? `<p class="recipe-description">${recipe.description}</p>` : ''}
+
+                    ${ingredientsList ? `
+                        <h3>Ingredients</h3>
+                        <ul class="ingredients-list">${ingredientsList}</ul>
+                    ` : ''}
+
+                    ${stepsList ? `
+                        <h3>Instructions</h3>
+                        <ol class="steps-list">${stepsList}</ol>
+                    ` : ''}
+                </div>
+            `;
+        }
+
         async function sendMessage() {
             const input = document.getElementById('message-input');
             const message = input.value.trim();
@@ -738,6 +1040,9 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
                                         streamedText += parsed.text;
                                         updateStreamingMessage(streamedText);
                                     }
+                                } else if (parsed.recipe_id !== undefined) {
+                                    // Recipe artifact event - fetch and display
+                                    fetchAndDisplayRecipe(parsed.recipe_id);
                                 } else if (parsed.tool) {
                                     // Tool use notification
                                     setLoading(true, `Using ${parsed.tool}...`);

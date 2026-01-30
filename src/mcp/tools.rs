@@ -18,7 +18,7 @@ pub fn get_all_tools() -> Vec<ToolDefinition> {
 pub fn list_recipes_tool() -> ToolDefinition {
     ToolDefinition::new(
         "list_recipes",
-        "List all saved recipes. Use this to search for existing recipes, check if a recipe exists (e.g., 'do I have...'), or browse available options.",
+        "List all saved recipes with their UUIDs. Returns recipe_id values that MUST be used with display_recipe or get_recipe. Never fabricate IDs—only use the exact UUIDs returned by this tool.",
         json!({
             "type": "object",
             "properties": {}
@@ -191,7 +191,23 @@ pub fn delete_recipe_tool() -> ToolDefinition {
 /// Handle list_recipes tool call
 pub fn handle_list_recipes(client: &ApiClient, _params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let recipes = client.list_recipes()?;
-    Ok(json!(recipes))
+    
+    // Format recipes with prominent ID labels to prevent hallucination
+    let formatted: Vec<JsonValue> = recipes.iter().map(|r| {
+        json!({
+            "recipe_id": r.id,  // Prominently labeled for tool use
+            "title": r.title,
+            "description": r.description,
+            "prep_time_minutes": r.prep_time_minutes,
+            "cook_time_minutes": r.cook_time_minutes,
+            "servings": r.servings
+        })
+    }).collect();
+    
+    Ok(json!({
+        "recipes": formatted,
+        "note": "Use the exact recipe_id values above when calling display_recipe or get_recipe. Do not fabricate IDs."
+    }))
 }
 
 /// Handle get_recipe tool call
