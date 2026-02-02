@@ -22,3 +22,6 @@ credentials/
 .gemini/commands/opsx/
 .gemini/skills/
 .github/
+
+.DS_Store
+**/.DS_Store

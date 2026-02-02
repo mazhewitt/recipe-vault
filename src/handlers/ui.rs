@@ -522,6 +522,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         /* ==================== NOTEPAD COMPONENT ==================== */
         .notepad-container {
             width: 380px;
+            height: 100%;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
@@ -529,12 +530,14 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .notepad {
             flex: 1;
+            min-height: 0;
             display: flex;
             position: relative;
         }
 
         .notepad-paper {
             flex: 1;
+            min-height: 0;
             background: linear-gradient(180deg,
                 var(--color-paper-aged-light) 0%,
                 var(--color-paper-aged) 20%,
@@ -728,6 +731,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         /* ==================== RECIPE BOOK COMPONENT ==================== */
         .book-container {
             flex: 1;
+            height: 100%;
             display: flex;
             flex-direction: column;
             min-width: 700px;
@@ -735,6 +739,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .recipe-book {
             flex: 1;
+            min-height: 0;
             display: flex;
             position: relative;
         }
@@ -793,6 +798,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         /* Pages container */
         .pages-container {
             flex: 1;
+            min-height: 0;
             display: flex;
             position: relative;
             z-index: 1;
@@ -802,6 +808,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         /* Page styles */
         .page {
             flex: 1;
+            min-height: 0;
             background: linear-gradient(180deg,
                 var(--color-paper-cream) 0%,
                 #f5f0e0 50%,
@@ -862,21 +869,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             pointer-events: none;
         }
 
-        /* Page numbers */
-        .page-number {
-            font-family: var(--font-handwritten);
-            font-size: 14px;
-            color: var(--color-ink-muted);
-            margin-bottom: 8px;
-        }
-
-        .page-left .page-number {
-            text-align: left;
-        }
-
-        .page-right .page-number {
-            text-align: right;
-        }
+       
 
         /* ==================== RECIPE CONTENT ==================== */
         .recipe-label {
@@ -1100,7 +1093,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
             .notepad,
             .recipe-book {
-                max-height: 500px;
+                max-height: 90%;
             }
 
             .timer-widget {
@@ -1314,7 +1307,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             const rightPage = document.getElementById('page-right');
 
             leftPage.innerHTML = `
-                <div class="page-number">...</div>
                 <div class="skeleton skeleton-title"></div>
                 <div class="skeleton skeleton-line"></div>
                 <div class="skeleton skeleton-line"></div>
@@ -1323,7 +1315,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             `;
 
             rightPage.innerHTML = `
-                <div class="page-number">...</div>
                 <div class="skeleton skeleton-title"></div>
                 <div class="skeleton skeleton-line"></div>
                 <div class="skeleton skeleton-line"></div>
@@ -1385,7 +1376,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
             // Left page - Ingredients & Metadata
             leftPage.innerHTML = `
-                <div class="page-number">${recipe.id || '?'}</div>
                 <div class="recipe-label">recipe</div>
                 <div class="recipe-title">${recipe.title || 'Untitled Recipe'}</div>
 
@@ -1452,7 +1442,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
             // Right page - Preparation
             rightPage.innerHTML = `
-                <div class="page-number">${(recipe.id || 0) + 1}</div>
                 <div class="section-header">preparation</div>
 
                 <div class="prep-list">
