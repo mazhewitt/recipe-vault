@@ -621,7 +621,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .message-content {
             font-family: var(--font-handwritten);
-            font-size: 14px;
+            font-size: 15px;
             line-height: 1.6;
             color: var(--color-ink-dark);
         }
@@ -633,7 +633,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         .message.tool-use .message-content {
             color: var(--color-ink-light);
             font-style: italic;
-            font-size: 13px;
+            font-size: 14px;
         }
 
         .message.error .message-content {
@@ -680,7 +680,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             border-radius: var(--radius-sm);
             background: #fff;
             font-family: var(--font-handwritten);
-            font-size: 14px;
+            font-size: 15px;
             resize: none;
             outline: none;
             transition: border-color 0.15s ease;
@@ -705,7 +705,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             align-items: center;
             gap: 8px;
             padding: 8px 28px;
-            font-size: 13px;
+            font-size: 14px;
             color: var(--color-ink-light);
         }
 
@@ -890,7 +890,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .recipe-title {
             font-family: var(--font-handwritten);
-            font-size: 26px;
+            font-size: 27px;
             color: var(--color-ink-dark);
             margin-bottom: var(--space-md);
             font-weight: 400;
@@ -898,7 +898,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .section-header {
             font-family: var(--font-handwritten);
-            font-size: 18px;
+            font-size: 19px;
             color: var(--color-accent-brown);
             margin-bottom: 12px;
             padding-bottom: 4px;
@@ -910,7 +910,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         /* Ingredients list */
         .ingredients-list {
             font-family: var(--font-handwritten);
-            font-size: 13px;
+            font-size: 14px;
             line-height: 1.7;
             color: var(--color-ink-dark);
             margin-bottom: 20px;
@@ -929,7 +929,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         /* Preparation steps */
         .prep-list {
             font-family: var(--font-handwritten);
-            font-size: 12px;
+            font-size: 13px;
             line-height: 1.65;
             color: var(--color-ink-dark);
         }
@@ -951,7 +951,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             color: var(--color-ink-medium);
             padding: 2px 6px;
             border-radius: 3px;
-            font-size: 11px;
+            font-size: 12px;
             margin-left: 4px;
         }
 
@@ -959,7 +959,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             margin-top: var(--space-md);
             font-style: italic;
             color: var(--color-ink-light);
-            font-size: 12px;
+            font-size: 13px;
         }
 
         /* ==================== RECIPE METADATA ==================== */
@@ -981,7 +981,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .meta-label {
             font-family: var(--font-handwritten);
-            font-size: 10px;
+            font-size: 11px;
             color: var(--color-ink-muted);
             text-transform: capitalize;
         }
@@ -1022,7 +1022,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
 
         .meta-value {
             font-family: var(--font-handwritten);
-            font-size: 11px;
+            font-size: 12px;
             color: var(--color-ink-medium);
         }
 
@@ -1054,7 +1054,7 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
         }
 
         .recipe-placeholder-text {
-            font-size: 16px;
+            font-size: 17px;
             line-height: 1.6;
         }
 
