@@ -531,7 +531,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             flex: 1;
             display: flex;
             position: relative;
-            max-height: 580px;
         }
 
         .notepad-paper {
@@ -738,7 +737,6 @@ const CHAT_PAGE_HTML: &str = r#"<!DOCTYPE html>
             flex: 1;
             display: flex;
             position: relative;
-            max-height: 580px;
         }
 
         /* Book cover */
