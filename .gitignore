@@ -21,7 +21,9 @@ credentials/
 .claude/skills/
 .gemini/commands/opsx/
 .gemini/skills/
-.github/
+.github/appmod/
+.github/prompts/
+.github/skills/
 
 .DS_Store
 **/.DS_Store

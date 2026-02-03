@@ -252,6 +252,14 @@ docker run -d -p 3000:3000 \
 # Configure MCP with API_BASE_URL=http://<server-ip>:3000
 ```
 
+### Automated Releases
+
+Changes tagged with `v*` (e.g., `v1.0.0`) are automatically built and pushed to Docker Hub via GitHub Actions.
+
+**Required Secrets:**
+- `DOCKERHUB_USERNAME`: Your Docker Hub username
+- `DOCKERHUB_TOKEN`: A Docker Hub access token (Read & Write permissions)
+
 ## Development
 
 ### Run Tests

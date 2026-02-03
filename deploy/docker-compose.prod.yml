@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  recipe-vault:
+    # Replace 'username' with your Docker Hub username
+    image: username/recipe-vault:latest
+    container_name: recipe-vault
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Check for updates every 5 minutes (300 seconds)
+    command: --interval 300 --cleanup recipe-vault

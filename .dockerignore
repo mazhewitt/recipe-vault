@@ -7,3 +7,11 @@ target/
 *.db-shm
 *.db-wal
 docker-compose.override.yml
+.amazonq/
+.claude/
+.gemini/
+.idea/
+.vscode/
+openspec/
+restart_docker.sh
+deploy/
