@@ -460,6 +460,41 @@ All tools return standard JSON-RPC 2.0 error codes:
 | -32001 | Not found (custom) | Recipe doesn't exist |
 | -32002 | Conflict (custom) | Duplicate recipe title |
 
+### 2. Configure Claude Desktop
+
+Edit your Claude Desktop configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "recipe-vault": {
+      "command": "/absolute/path/to/recipe-vault-mcp",
+      "env": {
+        "API_BASE_URL": "http://localhost:3000",
+        "API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+#### Remote Setup (e.g., Synology NAS)
+
+If your Recipe Vault API is running on a remote server like a Synology NAS, update the `env` section in the config above:
+
+1.  **Get the API Key from the NAS:**
+    ```bash
+    # Run via SSH on your Synology
+    sudo docker exec recipe-vault cat /app/data/.api_key
+    ```
+2.  **Update Config:**
+    - `API_BASE_URL`: Change to `http://<your-nas-ip>:3000`
+    - `API_KEY`: Paste the key retrieved in step 1.
+
+3.  **Restart Claude Desktop.**
+
+### 3. Restart Claude Desktop
+
 ## Testing Your Setup
 
 ### 1. Verify Tools Are Loaded

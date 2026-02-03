@@ -92,6 +92,17 @@ If you have **Docker** (DSM 7.1.x):
 - Log in with your `FAMILY_PASSWORD`.
 - Try asking: "What recipes do I have?"
 
+## Connecting Claude Desktop
+
+You can connect your local Claude Desktop application to your remote Synology instance. This allows you to manage recipes using natural language directly from Claude.
+
+1.  **Retrieve API Key**:
+    ```bash
+    ssh your-user@your-synology-ip
+    sudo docker exec recipe-vault cat /app/data/.api_key
+    ```
+2.  **Configure MCP**: Follow the detailed setup instructions in **[MCP.md](MCP.md#remote-setup-eg-synology-nas)**.
+
 ## Automatic Updates
 
 The configuration includes **Watchtower**, a service that automatically keeps your application up to date.
