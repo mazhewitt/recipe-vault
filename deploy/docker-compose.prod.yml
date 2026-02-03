@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   recipe-vault:
-    image: ${DOCKERHUB_USERNAME}/recipe-vault:latest
+    image: mazhewitt/recipe-vault:latest
     container_name: recipe-vault
     restart: unless-stopped
     ports:

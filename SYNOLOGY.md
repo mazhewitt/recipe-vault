@@ -1,12 +1,16 @@
 # Synology NAS Deployment
 
-This guide explains how to deploy Recipe Vault to your Synology NAS using Container Manager (formerly Docker).
+This guide explains how to deploy Recipe Vault to your Synology NAS using Docker.
+
+**Note:** Instructions differ based on your DSM version:
+- **DSM 7.2+**: Uses "Container Manager" (new UI)
+- **DSM 7.1.x**: Uses "Docker" (classic UI) - see specific instructions below
 
 ## Prerequisites
 
-- Synology NAS with "Container Manager" installed
+- Synology NAS with "Docker" or "Container Manager" installed
 - A Docker Hub account (or use the public image `mazhewitt/recipe-vault:latest` if available)
-- SSH access enabled (optional, but recommended for setup)
+- SSH access enabled (recommended for easier setup on DSM 7.1.x)
 
 ## Deployment Steps
 
@@ -45,7 +49,19 @@ Edit the `.env` file on your NAS (using Synology Text Editor or via SSH).
 
 ### 4. Start the Application
 
-#### Option A: Using Synology Container Manager (UI)
+#### Option A: Using SSH (Recommended for DSM 7.1.x)
+
+This method works on all DSM versions:
+
+```bash
+ssh your-user@your-synology-ip
+cd /volume1/docker/recipe-vault
+sudo docker-compose up -d
+```
+
+#### Option B: Using Container Manager UI (DSM 7.2+)
+
+If you have **Container Manager** (DSM 7.2+):
 
 1.  Open **Container Manager**.
 2.  Go to **Project** tab.
@@ -55,13 +71,20 @@ Edit the `.env` file on your NAS (using Synology Text Editor or via SSH).
 6.  **Source**: Choose "Create docker-compose.yml" (it will automatically use the file you uploaded).
 7.  Click **Next**, verify settings, and click **Done**.
 
-#### Option B: Using SSH (Command Line)
+#### Option C: Using Docker UI (DSM 7.1.x)
 
-```bash
-ssh your-user@your-synology-ip
-cd /volume1/docker/recipe-vault
-sudo docker-compose up -d
-```
+If you have **Docker** (DSM 7.1.x):
+
+**Note:** The older Docker UI doesn't have native docker-compose project support. You have two choices:
+
+1. **Use SSH method above** (easiest and recommended)
+2. **Manual container creation** (more complex):
+   - Open **Docker** app
+   - Go to **Image** tab
+   - Download the image: `mazhewitt/recipe-vault:latest` and `containrrr/watchtower:latest`
+   - Go to **Container** tab
+   - Create containers manually based on the docker-compose.yml settings
+   - This is tedious and error-prone, so SSH is strongly recommended for DSM 7.1.x
 
 ### 5. Verify Installation
 
@@ -79,6 +102,10 @@ The configuration includes **Watchtower**, a service that automatically keeps yo
 
 ## Troubleshooting
 
-- **Check Logs**: In Container Manager, click on the container > Log to see startup errors.
+- **Check Logs**:
+  - DSM 7.2+: In Container Manager, click on the container > Log
+  - DSM 7.1.x: In Docker app, go to Container tab > select container > Details > Log tab
+  - Or via SSH: `sudo docker-compose logs -f` (in the `/volume1/docker/recipe-vault` directory)
 - **Permission Issues**: Ensure the `data` folder is writable by the container user.
 - **Port Conflicts**: If port 3000 is used, change `"3000:3000"` to `"3001:3000"` in `docker-compose.yml` and access on port 3001.
+- **Can't access via SSH**: Enable SSH in Control Panel > Terminal & SNMP > Enable SSH service.
