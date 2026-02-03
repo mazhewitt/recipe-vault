@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   recipe-vault:
-    # Replace 'username' with your Docker Hub username
-    image: username/recipe-vault:latest
+    image: ${DOCKERHUB_USERNAME}/recipe-vault:latest
     container_name: recipe-vault
     restart: unless-stopped
     ports:
