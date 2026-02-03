@@ -236,29 +236,32 @@ Use natural language to manage recipes through Claude Desktop.
 
 See [MCP.md](MCP.md) for detailed tool documentation.
 
-## Docker Deployment
+## Deployment
+
+### Synology NAS (Production)
+
+For automated production deployment on Synology NAS, see the detailed **[Synology Deployment Guide](SYNOLOGY.md)**.
+
+Features:
+- **One-click install** via Container Manager (docker-compose)
+- **Automatic Updates** via Watchtower
+- **Persistent Storage** for your recipe database
+- **Secure Secrets** management
+
+### Docker (Quick Run)
+
+For a quick test run on any machine with Docker:
 
 ```bash
-# Build
-docker build -t recipe-vault .
-
-# Run
 docker run -d -p 3000:3000 \
   -v recipe-data:/app/data \
   -e ANTHROPIC_API_KEY=your-key \
-  recipe-vault
-
-# Remote access (from another machine)
-# Configure MCP with API_BASE_URL=http://<server-ip>:3000
+  mazhewitt/recipe-vault:latest
 ```
 
 ### Automated Releases
 
 Changes tagged with `v*` (e.g., `v1.0.0`) are automatically built and pushed to Docker Hub via GitHub Actions.
-
-**Required Secrets:**
-- `DOCKERHUB_USERNAME`: Your Docker Hub username
-- `DOCKERHUB_TOKEN`: A Docker Hub access token (Read & Write permissions)
 
 ## Development
 
