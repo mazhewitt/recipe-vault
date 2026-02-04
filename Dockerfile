@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /app/target/release/recipe-vault /usr/local/bin/recipe-vault
 COPY --from=builder /app/target/release/recipe-vault-mcp /usr/local/bin/recipe-vault-mcp
 
+# Copy static assets
+COPY static /app/static
+
 # Create data directory for SQLite
 RUN mkdir -p /app/data
 ENV DATABASE_URL=sqlite:///app/data/recipes.db?mode=rwc

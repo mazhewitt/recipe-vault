@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200, initial-scale=1.0">
+    <title>Recipe Vault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <!-- Logout Button -->
+    <form method="POST" action="/logout" style="margin: 0;">
+        <button type="submit" class="logout-btn">Logout</button>
+    </form>
+
+    <!-- Timer Widget -->
+    <div class="timer-widget" id="timer-widget" style="display: none;">
+        <div class="timer-icon">
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="13" r="9"/>
+                <polyline points="12 7 12 13 15 15"/>
+                <path d="M9 2h6"/>
+                <path d="M12 2v2"/>
+            </svg>
+        </div>
+        <span class="timer-text" id="timer-text">Timer: 00:00</span>
+    </div>
+
+    <div class="app-container">
+        <!-- Notepad Section -->
+        <div class="notepad-container">
+            <div class="section-label">Notepad</div>
+            <div class="notepad">
+                <div class="notepad-paper">
+                    <div class="notepad-header">
+                        <h2>Recipe Development & Search</h2>
+                    </div>
+                    <div class="notepad-content" id="messages">
+                        <div class="message">
+                            <div class="message-content">
+                                <strong>AI:</strong> Hello! I'm your cooking assistant. I can help you manage your recipes - list them, get details, create new ones, or update existing recipes. What would you like to do?
+                            </div>
+                        </div>
+                    </div>
+                    <div id="loading" class="loading">
+                        <div class="spinner"></div>
+                        <span id="loading-text">Thinking...</span>
+                    </div>
+                    <div class="notepad-input">
+                        <textarea class="text-input" id="message-input" placeholder="Type your message..." onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recipe Book Section -->
+        <div class="book-container">
+            <div class="section-label">Recipe Book</div>
+            <div class="recipe-book">
+                <div class="book-cover"></div>
+                <div class="pages-container">
+                    <!-- Left Page - Ingredients -->
+                    <div class="page page-left" id="page-left">
+                        <div class="recipe-placeholder">
+                            <div class="recipe-placeholder-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                    <path d="M12 11v4"/>
+                                    <path d="M9 14h6"/>
+                                </svg>
+                            </div>
+                            <div class="recipe-placeholder-text">
+                                Ask me to find or create a recipe, and it will appear here in your book.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Page - Preparation -->
+                    <div class="page page-right" id="page-right">
+                        <div class="recipe-placeholder">
+                            <div class="recipe-placeholder-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 2a4 4 0 00-4 4v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2h-2V6a4 4 0 00-4-4z"/>
+                                    <path d="M10 14h4"/>
+                                    <path d="M12 12v4"/>
+                                </svg>
+                            </div>
+                            <div class="recipe-placeholder-text">
+                                Your preparation steps will appear on this page.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

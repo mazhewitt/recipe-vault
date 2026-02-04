@@ -7,6 +7,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::{
     cors::CorsLayer,
+    services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -107,6 +108,7 @@ async fn main() {
         .with_state(ui_state);
 
     let app = Router::new()
+        .nest_service("/static", ServeDir::new("./static"))
         .merge(ui_routes)
         .nest("/api", api_routes)
         .layer(
