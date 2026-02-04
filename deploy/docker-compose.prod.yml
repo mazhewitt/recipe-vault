@@ -5,12 +5,24 @@ services:
     image: mazhewitt/recipe-vault:latest
     container_name: recipe-vault
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # Port 3000 NOT exposed to local network (Tunnel only)
+    expose:
+      - "3000"
     volumes:
       - ./data:/app/data
     env_file:
       - .env
+
+  api-proxy:
+    image: nginx:alpine
+    container_name: api-proxy
+    restart: unless-stopped
+    ports:
+      - "3500:3500"
+    volumes:
+      - ./nginx-api-only.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - recipe-vault
 
   watchtower:
     image: containrrr/watchtower

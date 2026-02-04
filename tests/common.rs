@@ -24,6 +24,8 @@ pub async fn create_test_db() -> SqlitePool {
 /// Create test router with database pool
 pub fn create_test_app(pool: SqlitePool) -> Router {
     use recipe_vault::handlers::recipes;
+    use recipe_vault::auth::cloudflare_auth;
+    use axum::middleware;
 
     Router::new()
         .route("/api/recipes", axum::routing::post(recipes::create_recipe))
@@ -41,6 +43,10 @@ pub fn create_test_app(pool: SqlitePool) -> Router {
             axum::routing::delete(recipes::delete_recipe),
         )
         .with_state(pool)
+        .layer(middleware::from_fn_with_state(
+            Some("test@example.com".to_string()),
+            cloudflare_auth,
+        ))
 }
 
 /// Helper to send JSON request and get response

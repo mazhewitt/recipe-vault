@@ -24,43 +24,17 @@ export interface Recipe {
 }
 
 /**
- * Authenticate with the server using family password
+ * Authenticate with the server (navigation only, relies on DEV_USER_EMAIL)
  */
 export async function authenticate(page: Page): Promise<void> {
-  const familyPassword = process.env.FAMILY_PASSWORD || 'test123';
-
-  console.log(`Attempting to authenticate at /chat with password: ${familyPassword}`);
   await page.goto('/chat');
-  console.log(`Current URL after goto: ${page.url()}`);
 
-  // Check if we need to authenticate
-  const authInput = page.locator('input[type="password"]');
-  const needsAuth = await authInput.isVisible().catch(() => false);
-  console.log(`Needs auth: ${needsAuth}`);
-
-  if (needsAuth) {
-    console.log('Filling password and clicking submit...');
-    await authInput.fill(familyPassword);
-    await page.locator('button[type="submit"]').click();
-    console.log('Clicked submit, waiting for #message-input...');
-
-    // Wait for authentication to complete - chat page loads
-    try {
-      await expect(page.locator('#message-input')).toBeVisible({ timeout: 5000 });
-      console.log('Authentication successful!');
-    } catch (e) {
-      console.error(`Authentication failed. Current URL: ${page.url()}`);
-      const body = await page.innerHTML('body');
-      console.error('Page body snippet:', body.substring(0, 500));
-      throw e;
-    }
-  } else {
-    console.log('No auth input found, checking if #message-input is visible...');
-    const chatVisible = await page.locator('#message-input').isVisible();
-    console.log(`Chat visible: ${chatVisible}`);
-    if (!chatVisible) {
-      console.error(`Not on login page but chat not visible either. URL: ${page.url()}`);
-    }
+  // Wait for chat page to load
+  try {
+    await expect(page.locator('#message-input')).toBeVisible({ timeout: 5000 });
+  } catch (e) {
+    console.error(`Failed to load chat page. Current URL: ${page.url()}`);
+    throw e;
   }
 }
 

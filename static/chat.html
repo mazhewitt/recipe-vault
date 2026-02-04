@@ -11,10 +11,11 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <!-- Logout Button -->
-    <form method="POST" action="/logout" style="margin: 0;">
-        <button type="submit" class="logout-btn">Logout</button>
-    </form>
+    <!-- User Identity & Logout -->
+    <div class="user-info">
+        <span class="user-email">{{user_email}}</span>
+        <a href="/cdn-cgi/access/logout" class="logout-link">Logout</a>
+    </div>
 
     <!-- Timer Widget -->
     <div class="timer-widget" id="timer-widget" style="display: none;">

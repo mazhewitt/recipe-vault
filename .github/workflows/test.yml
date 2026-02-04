@@ -78,7 +78,7 @@ jobs:
           MOCK_LLM: 'true'
           DATABASE_URL: 'sqlite::memory:'
           ANTHROPIC_API_KEY: 'mock-key'
-          FAMILY_PASSWORD: 'test123'
+          DEV_USER_EMAIL: 'ci-test@example.com'
         run: npm test
 
       - name: Upload test results

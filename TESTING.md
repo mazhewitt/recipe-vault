@@ -73,8 +73,8 @@ The E2E tests use a mock LLM provider to avoid consuming API tokens. The mock pr
 
 **Testing with mock locally:**
 ```bash
-# Terminal 1: Start server with mock LLM
-MOCK_LLM=true DATABASE_URL=sqlite::memory: cargo run
+# Terminal 1: Start server with mock LLM and dev identity
+MOCK_LLM=true DEV_USER_EMAIL=test@example.com DATABASE_URL=sqlite::memory: cargo run
 
 # Terminal 2: Run Playwright tests
 cd tests/e2e

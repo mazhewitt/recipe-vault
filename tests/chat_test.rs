@@ -18,7 +18,6 @@ use recipe_vault::auth::{api_key_auth, ApiKeyState};
 fn create_auth_test_app(api_key: &str) -> Router {
     let api_key_state = ApiKeyState {
         key: Arc::new(api_key.to_string()),
-        family_password: None,
     };
 
     // Simple handler that returns OK if auth passes

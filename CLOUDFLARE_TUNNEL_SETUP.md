@@ -155,7 +155,6 @@ Add the tunnel token to your `deploy/.env` file:
 ```bash
 # Existing vars
 ANTHROPIC_API_KEY=your-anthropic-key
-FAMILY_PASSWORD=your-family-password
 DATABASE_URL=sqlite:///app/data/recipes.db
 
 # Add this - get from Cloudflare dashboard when you create the tunnel
@@ -163,6 +162,8 @@ TUNNEL_TOKEN=eyJhIjoiNjM...your-token-here
 ```
 
 > **Important:** The token is sensitive - don't commit it to git. Your `.env` should already be in `.gitignore`.
+
+> **Note:** `FAMILY_PASSWORD` is no longer needed. Authentication is handled by Cloudflare Access using the Google OAuth configured in Step 1.
 
 ### 3.3 Configure Tunnel URL in Cloudflare
 
@@ -233,56 +234,8 @@ Now protect the tunnel with Google authentication.
 4. Click **Sign in with Google**
 5. Select your Google account
 6. If your email is in the allow list, you'll be redirected to Recipe Vault
-7. Log in with your family password (still required for now)
-
-### 5.2 Test Rejection
-
-1. Open another incognito window
-2. Go to `https://recipes.domain.com`
-3. Try to sign in with a Google account NOT on your list
-4. Should see "Access Denied"
-
-### 5.3 Have Your Daughter Test
-
-1. Send her the URL: `https://recipes.domain.com`
-2. She signs in with her Google account
-3. Then enters the family password
-4. She's in!
-
----
-
-## Troubleshooting
-
-### Tunnel shows "Inactive" or "Down"
-
-- Check cloudflared container logs in Synology
-- Verify the tunnel token is correct
-- Ensure container can reach the internet (outbound)
-
-### "Bad Gateway" or "Connection refused"
-
-- The tunnel is working but can't reach recipe-vault
-- Check the URL in Cloudflare tunnel config
-- Verify recipe-vault is running and accessible at that address
-- Try using the NAS IP directly: `192.168.x.x:3000`
-
-### Google login not appearing
-
-- Verify Google is configured in Settings → Authentication
-- Check the OAuth redirect URI matches your team name
-- Ensure the Access application is using Google as an identity provider
-
-### Access denied for allowed email
-
-- Check spelling of email in the policy
-- Emails are case-insensitive but double-check
-- Try removing and re-adding the email
-
-### Certificate errors
-
-- Cloudflare handles HTTPS automatically
-- If you see cert errors, ensure you're accessing via `https://` not `http://`
-- Check that Cloudflare proxy is enabled (orange cloud) for the DNS record
+7. Log in with your Google account.
+8. You're in! No additional family password is required.
 
 ---
 
@@ -291,28 +244,17 @@ Now protect the tunnel with Google authentication.
 ### What's protected
 
 - **Cloudflare Access** blocks all unauthenticated traffic at Cloudflare's edge
-- Attackers can't even see your login page without valid Google auth
+- Attackers can't even see your application without valid Google auth
 - Your NAS IP is never exposed (traffic goes through Cloudflare)
 - No ports need to be opened on your router
 
-### Current authentication flow
+### Authentication Flow
 
 ```
-User → Google OAuth (Cloudflare) → Family Password (recipe-vault) → Access
+User → Google OAuth (Cloudflare) → User Identity Header → Access
 ```
 
-### Future: Remove family password
-
-Once you're comfortable with this setup, you can:
-1. Trust Cloudflare Access as the sole authentication
-2. Read user identity from Cloudflare headers in the app
-3. Add "created by" / "updated by" tracking
-
-Cloudflare passes these headers to your app:
-- `Cf-Access-Authenticated-User-Email` - the user's email
-- `Cf-Access-Jwt-Assertion` - JWT token for verification
-
-This would be a code change to recipe-vault (a future phase).
+Recipe Vault reads the `Cf-Access-Authenticated-User-Email` header to identify you.
 
 ---
 

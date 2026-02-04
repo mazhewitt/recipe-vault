@@ -82,12 +82,12 @@ Create a `.env` file:
 ```bash
 # Required for web chat
 ANTHROPIC_API_KEY=your-anthropic-api-key
-FAMILY_PASSWORD=your-secret-family-password
 
 # Optional
 DATABASE_URL=sqlite://recipes.db
 PORT=3000
 AI_MODEL=claude-sonnet-4-5  # or gpt-4o for OpenAI
+DEV_USER_EMAIL=test@example.com  # For local development (simulates Cloudflare auth)
 ```
 
 ### 3. Run the Server
@@ -104,16 +104,17 @@ The server starts at `http://localhost:3000` with:
 
 The web chat provides a browser-based AI assistant for managing recipes through natural language.
 
-### Setup
+### Authentication
 
-1. Set `ANTHROPIC_API_KEY` and `FAMILY_PASSWORD` in `.env`
-2. Start the server
-3. Open `http://localhost:3000/chat`
-4. Log in with your family password
+The Web UI uses **Cloudflare Access** for authentication.
+
+1.  **Production**: Identity is read from the `Cf-Access-Authenticated-User-Email` header provided by Cloudflare.
+2.  **Local Development**: Set `DEV_USER_EMAIL` in your `.env` to simulate an authenticated user.
 
 ### Features
 
-- **Secure Access** - Password-protected access for the whole family
+- **Single Sign-On** - Authenticate once via Google/Cloudflare and you're in
+- **User Identity** - See who's logged in directly in the UI
 - **Real-time streaming** - Responses stream as they're generated
 - **Tool use indicators** - See when the AI is searching or creating recipes
 - **Conversation context** - Follow-up questions understand previous context
@@ -144,7 +145,7 @@ AI: [Calls create_recipe] I've created a new Pancakes recipe for you...
 All `/api/*` endpoints require authentication.
 
 1.  **API Key**: Include the `X-API-Key` header (Standard for API clients/MCP).
-2.  **Session Cookie**: Include a valid `rv_session` cookie (Standard for Web UI).
+2.  **Cloudflare Identity**: Include valid Cloudflare Access headers (Standard for Web UI).
 
 **First startup**: The server generates a 32-character API key and prints it to stdout.
 
@@ -214,13 +215,15 @@ Use natural language to manage recipes through Claude Desktop.
        "recipe-vault": {
          "command": "/absolute/path/to/recipe-vault-mcp",
          "env": {
-           "API_BASE_URL": "http://localhost:3000",
+           "API_BASE_URL": "http://localhost:3500",
            "API_KEY": "your-api-key"
          }
        }
      }
    }
    ```
+
+   > **Note**: Port 3500 is the API-only port that strips Cloudflare headers, ensuring MCP clients authenticate via API key only.
 
 3. Restart Claude Desktop
 
@@ -340,7 +343,7 @@ recipe-vault/
 1. Use absolute paths in Claude Desktop config
 2. Verify binary is executable: `chmod +x target/release/recipe-vault-mcp`
 3. Check Claude Desktop logs for errors
-4. Test API is reachable: `curl http://localhost:3000/api/recipes`
+4. Test API is reachable: `curl -H "X-API-Key: your-key" http://localhost:3500/api/recipes`
 
 ### Authentication Errors (401)
 

@@ -31,7 +31,7 @@ export default defineConfig({
       MOCK_LLM: 'true',
       DATABASE_URL: 'sqlite::memory:',
       ANTHROPIC_API_KEY: 'mock-key',
-      FAMILY_PASSWORD: 'test123',
+      DEV_USER_EMAIL: 'test@example.com',
       BIND_ADDRESS: '127.0.0.1:3001',
       API_KEY: 'test-api-key-for-playwright',
       RUST_LOG: 'debug',

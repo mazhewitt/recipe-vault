@@ -6,6 +6,7 @@ use axum::{
 use sqlx::SqlitePool;
 
 use crate::{
+    auth::UserIdentity,
     db::queries,
     error::ApiResult,
     models::{
@@ -17,9 +18,13 @@ use crate::{
 /// Create a new recipe
 pub async fn create_recipe(
     State(pool): State<SqlitePool>,
+    extensions: axum::http::Extensions,
     Json(input): Json<CreateRecipeInput>,
 ) -> ApiResult<(StatusCode, Json<RecipeWithDetails>)> {
-    let recipe = queries::create_recipe(&pool, input).await?;
+    let identity = extensions.get::<UserIdentity>();
+    let user_email = identity.and_then(|i| i.email.clone());
+
+    let recipe = queries::create_recipe(&pool, input, user_email).await?;
     Ok((StatusCode::CREATED, Json(recipe)))
 }
 
@@ -44,9 +49,13 @@ pub async fn get_recipe(
 pub async fn update_recipe(
     State(pool): State<SqlitePool>,
     Path(id): Path<String>,
+    extensions: axum::http::Extensions,
     Json(input): Json<UpdateRecipeInput>,
 ) -> ApiResult<Json<RecipeWithDetails>> {
-    let recipe = queries::update_recipe(&pool, &id, input).await?;
+    let identity = extensions.get::<UserIdentity>();
+    let user_email = identity.and_then(|i| i.email.clone());
+
+    let recipe = queries::update_recipe(&pool, &id, input, user_email).await?;
     Ok(Json(recipe))
 }
 

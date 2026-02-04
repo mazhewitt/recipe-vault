@@ -6,7 +6,7 @@ pub struct Config {
     pub bind_address: String,
     pub anthropic_api_key: String,
     pub ai_model: String,
-    pub family_password: Option<String>,
+    pub dev_user_email: Option<String>,
     pub mock_llm: bool,
     pub mock_recipe_id: Option<String>,
 }
@@ -25,7 +25,7 @@ impl Config {
         let ai_model = env::var("AI_MODEL")
             .unwrap_or_else(|_| "claude-sonnet-4-5".to_string());
 
-        let family_password = env::var("FAMILY_PASSWORD").ok();
+        let dev_user_email = env::var("DEV_USER_EMAIL").ok();
 
         let mock_llm = env::var("MOCK_LLM")
             .unwrap_or_else(|_| "false".to_string())
@@ -38,7 +38,7 @@ impl Config {
             bind_address,
             anthropic_api_key,
             ai_model,
-            family_password,
+            dev_user_email,
             mock_llm,
             mock_recipe_id,
         })

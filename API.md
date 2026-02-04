@@ -24,8 +24,8 @@ Authentication is required for all API endpoints.
 Include the `X-API-Key` header with every request.
 The key is generated on first startup and stored in `data/.api_key`.
 
-**Method 2: Session Cookie (Web UI)**
-The Web UI uses the `rv_session` cookie, which is set via the `/login` endpoint using the `FAMILY_PASSWORD`.
+**Method 2: Cloudflare Identity (Web UI)**
+The Web UI uses Cloudflare Access identity headers. Include the `Cf-Access-Authenticated-User-Email` header with a valid email.
 
 ### API Endpoints
 

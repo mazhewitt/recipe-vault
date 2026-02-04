@@ -799,24 +799,37 @@ body::before {
     }
 }
 
-/* Logout button */
-.logout-btn {
+/* User info and Logout */
+.user-info {
     position: fixed;
     top: 25px;
     left: 50px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid var(--color-label-cream);
-    color: var(--color-label-cream);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0,0,0,0.3);
     padding: 6px 14px;
     border-radius: var(--radius-sm);
-    font-family: var(--font-handwritten);
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.15s ease;
+    border: 1px solid var(--color-border);
     z-index: 100;
 }
 
-.logout-btn:hover {
-    background: rgba(255,255,255,0.2);
+.user-email {
+    color: var(--color-paper-cream);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.logout-link {
+    color: var(--color-label-cream);
+    text-decoration: none;
+    font-size: 13px;
+    opacity: 0.8;
+    transition: opacity 0.15s ease;
+}
+
+.logout-link:hover {
+    opacity: 1;
+    text-decoration: underline;
 }
 

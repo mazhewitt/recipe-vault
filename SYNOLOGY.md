@@ -44,7 +44,6 @@ Edit the `.env` file on your NAS (using Synology Text Editor or via SSH).
 **Required Settings:**
 
 - `ANTHROPIC_API_KEY`: Your API key from Anthropic console.
-- `FAMILY_PASSWORD`: A secure password for web access.
 - `DOCKERHUB_USERNAME`: Set this to `mazhewitt` (or your own username if you built your own image).
 
 ### 4. Start the Application
@@ -88,8 +87,8 @@ If you have **Docker** (DSM 7.1.x):
 
 ### 5. Verify Installation
 
-- Open your browser to `http://<synology-ip>:3000/chat`.
-- Log in with your `FAMILY_PASSWORD`.
+- Open your browser to `https://recipes.yourdomain.com/chat`.
+- Sign in with your Google account (via Cloudflare Access).
 - Try asking: "What recipes do I have?"
 
 ## Connecting Claude Desktop
