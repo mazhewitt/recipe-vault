@@ -17,6 +17,10 @@ pub struct Recipe {
     pub servings: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_by: Option<String>,
 }
 
 /// Full recipe with ingredients and steps

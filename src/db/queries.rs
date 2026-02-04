@@ -13,6 +13,7 @@ use crate::{
 pub async fn create_recipe(
     pool: &SqlitePool,
     input: CreateRecipeInput,
+    user_email: Option<String>,
 ) -> ApiResult<RecipeWithDetails> {
     // Validate input
     input.validate()?;
@@ -36,8 +37,8 @@ pub async fn create_recipe(
 
     // Insert recipe
     sqlx::query(
-        "INSERT INTO recipes (id, title, description, prep_time_minutes, cook_time_minutes, servings)
-         VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO recipes (id, title, description, prep_time_minutes, cook_time_minutes, servings, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&recipe_id)
     .bind(&input.title)
@@ -45,6 +46,8 @@ pub async fn create_recipe(
     .bind(&input.prep_time_minutes)
     .bind(&input.cook_time_minutes)
     .bind(&input.servings)
+    .bind(&user_email)
+    .bind(&user_email)
     .execute(&mut *tx)
     .await?;
 
@@ -137,6 +140,7 @@ pub async fn update_recipe(
     pool: &SqlitePool,
     recipe_id: &str,
     input: UpdateRecipeInput,
+    user_email: Option<String>,
 ) -> ApiResult<RecipeWithDetails> {
     let mut tx = pool.begin().await?;
 
@@ -202,6 +206,7 @@ pub async fn update_recipe(
 
     if has_update {
         updates.push("updated_at = datetime('now')");
+        updates.push("updated_by = ?");
         let update_query = format!("UPDATE recipes SET {} WHERE id = ?", updates.join(", "));
 
         let mut query = sqlx::query(&update_query);
@@ -220,6 +225,7 @@ pub async fn update_recipe(
         if let Some(servings) = input.servings {
             query = query.bind(servings);
         }
+        query = query.bind(&user_email);
         query = query.bind(recipe_id);
 
         query.execute(&mut *tx).await?;
@@ -228,6 +234,13 @@ pub async fn update_recipe(
     // Replace ingredients if provided
     if let Some(ingredients) = input.ingredients {
         sqlx::query("DELETE FROM ingredients WHERE recipe_id = ?")
+            .bind(recipe_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // Update the recipe's updated_by and updated_at when ingredients change
+        sqlx::query("UPDATE recipes SET updated_at = datetime('now'), updated_by = ? WHERE id = ?")
+            .bind(&user_email)
             .bind(recipe_id)
             .execute(&mut *tx)
             .await?;
@@ -253,6 +266,13 @@ pub async fn update_recipe(
     // Replace steps if provided
     if let Some(steps) = input.steps {
         sqlx::query("DELETE FROM steps WHERE recipe_id = ?")
+            .bind(recipe_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // Update the recipe's updated_by and updated_at when steps change
+        sqlx::query("UPDATE recipes SET updated_at = datetime('now'), updated_by = ? WHERE id = ?")
+            .bind(&user_email)
             .bind(recipe_id)
             .execute(&mut *tx)
             .await?;

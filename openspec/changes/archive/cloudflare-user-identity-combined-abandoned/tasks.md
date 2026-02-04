@@ -2,10 +2,11 @@
 
 ## 1. Database Migration
 
-- [ ] 1.1 Create migration to add `created_by` column (nullable VARCHAR) to recipes table
-- [ ] 1.2 Create migration to add `updated_by` column (nullable VARCHAR) to recipes table
-- [ ] 1.3 Update Recipe model struct to include new fields
+- [x] 1.1 Create migration to add `created_by` column (nullable VARCHAR) to recipes table
+- [x] 1.2 Create migration to add `updated_by` column (nullable VARCHAR) to recipes table
+- [x] 1.3 Update Recipe model struct to include new fields
 - [ ] 1.4 Update recipe queries to read/write new fields
+- [ ] 1.5 Test migration runs successfully on development database
 
 ## 2. Identity Extraction
 
@@ -46,6 +47,8 @@
 - [ ] 6.6 Update chat tests (tests/chat_test.rs) to handle optional family_password
 - [ ] 6.7 Update E2E test helpers (tests/e2e/tests/helpers.ts) to remove password authentication
 - [ ] 6.8 Verify E2E tests work without login flow (or update to use DEV_USER_EMAIL)
+- [ ] 6.9 Test migration can be applied to existing database without data loss
+- [ ] 6.10 Verify schema changes after migration (created_by and updated_by columns exist and are nullable)
 
 ## 7. Documentation and Deployment
 
@@ -55,3 +58,8 @@
 - [ ] 7.4 Update SYNOLOGY.md to remove FAMILY_PASSWORD references
 - [ ] 7.5 Document `DEV_USER_EMAIL` environment variable for local development
 - [ ] 7.6 Update TESTING.md if it mentions authentication setup
+- [ ] 7.7 Backup production database before applying migration
+- [ ] 7.8 Test migration on a copy of production database
+- [ ] 7.9 Run migration in production environment (sqlx migrate run)
+- [ ] 7.10 Verify migration completed successfully in production (check schema and existing recipes)
+- [ ] 7.11 Document rollback procedure if migration fails
