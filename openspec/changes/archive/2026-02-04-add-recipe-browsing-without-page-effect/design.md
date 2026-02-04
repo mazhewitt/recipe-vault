@@ -31,10 +31,11 @@ The recipe book UI currently displays one recipe at a time, loaded via chat inte
 ### Decision 2: Arrow placement
 
 **Choice**:
-- "<" arrow: Top-left corner of left page (inside the page, below page number area)
-- ">" arrow: Top-right corner of right page (inside the page, below page number area)
+- Place the navigation arrows anchored to the `.recipe-book` container (visually at the top-left and top-right corners of the book), rather than as children of the individual page elements.
 
-**Rationale**: Mimics natural book page-turning gesture. Arrows are visible but don't interfere with recipe content.
+**Rationale**: Anchoring arrows to the `.recipe-book` container prevents them from shifting when individual page scrollbars appear or page content changes. This preserves the intended visual placement (top corners of the book) while improving stability and usability.
+
+**Notes**: This deviates from the original "inside page" placement decision but keeps the visual metaphor intact. Documenting this change ensures future designers and implementers understand why the arrows live outside the individual `.page` scroll areas.
 
 ### Decision 3: Boundary behavior
 

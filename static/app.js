@@ -28,7 +28,8 @@ async function updateNavigationState() {
     if (!prevBtn || !nextBtn) return;
 
     if (!currentRecipeId) {
-        prevBtn.disabled = true;
+        // When no recipe is displayed, both arrows should be enabled if recipes exist.
+        prevBtn.disabled = list.length === 0;
         nextBtn.disabled = list.length === 0;
         return;
     }
@@ -46,7 +47,8 @@ async function updateNavigationState() {
 }
 
 async function loadNextRecipe() {
-    const list = await fetchRecipeList();
+    // Fetch fresh list to ensure we're using up-to-date data after chat operations
+    const list = await fetchRecipeList(true);
     if (list.length === 0) return;
     if (!currentRecipeId) {
         fetchAndDisplayRecipe(list[0].id);
@@ -63,9 +65,15 @@ async function loadNextRecipe() {
 }
 
 async function loadPrevRecipe() {
-    const list = await fetchRecipeList();
+    // Fetch fresh list to ensure we're using up-to-date data after chat operations
+    const list = await fetchRecipeList(true);
     if (list.length === 0) return;
-    if (!currentRecipeId) return;
+    // If no recipe currently shown, clicking back should load the first recipe
+    if (!currentRecipeId) {
+        fetchAndDisplayRecipe(list[0].id);
+        return;
+    }
+
     const idx = findIndexById(list, currentRecipeId);
     if (idx === -1) {
         fetchAndDisplayRecipe(list[0].id);

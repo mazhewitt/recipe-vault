@@ -538,14 +538,14 @@ body::before {
 /* Page navigation arrows */
 .page-nav {
     position: absolute;
-    top: 10px;
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
+    top: 5px;
+    width: 29px;
+    height: 29px;
+    border-radius: 5px;
     background: var(--color-paper-aged);
     border: 1px solid var(--color-border);
     font-family: 'Kalam', cursive;
-    font-size: 20px;
+    font-size: 16px;
     color: var(--color-ink-dark);
     display: flex;
     align-items: center;
@@ -557,8 +557,8 @@ body::before {
 }
 .page-nav:hover { background: var(--color-paper-aged-light); transform: translateY(-1px); }
 .page-nav[disabled], .page-nav.disabled { opacity: 0.35; cursor: default; transform: none; pointer-events: none; }
-.page-nav.prev { left: 8px; }
-.page-nav.next { right: 8px; }
+.page-nav.prev { left: 5px; }
+.page-nav.next { right: 5px; }
 
 .page-content {
     width: 100%;

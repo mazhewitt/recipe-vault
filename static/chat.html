@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1200, initial-scale=1.0">
-    <title>Recipe Vault</title>
+    <title>Recipe Vault - Chat</title>
     <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -61,10 +61,11 @@
             <div class="section-label">Recipe Book</div>
             <div class="recipe-book">
                 <div class="book-cover"></div>
+                <button id="page-prev" class="page-nav prev" aria-label="Previous recipe" disabled>&lt;</button>
+                <button id="page-next" class="page-nav next" aria-label="Next recipe" disabled>&gt;</button>
                 <div class="pages-container">
                     <!-- Left Page - Ingredients -->
                     <div class="page page-left" id="page-left">
-                        <button id="page-prev" class="page-nav prev" aria-label="Previous recipe" disabled>&lt;</button>
                         <div class="page-content" id="page-left-content">
                             <div class="recipe-placeholder">
                                 <div class="recipe-placeholder-icon">
@@ -83,7 +84,6 @@
 
                     <!-- Right Page - Preparation -->
                     <div class="page page-right" id="page-right">
-                        <button id="page-next" class="page-nav next" aria-label="Next recipe" disabled>&gt;</button>
                         <div class="page-content" id="page-right-content">
                             <div class="recipe-placeholder">
                                 <div class="recipe-placeholder-icon">
