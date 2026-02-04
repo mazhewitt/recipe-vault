@@ -1,4 +1,91 @@
 let conversationId = null;
+let currentRecipeId = null;
+let recipeListCache = null;
+
+async function fetchRecipeList(forceRefresh = false) {
+    if (recipeListCache && !forceRefresh) return recipeListCache;
+    try {
+        const resp = await fetch('/api/recipes', { credentials: 'same-origin' });
+        if (!resp.ok) return [];
+        const list = await resp.json();
+        recipeListCache = list;
+        return list;
+    } catch (e) {
+        console.error('Failed to fetch recipe list:', e);
+        return [];
+    }
+}
+
+function findIndexById(list, id) {
+    return list.findIndex(r => String(r.id) === String(id));
+}
+
+async function updateNavigationState() {
+    const prevBtn = document.getElementById('page-prev');
+    const nextBtn = document.getElementById('page-next');
+
+    const list = await fetchRecipeList();
+    if (!prevBtn || !nextBtn) return;
+
+    if (!currentRecipeId) {
+        prevBtn.disabled = true;
+        nextBtn.disabled = list.length === 0;
+        return;
+    }
+
+    const idx = findIndexById(list, currentRecipeId);
+
+    if (idx === -1) {
+        prevBtn.disabled = list.length === 0;
+        nextBtn.disabled = list.length <= 1;
+        return;
+    }
+
+    prevBtn.disabled = idx <= 0;
+    nextBtn.disabled = idx >= list.length - 1;
+}
+
+async function loadNextRecipe() {
+    const list = await fetchRecipeList();
+    if (list.length === 0) return;
+    if (!currentRecipeId) {
+        fetchAndDisplayRecipe(list[0].id);
+        return;
+    }
+    const idx = findIndexById(list, currentRecipeId);
+    if (idx === -1) {
+        fetchAndDisplayRecipe(list[0].id);
+        return;
+    }
+    if (idx < list.length - 1) {
+        fetchAndDisplayRecipe(list[idx + 1].id);
+    }
+}
+
+async function loadPrevRecipe() {
+    const list = await fetchRecipeList();
+    if (list.length === 0) return;
+    if (!currentRecipeId) return;
+    const idx = findIndexById(list, currentRecipeId);
+    if (idx === -1) {
+        fetchAndDisplayRecipe(list[0].id);
+        return;
+    }
+    if (idx > 0) {
+        fetchAndDisplayRecipe(list[idx - 1].id);
+    }
+}
+
+// attach handlers once DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    const prevBtn = document.getElementById('page-prev');
+    const nextBtn = document.getElementById('page-next');
+    if (prevBtn) prevBtn.addEventListener('click', () => { loadPrevRecipe().then(updateNavigationState); });
+    if (nextBtn) nextBtn.addEventListener('click', () => { loadNextRecipe().then(updateNavigationState); });
+
+    // ensure navigation state is initialized
+    fetchRecipeList().then(() => updateNavigationState());
+});
 
 function scrollToBottom() {
     const messages = document.getElementById('messages');
@@ -88,10 +175,10 @@ function setLoading(loading, text = 'Thinking...') {
 
 // Recipe Display Functions
 function showRecipeLoading() {
-    const leftPage = document.getElementById('page-left');
-    const rightPage = document.getElementById('page-right');
+    const leftContent = document.getElementById('page-left-content');
+    const rightContent = document.getElementById('page-right-content');
 
-    leftPage.innerHTML = `
+    leftContent.innerHTML = `
         <div class="skeleton skeleton-title"></div>
         <div class="skeleton skeleton-line"></div>
         <div class="skeleton skeleton-line"></div>
@@ -99,7 +186,7 @@ function showRecipeLoading() {
         <div class="skeleton skeleton-short"></div>
     `;
 
-    rightPage.innerHTML = `
+    rightContent.innerHTML = `
         <div class="skeleton skeleton-title"></div>
         <div class="skeleton skeleton-line"></div>
         <div class="skeleton skeleton-line"></div>
@@ -109,8 +196,8 @@ function showRecipeLoading() {
 }
 
 function showRecipeError(message) {
-    const leftPage = document.getElementById('page-left');
-    leftPage.innerHTML = `
+    const leftContent = document.getElementById('page-left-content');
+    leftContent.innerHTML = `
         <div class="recipe-placeholder">
             <div class="recipe-placeholder-text" style="color: var(--color-leather);">
                 ${message}
@@ -127,7 +214,17 @@ async function fetchAndDisplayRecipe(recipeId) {
         });
         if (!response.ok) {
             if (response.status === 404) {
-                showRecipeError('Recipe not found');
+                // Recipe missing - refresh list and fallback to first if available
+                const list = await fetchRecipeList(true);
+                if (list.length > 0) {
+                    const firstId = list[0].id;
+                    currentRecipeId = firstId;
+                    await fetchAndDisplayRecipe(firstId);
+                } else {
+                    currentRecipeId = null;
+                    showRecipeError('Recipe not found');
+                    updateNavigationState();
+                }
             } else {
                 showRecipeError('Failed to load recipe');
             }
@@ -135,15 +232,20 @@ async function fetchAndDisplayRecipe(recipeId) {
         }
         const recipe = await response.json();
         renderRecipe(recipe);
+        currentRecipeId = recipe.id || recipe.recipe?.id || currentRecipeId;
+        // Refresh recipe list to include newly created recipes
+        await fetchRecipeList(true);
+        updateNavigationState();
     } catch (error) {
         console.error('Error fetching recipe:', error);
         showRecipeError('Failed to load recipe');
+        updateNavigationState();
     }
 }
 
 function renderRecipe(recipe) {
-    const leftPage = document.getElementById('page-left');
-    const rightPage = document.getElementById('page-right');
+    const leftContent = document.getElementById('page-left-content');
+    const rightContent = document.getElementById('page-right-content');
 
     // Build ingredients list
     const ingredientsList = (recipe.ingredients || []).map(ing => {
@@ -160,8 +262,7 @@ function renderRecipe(recipe) {
     ).join('');
 
     // Left page - Ingredients & Metadata
-    leftPage.innerHTML = `
-        <div class="recipe-label">recipe</div>
+    leftContent.innerHTML = `
         <div class="recipe-title">${recipe.title || 'Untitled Recipe'}</div>
 
         <div class="section-header">ingredients:</div>
@@ -226,7 +327,7 @@ function renderRecipe(recipe) {
     }).join('');
 
     // Right page - Preparation
-    rightPage.innerHTML = `
+    rightContent.innerHTML = `
         <div class="section-header">preparation</div>
 
         <div class="prep-list">
