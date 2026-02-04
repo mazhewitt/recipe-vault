@@ -497,6 +497,9 @@ impl AiAgent {
                     messages.push(Message::Tool { tool_results });
                 }
                 LlmResponse::TextWithToolUse { text, tool_calls } => {
+                    // Capture the text from this response
+                    final_text = text.clone();
+
                     // Execute all tool calls
                     let mut tool_results: Vec<ToolResult> = Vec::new();
                     for call in &tool_calls {
@@ -526,6 +529,9 @@ impl AiAgent {
 
                     // Add tool results
                     messages.push(Message::Tool { tool_results });
+
+                    // Break after executing tools - don't loop again
+                    break;
                 }
             }
         }

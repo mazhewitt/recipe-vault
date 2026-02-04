@@ -72,8 +72,17 @@ fn extract_cookie(cookie_header: &str, name: &str) -> Option<String> {
     None
 }
 
-/// Load API key from file or generate a new one
+/// Load API key from environment, file, or generate a new one
 pub fn load_or_generate_api_key() -> String {
+    // Check for API_KEY environment variable first (for testing)
+    if let Ok(key) = std::env::var("API_KEY") {
+        let key = key.trim().to_string();
+        if !key.is_empty() {
+            info!("Using API key from API_KEY environment variable");
+            return key;
+        }
+    }
+
     let key_path = Path::new(API_KEY_FILE);
 
     // Try to load existing key

@@ -38,11 +38,15 @@ impl ChatState {
     async fn get_or_create_agent(&self) -> Result<(), ChatError> {
         let mut agent_guard = self.agent.write().await;
         if agent_guard.is_none() {
-            let llm = LlmProvider::new(
-                LlmProviderType::Anthropic,
-                self.config.anthropic_api_key.clone(),
-                self.config.ai_model.clone(),
-            );
+            let llm = if self.config.mock_llm {
+                LlmProvider::mock(self.config.mock_recipe_id.clone())
+            } else {
+                LlmProvider::new(
+                    LlmProviderType::Anthropic,
+                    self.config.anthropic_api_key.clone(),
+                    self.config.ai_model.clone(),
+                )
+            };
 
             let agent_config = AiAgentConfig {
                 mcp_binary_path: std::env::var("MCP_BINARY_PATH")

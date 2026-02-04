@@ -16,6 +16,7 @@ pub enum LlmError {
 pub enum LlmProviderType {
     Anthropic,
     OpenAi,
+    Mock,
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +25,7 @@ pub struct LlmProvider {
     api_key: String,
     model: String,
     client: reqwest::Client,
+    mock_recipe_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,6 +78,7 @@ impl LlmProvider {
             api_key,
             model,
             client: reqwest::Client::new(),
+            mock_recipe_id: None,
         }
     }
 
@@ -87,6 +90,16 @@ impl LlmProvider {
         Self::new(LlmProviderType::OpenAi, api_key, model)
     }
 
+    pub fn mock(mock_recipe_id: Option<String>) -> Self {
+        Self {
+            provider_type: LlmProviderType::Mock,
+            api_key: String::new(),
+            model: String::new(),
+            client: reqwest::Client::new(),
+            mock_recipe_id,
+        }
+    }
+
     pub async fn complete(
         &self,
         messages: &[Message],
@@ -96,6 +109,52 @@ impl LlmProvider {
         match self.provider_type {
             LlmProviderType::Anthropic => self.complete_anthropic(messages, tools, system_prompt).await,
             LlmProviderType::OpenAi => self.complete_openai(messages, tools, system_prompt).await,
+            LlmProviderType::Mock => Ok(self.complete_mock(messages)),
+        }
+    }
+
+    fn complete_mock(&self, messages: &[Message]) -> LlmResponse {
+        // Get the last user message
+        let last_message = messages
+            .iter()
+            .rev()
+            .find_map(|m| match m {
+                Message::User { content } => Some(content.as_str()),
+                _ => None,
+            })
+            .unwrap_or("");
+
+        let lower_message = last_message.to_lowercase();
+
+        // Pattern match on input to return appropriate response
+        if lower_message.contains("list") {
+            // Return list_recipes tool use followed by text response
+            LlmResponse::TextWithToolUse {
+                text: "Here are all your saved recipes:\n\n## 1. **Chicken Curry**\nA flavorful, aromatic curry with coconut milk\n\nPrep: 15 min | Cook: 30 min | Total: 45 min | Servings: 4".to_string(),
+                tool_calls: vec![ToolCall {
+                    id: "toolu_mock_list".to_string(),
+                    name: "list_recipes".to_string(),
+                    arguments: serde_json::json!({}),
+                }],
+            }
+        } else if lower_message.contains("show") || lower_message.contains("display") {
+            // Return display_recipe tool use
+            let recipe_id = self.mock_recipe_id.clone()
+                .unwrap_or_else(|| "9ebef851-3333-47ec-9238-2757ecafcf4e".to_string());
+
+            LlmResponse::TextWithToolUse {
+                text: "I've pulled up the Chicken Curry recipe in the side panel for you! This is a flavorful, aromatic curry with coconut milk that comes together in about 45 minutes total. Perfect for a weeknight dinner with 4 servings.".to_string(),
+                tool_calls: vec![ToolCall {
+                    id: "toolu_mock_display".to_string(),
+                    name: "display_recipe".to_string(),
+                    arguments: serde_json::json!({
+                        "recipe_id": recipe_id
+                    }),
+                }],
+            }
+        } else {
+            // Default response for other queries
+            LlmResponse::Text("I'm a mock assistant. Try asking me to 'list recipes' or 'show a recipe'.".to_string())
         }
     }
 

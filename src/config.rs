@@ -7,6 +7,8 @@ pub struct Config {
     pub anthropic_api_key: String,
     pub ai_model: String,
     pub family_password: Option<String>,
+    pub mock_llm: bool,
+    pub mock_recipe_id: Option<String>,
 }
 
 impl Config {
@@ -25,12 +27,20 @@ impl Config {
 
         let family_password = env::var("FAMILY_PASSWORD").ok();
 
+        let mock_llm = env::var("MOCK_LLM")
+            .unwrap_or_else(|_| "false".to_string())
+            .to_lowercase() == "true";
+
+        let mock_recipe_id = env::var("MOCK_RECIPE_ID").ok();
+
         Ok(Config {
             database_url,
             bind_address,
             anthropic_api_key,
             ai_model,
             family_password,
+            mock_llm,
+            mock_recipe_id,
         })
     }
 }

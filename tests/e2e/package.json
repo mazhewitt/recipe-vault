@@ -1,0 +1,16 @@
+{
+  "name": "recipe-vault-e2e-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests and linting for recipe-vault",
+  "scripts": {
+    "lint": "cd ../.. && npx eslint --config tests/e2e/eslint.config.js static/*.js",
+    "lint:fix": "cd ../.. && npx eslint --config tests/e2e/eslint.config.js static/*.js --fix",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "eslint": "^9.17.0"
+  }
+}

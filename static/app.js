@@ -347,6 +347,7 @@ function renderRecipe(recipe) {
     `;
 }
 
+// eslint-disable-next-line no-unused-vars -- Used in chat.html inline event handler
 async function sendMessage() {
     const input = document.getElementById('message-input');
     const message = input.value.trim();

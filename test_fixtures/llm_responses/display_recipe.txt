@@ -1,0 +1,15 @@
+event: chunk
+data: {"text":""}
+
+event: tool_use
+data: {"status":"completed","tool":"display_recipe"}
+
+event: recipe_artifact
+data: {"recipe_id":"9ebef851-3333-47ec-9238-2757ecafcf4e"}
+
+event: chunk
+data: {"text":"I've pulled up the Chicken Curry recipe in the side panel for you! This is a flavorful, aromatic curry with coconut milk that comes together in about 45 minutes total. Perfect for a weeknight dinner with 4 servings."}
+
+event: done
+data: {"conversation_id":"461f1b19-5cca-450f-bc1a-6326f8c597aa","tools_used":["display_recipe"]}
+

@@ -1,0 +1,12 @@
+event: chunk
+data: {"text":""}
+
+event: tool_use
+data: {"status":"completed","tool":"list_recipes"}
+
+event: chunk
+data: {"text":"Here are all your saved recipes:\n\n## 1. **Chicken Curry**\nA delicious and aromatic chicken curry with coconut milk, tomatoes, and fresh vegetables.\n- **Prep Time:** 15 min | **Cook Time:** 30 min | **Servings:** 4\n\n## 2. **Home Style Chicken Curry**\nA comforting North Indian home-style chicken curry starting with a yoghurt marinade. Rich, deeply flavoured gravy that clings to the meat rather than soupy restaurant-style. Best with bone-in thighs and drumsticks.\n- **Prep Time:** 30 min | **Cook Time:** 60 min | **Servings:** 4\n\n## 3. **Homemade Bread (Overnight Sponge)**\nAn enhanced artisan white bread using an overnight sponge (poolish) with advanced techniques for superior flavour, texture, and crust.\n- **Prep Time:** 30 min | **Cook Time:** 35 min | **Servings:** 12\n\nWould you like to see the full details for any of these recipes?"}
+
+event: done
+data: {"conversation_id":"461f1b19-5cca-450f-bc1a-6326f8c597aa","tools_used":["list_recipes"]}
+
