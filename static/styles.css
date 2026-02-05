@@ -803,7 +803,7 @@ body::before {
 .user-info {
     position: fixed;
     top: 25px;
-    left: 50px;
+    right: 50px;
     display: flex;
     align-items: center;
     gap: 12px;
