@@ -12,6 +12,20 @@ services:
       - ./data:/app/data
     env_file:
       - .env
+    networks:
+      - recipe-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - recipe-net
+    depends_on:
+      - recipe-vault
 
   api-proxy:
     image: nginx:alpine
@@ -21,6 +35,8 @@ services:
       - "3500:3500"
     volumes:
       - ./nginx-api-only.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - recipe-net
     depends_on:
       - recipe-vault
 
@@ -31,4 +47,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     # Check for updates every 5 minutes (300 seconds)
-    command: --interval 300 --cleanup recipe-vault
+    command: --interval 300 --cleanup recipe-vault cloudflared
+
+networks:
+  recipe-net:
+    driver: bridge
