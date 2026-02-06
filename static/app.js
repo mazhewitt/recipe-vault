@@ -334,6 +334,25 @@ function renderRecipe(recipe) {
         return `<div class="prep-step">${i + 1}. ${step.instruction}${duration}</div>`;
     }).join('');
 
+    // Format email for display (show name portion before @)
+    const formatEmail = (email) => {
+        if (!email) return null;
+        const name = email.split('@')[0];
+        return name.replace(/[._-]/g, ' ');
+    };
+
+    // Build authorship info
+    const authorshipHtml = [];
+    if (recipe.created_by) {
+        authorshipHtml.push(`<div class="recipe-meta-item">Created by ${formatEmail(recipe.created_by)}</div>`);
+    }
+    if (recipe.updated_by && recipe.updated_by !== recipe.created_by) {
+        authorshipHtml.push(`<div class="recipe-meta-item">Updated by ${formatEmail(recipe.updated_by)}</div>`);
+    }
+    const authorship = authorshipHtml.length > 0
+        ? `<div class="recipe-authorship">${authorshipHtml.join('')}</div>`
+        : '';
+
     // Right page - Preparation
     rightContent.innerHTML = `
         <div class="section-header">preparation</div>
@@ -344,6 +363,7 @@ function renderRecipe(recipe) {
 
         ${recipe.notes ? `<div class="recipe-note">Note: ${recipe.notes}</div>` : ''}
         ${recipe.description ? `<div class="recipe-note">${recipe.description}</div>` : ''}
+        ${authorship}
     `;
 }
 

@@ -109,17 +109,26 @@ mod hex {
     }
 }
 
-/// Middleware to extract Cloudflare identity headers
+/// Middleware to extract user identity from Cloudflare headers, X-User-Email header, or dev environment
 pub async fn cloudflare_auth(
     axum::extract::State(dev_email): axum::extract::State<Option<String>>,
     mut request: Request<Body>,
     next: Next,
 ) -> Response {
+    // Priority: Cloudflare header > X-User-Email (from MCP) > dev email
     let email = request
         .headers()
         .get("Cf-Access-Authenticated-User-Email")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
+        .or_else(|| {
+            // Check for X-User-Email header (sent by MCP client)
+            request
+                .headers()
+                .get("X-User-Email")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        })
         .or_else(|| dev_email.clone());
 
     request.extensions_mut().insert(UserIdentity { email });

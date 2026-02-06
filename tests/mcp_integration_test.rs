@@ -150,3 +150,41 @@ async fn test_mcp_server_recovers_from_crash() {
 
     println!("Integration test - requires manual process manipulation");
 }
+
+// ==== Recipe Authorship Tests ====
+
+#[tokio::test]
+#[ignore = "Requires MCP binary with DEFAULT_AUTHOR_EMAIL set"]
+async fn test_mcp_recipe_creation_with_author_email() {
+    // Verify MCP-created recipes have correct authorship when DEFAULT_AUTHOR_EMAIL is set
+    //
+    // Manual test:
+    // 1. Configure MCP with DEFAULT_AUTHOR_EMAIL=test@example.com in environment
+    // 2. Start API server and MCP
+    // 3. Create a recipe via MCP (e.g., "Create a recipe for pancakes")
+    // 4. Check database or API response
+    // 5. Verify created_by and updated_by are both "test@example.com"
+    //
+    // SQL verification:
+    // SELECT title, created_by, updated_by FROM recipes WHERE title = 'Pancakes';
+
+    println!("Manual test - verify MCP sends X-User-Email header and recipe has authorship");
+}
+
+#[tokio::test]
+#[ignore = "Requires MCP binary without DEFAULT_AUTHOR_EMAIL"]
+async fn test_mcp_recipe_creation_without_author_email() {
+    // Verify MCP-created recipes have null authorship when DEFAULT_AUTHOR_EMAIL is not set
+    //
+    // Manual test:
+    // 1. Configure MCP WITHOUT DEFAULT_AUTHOR_EMAIL in environment
+    // 2. Start API server and MCP
+    // 3. Create a recipe via MCP
+    // 4. Check database or API response
+    // 5. Verify created_by and updated_by are both NULL
+    //
+    // SQL verification:
+    // SELECT title, created_by, updated_by FROM recipes WHERE created_by IS NULL;
+
+    println!("Manual test - verify MCP without DEFAULT_AUTHOR_EMAIL creates null authorship");
+}

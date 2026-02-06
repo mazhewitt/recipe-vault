@@ -9,11 +9,12 @@ pub struct ApiClient {
     base_url: String,
     client: Client,
     api_key: Option<String>,
+    user_email: Option<String>,
 }
 
 impl ApiClient {
-    /// Create a new API client with the given base URL and optional API key
-    pub fn new(base_url: String, api_key: Option<String>) -> Result<Self, String> {
+    /// Create a new API client with the given base URL, optional API key, and optional user email
+    pub fn new(base_url: String, api_key: Option<String>, user_email: Option<String>) -> Result<Self, String> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -23,18 +24,25 @@ impl ApiClient {
             base_url,
             client,
             api_key,
+            user_email,
         })
     }
 
-    /// Add API key header to a request if configured
-    fn add_auth_header(
+    /// Add auth headers (API key and user email) to a request if configured
+    fn add_auth_headers(
         &self,
         request: reqwest::blocking::RequestBuilder,
     ) -> reqwest::blocking::RequestBuilder {
-        match &self.api_key {
+        let mut req = match &self.api_key {
             Some(key) => request.header("X-API-Key", key),
             None => request,
+        };
+
+        if let Some(email) = &self.user_email {
+            req = req.header("X-User-Email", email);
         }
+
+        req
     }
 
     /// List all recipes
@@ -43,7 +51,7 @@ impl ApiClient {
 
         let request = self.client.get(&url);
         let response = self
-            .add_auth_header(request)
+            .add_auth_headers(request)
             .send()
             .map_err(|e| self.map_request_error(e))?;
 
@@ -56,7 +64,7 @@ impl ApiClient {
 
         let request = self.client.get(&url);
         let response = self
-            .add_auth_header(request)
+            .add_auth_headers(request)
             .send()
             .map_err(|e| self.map_request_error(e))?;
 
@@ -69,7 +77,7 @@ impl ApiClient {
 
         let request = self.client.post(&url).json(&input);
         let response = self
-            .add_auth_header(request)
+            .add_auth_headers(request)
             .send()
             .map_err(|e| self.map_request_error(e))?;
 
@@ -86,7 +94,7 @@ impl ApiClient {
 
         let request = self.client.put(&url).json(&input);
         let response = self
-            .add_auth_header(request)
+            .add_auth_headers(request)
             .send()
             .map_err(|e| self.map_request_error(e))?;
 
@@ -99,7 +107,7 @@ impl ApiClient {
 
         let request = self.client.delete(&url);
         let response = self
-            .add_auth_header(request)
+            .add_auth_headers(request)
             .send()
             .map_err(|e| self.map_request_error(e))?;
 
@@ -167,7 +175,7 @@ mod tests {
     use super::*;
 
     fn test_client() -> ApiClient {
-        ApiClient::new("http://localhost:3000".to_string(), None).unwrap()
+        ApiClient::new("http://localhost:3000".to_string(), None, None).unwrap()
     }
 
     #[test]
@@ -211,6 +219,7 @@ mod tests {
         let client = ApiClient::new(
             "http://localhost:3000".to_string(),
             Some("test-api-key".to_string()),
+            None,
         )
         .unwrap();
         assert!(client.api_key.is_some());
@@ -218,7 +227,18 @@ mod tests {
 
     #[test]
     fn test_client_without_api_key() {
-        let client = ApiClient::new("http://localhost:3000".to_string(), None).unwrap();
+        let client = ApiClient::new("http://localhost:3000".to_string(), None, None).unwrap();
         assert!(client.api_key.is_none());
+    }
+
+    #[test]
+    fn test_client_with_user_email() {
+        let client = ApiClient::new(
+            "http://localhost:3000".to_string(),
+            None,
+            Some("test@example.com".to_string()),
+        )
+        .unwrap();
+        assert!(client.user_email.is_some());
     }
 }

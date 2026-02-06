@@ -43,8 +43,20 @@ fn main() {
         }
     };
 
+    // Get default author email from environment (optional, for authorship tracking)
+    let user_email = match env::var("DEFAULT_AUTHOR_EMAIL") {
+        Ok(email) => {
+            tracing::info!("Default author email configured: {}", email);
+            Some(email)
+        }
+        Err(_) => {
+            tracing::info!("DEFAULT_AUTHOR_EMAIL not set - recipes created via MCP will have null author");
+            None
+        }
+    };
+
     // Create API client
-    let client = match ApiClient::new(api_base_url, api_key) {
+    let client = match ApiClient::new(api_base_url, api_key, user_email) {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("Failed to create API client: {}", e);

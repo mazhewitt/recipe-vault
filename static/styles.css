@@ -833,3 +833,18 @@ body::before {
     text-decoration: underline;
 }
 
+/* Recipe authorship */
+.recipe-authorship {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    opacity: 0.6;
+}
+
+.recipe-meta-item {
+    font-size: 12px;
+    color: var(--color-label-cream);
+    margin-bottom: 4px;
+    text-transform: capitalize;
+}
+

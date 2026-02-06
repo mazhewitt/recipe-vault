@@ -16,14 +16,15 @@ With Cloudflare Access providing user identity (from the `cloudflare-identity-au
 
 ## Decisions
 
-### Decision 1: Nullable created_by/updated_by Fields
+### Decision 1: Backfill Existing Recipes with Owner Email
 
-**Choice**: Add nullable `created_by` and `updated_by` columns to recipes table.
+**Choice**: Add nullable `created_by` and `updated_by` columns, but backfill all existing recipes with `mazhewitt@gmail.com`.
 
 **Rationale**:
-- Existing recipes don't have this data (can't backfill)
-- Recipes created via API key (MCP) may not have user context
-- Keeps migration simple (no data transformation needed)
+- All existing recipes were created by the owner (mazhewitt@gmail.com)
+- Accurately reflects authorship instead of leaving null values
+- Future recipes created via API key (MCP) may still have null if no user context
+- Nullable fields still needed for MCP-created recipes
 
 ### Decision 2: Email as Identifier
 
@@ -40,6 +41,19 @@ With Cloudflare Access providing user identity (from the `cloudflare-identity-au
 
 **Rationale**: Captures all recipe changes, not just title/description updates.
 
+### Decision 4: Automated Database Backup Before Migrations
+
+**Choice**: Automatically create timestamped database backups in Docker container startup script before running migrations.
+
+**Rationale**:
+- Prevents data loss from migration errors
+- No manual intervention required for production deployments
+- Backups persist in the `/app/data` volume
+- Only backs up if database exists (handles first-time startup)
+- Timestamped backups allow rollback to specific points
+
+**Implementation**: Add backup logic to Docker entrypoint script that runs before `sqlx migrate run`.
+
 ## Implementation Notes
 
 The database layer changes (migration, model, queries) have already been implemented and are waiting for handler integration:
@@ -48,3 +62,12 @@ The database layer changes (migration, model, queries) have already been impleme
 - Queries: `src/db/queries.rs` - create_recipe/update_recipe accept user_email parameter
 
 Remaining work is to wire up the handlers to pass the user identity to these queries.
+
+### MCP User Attribution
+
+For recipes created via Claude Desktop (MCP), the MCP server will:
+1. Accept a `DEFAULT_AUTHOR_EMAIL` environment variable (configured in Claude Desktop config)
+2. Send this as an `X-User-Email` header with create/update requests
+3. Web handlers will check for this header and use it for attribution
+
+This allows the owner to attribute MCP-created recipes to themselves without hardcoding the email in the codebase.

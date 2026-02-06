@@ -427,3 +427,59 @@ async fn test_step_with_temperature(#[future] test_db: SqlitePool) {
     assert_eq!(step["temperature_value"], 180);
     assert_eq!(step["temperature_unit"], "Celsius");
 }
+
+// ==== Scenario: Recipe authorship tracking ====
+#[rstest]
+#[tokio::test]
+async fn test_create_recipe_tracks_author(#[future] test_db: SqlitePool) {
+    let db = test_db.await;
+    let app = create_test_app(db);
+
+    let (status, response) = send_request(
+        &app,
+        "POST",
+        "/api/recipes",
+        Some(json!({"title": "Test Recipe with Author"})),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::CREATED);
+    let recipe = response.expect("Expected recipe");
+    assert_eq!(recipe["created_by"], "test@example.com");
+    assert_eq!(recipe["updated_by"], "test@example.com");
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_update_recipe_tracks_author(#[future] test_db: SqlitePool) {
+    let db = test_db.await;
+    let app = create_test_app(db);
+
+    // Create recipe
+    let (_, create_response) = send_request(
+        &app,
+        "POST",
+        "/api/recipes",
+        Some(json!({"title": "Original"})),
+    )
+    .await;
+
+    let created_recipe = create_response.unwrap();
+    let recipe_id = created_recipe["id"].as_str().unwrap();
+    assert_eq!(created_recipe["created_by"], "test@example.com");
+
+    // Update recipe
+    let (status, response) = send_request(
+        &app,
+        "PUT",
+        &format!("/api/recipes/{}", recipe_id),
+        Some(json!({"title": "Updated"})),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    let recipe = response.expect("Expected recipe");
+    assert_eq!(recipe["created_by"], "test@example.com");
+    assert_eq!(recipe["updated_by"], "test@example.com");
+    assert_eq!(recipe["title"], "Updated");
+}

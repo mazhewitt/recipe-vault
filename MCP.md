@@ -471,12 +471,16 @@ Edit your Claude Desktop configuration file (`~/Library/Application Support/Clau
       "command": "/absolute/path/to/recipe-vault-mcp",
       "env": {
         "API_BASE_URL": "http://localhost:3000",
-        "API_KEY": "your-api-key"
+        "API_KEY": "your-api-key",
+        "DEFAULT_AUTHOR_EMAIL": "your-email@example.com"
       }
     }
   }
 }
 ```
+
+**Optional Environment Variables:**
+- `DEFAULT_AUTHOR_EMAIL`: Email address to attribute recipes created via MCP. If not set, MCP-created recipes will have null authors.
 
 #### Remote Setup (e.g., Synology NAS)
 
@@ -489,7 +493,8 @@ If your Recipe Vault API is running on a remote server like a Synology NAS, upda
     ```
 2.  **Update Config:**
     - `API_BASE_URL`: Change to `http://<your-nas-ip>:3000`
-    - `API_KEY`: Paste the key retrieved in step 1.
+    - `API_KEY`: Paste the key retrieved in step 1
+    - `DEFAULT_AUTHOR_EMAIL`: (Optional) Your email address for recipe attribution
 
 3.  **Restart Claude Desktop.**
 
