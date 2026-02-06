@@ -44,7 +44,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
-ENV DATABASE_URL=sqlite:///app/data/recipe-vault.db
+ENV DATABASE_URL=sqlite:///app/data/recipe-vault.db?mode=rwc
 ENV BIND_ADDRESS=0.0.0.0:3000
 ENV MCP_BINARY_PATH=/usr/local/bin/recipe-vault-mcp
 
