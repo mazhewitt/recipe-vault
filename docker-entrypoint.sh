@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DB_FILE="/app/data/recipe-vault.db"
+DB_FILE="/app/data/recipes.db"
 BACKUP_DIR="/app/data/backups"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
