@@ -49,3 +49,44 @@ The `watchtower` service is configured to check for new images every 5 minutes. 
 1.  Watchtower pulls the new image.
 2.  It restarts the `recipe-vault` container.
 3.  Your data in `data/` is preserved.
+
+## Database Migrations
+
+Migrations run automatically on container startup via `docker-entrypoint.sh`. The entrypoint:
+
+1. **Backs up** the database before running migrations (timestamped copy in `data/backups/`)
+2. **Runs migrations** via `sqlx migrate run`
+3. **Starts the app** regardless of migration success (to avoid restart loops)
+
+If migrations fail, the app starts with the existing schema and logs a warning.
+
+### Migration Rules
+
+- **Never modify an existing migration file** after it has been applied. sqlx tracks checksums and will reject modified migrations, preventing the app from starting.
+- Always create a **new migration file** for changes (backfills, column modifications, etc.)
+- Migration filenames: `YYYYMMDDHHMMSS_description.sql`
+- The `DATABASE_URL` must include `?mode=rwc` for SQLite to create new database files
+- The database file is `recipes.db` (not `recipe-vault.db`)
+
+### Troubleshooting Migration Failures
+
+If you see `migration was previously applied but has been modified`:
+
+```bash
+# 1. Check what's in the migrations table
+sudo docker run --rm -v /volume1/docker/recipe-vault/data:/app/data \
+  alpine:latest sh -c "apk add --no-cache sqlite && \
+  sqlite3 /app/data/recipes.db 'SELECT version, description FROM _sqlx_migrations;'"
+
+# 2. If you must fix a checksum mismatch, delete the record and re-insert
+#    (only if you're certain the migration's effects are already applied)
+sudo docker run --rm -v /volume1/docker/recipe-vault/data:/app/data \
+  alpine:latest sh -c "apk add --no-cache sqlite && \
+  sqlite3 /app/data/recipes.db 'DELETE FROM _sqlx_migrations WHERE version = XXXXXXX;'"
+```
+
+### Post-Deployment Checklist
+
+After deploying changes that include static assets (JS, CSS):
+- **Purge Cloudflare cache**: Dashboard > Caching > Configuration > Purge Everything
+- Shift-reload only bypasses browser cache, not Cloudflare's CDN cache

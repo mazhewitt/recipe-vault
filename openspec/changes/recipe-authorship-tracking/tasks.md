@@ -49,11 +49,11 @@ This change depends on `cloudflare-identity-auth` being deployed first.
 - [x] 6.4 Only backup if database file exists (skip on first-time deployment)
 - [x] 6.5 Document rollback procedure using backups
 
-## 7. Production Deployment
+## 7. Production Deployment (COMPLETED)
 
-- [ ] 7.1 Deploy updated Docker image with automated backup
-- [ ] 7.2 Verify backup was created before migration ran
-- [ ] 7.3 Verify migration completed successfully in production
-- [ ] 7.4 Verify authorship data is present in production database
+- [x] 7.1 Deploy updated Docker image with automated backup
+- [x] 7.2 Verify backup was created before migration ran
+- [x] 7.3 Verify migration completed successfully in production
+- [x] 7.4 Verify authorship data is present in production database
 - [ ] 7.5 Test creating recipe via web UI (Cloudflare identity)
 - [ ] 7.6 Test creating recipe via MCP (X-User-Email header)

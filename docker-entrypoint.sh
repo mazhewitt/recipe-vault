@@ -23,10 +23,15 @@ else
     echo "ℹ️  No existing database found, skipping backup (first-time deployment)"
 fi
 
-# Run migrations
+# Run migrations (non-fatal: app starts even if migrations fail)
 echo "🔄 Running database migrations..."
-sqlx migrate run
-echo "✅ Migrations complete"
+if sqlx migrate run; then
+    echo "✅ Migrations complete"
+else
+    echo "⚠️  Migration failed! Starting app with existing schema."
+    echo "⚠️  Check logs and resolve migration issues manually."
+    echo "⚠️  Backup available at: $BACKUP_FILE"
+fi
 
 # Start the application
 echo "🚀 Starting Recipe Vault..."

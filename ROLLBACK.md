@@ -38,11 +38,11 @@ Choose the backup you want to restore (use the timestamp to identify the right o
 
 ```bash
 # Option A: Restore from inside container backup
-sudo docker exec recipe-vault cp /app/data/backups/recipe-vault-YYYYMMDD-HHMMSS.db /app/data/recipe-vault.db
+sudo docker exec recipe-vault cp /app/data/backups/recipe-vault-YYYYMMDD-HHMMSS.db /app/data/recipes.db
 
 # Option B: Restore from host volume
 sudo cp /volume1/docker/recipe-vault/data/backups/recipe-vault-YYYYMMDD-HHMMSS.db \
-         /volume1/docker/recipe-vault/data/recipe-vault.db
+         /volume1/docker/recipe-vault/data/recipes.db
 ```
 
 ### 4. Restart the Container
@@ -71,7 +71,7 @@ To create a manual backup outside the automatic process:
 
 ```bash
 # Create a backup with current timestamp
-sudo docker exec recipe-vault cp /app/data/recipe-vault.db \
+sudo docker exec recipe-vault cp /app/data/recipes.db \
     /app/data/backups/recipe-vault-manual-$(date +%Y%m%d-%H%M%S).db
 ```
 
@@ -81,19 +81,19 @@ Before production deployment, test the rollback procedure:
 
 ```bash
 # 1. Create a test backup
-cp recipe-vault.db recipe-vault-test-backup.db
+cp recipes.db recipe-vault-test-backup.db
 
 # 2. Run migrations
 sqlx migrate run
 
 # 3. Verify migration worked
-sqlite3 recipe-vault.db "PRAGMA table_info(recipes);"
+sqlite3 recipes.db "PRAGMA table_info(recipes);"
 
 # 4. Test rollback
-cp recipe-vault-test-backup.db recipe-vault.db
+cp recipe-vault-test-backup.db recipes.db
 
 # 5. Verify old schema is restored
-sqlite3 recipe-vault.db "PRAGMA table_info(recipes);"
+sqlite3 recipes.db "PRAGMA table_info(recipes);"
 ```
 
 ## Troubleshooting
@@ -104,7 +104,7 @@ sqlite3 recipe-vault.db "PRAGMA table_info(recipes);"
 2. Verify file permissions: `sudo docker exec recipe-vault ls -l /app/data/`
 3. Ensure database file is not corrupted:
    ```bash
-   sudo docker exec recipe-vault sqlite3 /app/data/recipe-vault.db "PRAGMA integrity_check;"
+   sudo docker exec recipe-vault sqlite3 /app/data/recipes.db "PRAGMA integrity_check;"
    ```
 
 ### Backup file not found
