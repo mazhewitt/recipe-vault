@@ -60,6 +60,13 @@ test.describe('Recipe Navigation', () => {
     // Seed multiple recipes
     const recipeIds = await seedRecipes(page, 3);
 
+    // On page load, the index should be displayed
+    await page.waitForTimeout(500);
+
+    // Previous button should be disabled on index (page zero)
+    await expect(page.locator('#page-prev')).toBeDisabled();
+    await expect(page.locator('#page-next')).not.toBeDisabled();
+
     // Fetch the recipe list to see what order they're in
     const recipes = await page.evaluate(async () => {
       // @ts-ignore - fetchRecipeList is defined in app.js
@@ -78,8 +85,8 @@ test.describe('Recipe Navigation', () => {
 
     await expect(page.locator('.recipe-title')).toBeVisible();
 
-    // Previous button should be disabled on first recipe
-    await expect(page.locator('#page-prev')).toBeDisabled();
+    // Previous button should be ENABLED on first recipe (goes back to index)
+    await expect(page.locator('#page-prev')).not.toBeDisabled();
     await expect(page.locator('#page-next')).not.toBeDisabled();
 
     // Navigate to last recipe (we know we have 3 recipes)
