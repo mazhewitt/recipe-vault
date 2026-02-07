@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1200, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recipe Vault - Chat</title>
     <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
@@ -103,6 +103,18 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Mobile Tab Bar -->
+    <div class="mobile-tab-bar">
+        <button class="mobile-tab" id="tab-book" onclick="switchTab('book')">
+            <span class="tab-icon">📖</span>
+            <span class="tab-text">Book</span>
+        </button>
+        <button class="mobile-tab" id="tab-chat" onclick="switchTab('chat')">
+            <span class="tab-icon">💬</span>
+            <span class="tab-text">Chat</span>
+        </button>
     </div>
 
     <script src="/static/app.js"></script>

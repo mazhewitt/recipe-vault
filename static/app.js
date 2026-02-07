@@ -116,9 +116,76 @@ document.addEventListener('DOMContentLoaded', () => {
     if (prevBtn) prevBtn.addEventListener('click', () => { loadPrevRecipe().then(updateNavigationState); });
     if (nextBtn) nextBtn.addEventListener('click', () => { loadNextRecipe().then(updateNavigationState); });
 
+    // Initial state for mobile
+    if (window.innerWidth <= 600) {
+        switchTab('book');
+    }
+    setupMobileKeyboardHandling();
+    setupResponsiveListeners();
+
     // Show index on page load
     showIndex();
 });
+
+function setupResponsiveListeners() {
+    const mobileQuery = window.matchMedia('(max-width: 600px)');
+
+    const handleLayoutChange = (e) => {
+        // Re-render current view when crossing 600px boundary
+        if (viewMode === 'index') {
+            showIndex();
+        } else if (currentRecipeId) {
+            fetchAndDisplayRecipe(currentRecipeId);
+        }
+
+        if (e.matches) {
+            switchTab('book');
+        } else {
+            const container = document.querySelector('.app-container');
+            if (container) container.removeAttribute('data-active-tab');
+        }
+    };
+
+    if (mobileQuery.addEventListener) {
+        mobileQuery.addEventListener('change', handleLayoutChange);
+    } else {
+        mobileQuery.addListener(handleLayoutChange);
+    }
+}
+
+function switchTab(tab) {
+    const container = document.querySelector('.app-container');
+    if (!container) return;
+
+    container.setAttribute('data-active-tab', tab);
+
+    // Update active state of buttons
+    document.querySelectorAll('.mobile-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.id === `tab-${tab}`);
+    });
+}
+
+function isMobile() {
+    return window.matchMedia('(max-width: 600px)').matches;
+}
+
+function setupMobileKeyboardHandling() {
+    const input = document.getElementById('message-input');
+    const tabBar = document.querySelector('.mobile-tab-bar');
+    if (!input || !tabBar) return;
+
+    input.addEventListener('focus', () => {
+        if (window.innerWidth <= 600) {
+            tabBar.style.display = 'none';
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        if (window.innerWidth <= 600) {
+            tabBar.style.display = 'flex';
+        }
+    });
+}
 
 function scrollToBottom() {
     const messages = document.getElementById('messages');
@@ -230,24 +297,18 @@ function renderIndex(recipes) {
         return;
     }
 
-    // Split recipes in half
-    const midpoint = Math.ceil(recipes.length / 2);
-    const leftRecipes = recipes.slice(0, midpoint);
-    const rightRecipes = recipes.slice(midpoint);
-
     // Group by first letter
-    function groupByLetter(recipeList) {
-        const groups = {};
-        recipeList.forEach(recipe => {
-            const letter = recipe.title[0].toUpperCase();
-            if (!groups[letter]) groups[letter] = [];
-            groups[letter].push(recipe);
-        });
-        return groups;
-    }
+    const groups = {};
+    recipes.forEach(recipe => {
+        const letter = recipe.title[0].toUpperCase();
+        if (!groups[letter]) groups[letter] = [];
+        groups[letter].push(recipe);
+    });
 
-    function renderGroup(groups) {
-        return Object.keys(groups).sort().map(letter => {
+    const sortedLetters = Object.keys(groups).sort();
+
+    function renderGroup(letters) {
+        return letters.map(letter => {
             const recipeItems = groups[letter].map(recipe =>
                 `<div class="index-recipe-item" data-recipe-id="${recipe.id}">${recipe.title}</div>`
             ).join('');
@@ -260,15 +321,50 @@ function renderIndex(recipes) {
         }).join('');
     }
 
-    const leftGroups = groupByLetter(leftRecipes);
-    const rightGroups = groupByLetter(rightRecipes);
+    if (isMobile()) {
+        leftContent.innerHTML = `
+            <div class="index-title">~ Index ~</div>
+            ${renderGroup(sortedLetters)}
+        `;
+        rightContent.innerHTML = '';
+    } else {
+        // Split groups across pages based on recipe count
+        const totalRecipes = recipes.length;
+        const targetPerSide = totalRecipes / 2;
+        
+        let currentCount = 0;
+        let splitIndex = 0;
 
-    leftContent.innerHTML = `
-        <div class="index-title">~ Index ~</div>
-        ${renderGroup(leftGroups)}
-    `;
+        // Find the letter index where we should split
+        for (let i = 0; i < sortedLetters.length; i++) {
+            const letter = sortedLetters[i];
+            const countInGroup = groups[letter].length;
+            
+            // If adding this group keeps us under/near the target, include it in left page
+            // Or if it's the first group and huge, we have to include it
+            if (currentCount + countInGroup <= targetPerSide || i === 0) {
+                currentCount += countInGroup;
+                splitIndex = i + 1;
+            } else {
+                // If this group pushes us way over, stop here (it goes to right page)
+                // Unless the left page is empty, then we must put at least one group there
+                if (currentCount === 0) {
+                    splitIndex = 1;
+                }
+                break;
+            }
+        }
 
-    rightContent.innerHTML = renderGroup(rightGroups);
+        const leftLetters = sortedLetters.slice(0, splitIndex);
+        const rightLetters = sortedLetters.slice(splitIndex);
+
+        leftContent.innerHTML = `
+            <div class="index-title">~ Index ~</div>
+            ${renderGroup(leftLetters)}
+        `;
+
+        rightContent.innerHTML = renderGroup(rightLetters);
+    }
 
     // Add click handlers for recipe names
     document.querySelectorAll('.index-recipe-item').forEach(item => {
@@ -292,13 +388,17 @@ function showRecipeLoading() {
         <div class="skeleton skeleton-short"></div>
     `;
 
-    rightContent.innerHTML = `
-        <div class="skeleton skeleton-title"></div>
-        <div class="skeleton skeleton-line"></div>
-        <div class="skeleton skeleton-line"></div>
-        <div class="skeleton skeleton-line"></div>
-        <div class="skeleton skeleton-line"></div>
-    `;
+    if (!isMobile()) {
+        rightContent.innerHTML = `
+            <div class="skeleton skeleton-title"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line"></div>
+        `;
+    } else {
+        rightContent.innerHTML = '';
+    }
 }
 
 function showRecipeError(message) {
@@ -368,8 +468,34 @@ function renderRecipe(recipe) {
         `<span class="difficulty-dot${i < difficulty ? ' filled' : ''}"></span>`
     ).join('');
 
-    // Left page - Ingredients & Metadata
-    leftContent.innerHTML = `
+    // Build preparation steps
+    const stepsList = (recipe.steps || []).map((step, i) => {
+        const duration = step.duration_minutes
+            ? `<span class="step-duration">${step.duration_minutes} min</span>`
+            : '';
+        return `<div class="prep-step">${i + 1}. ${step.instruction}${duration}</div>`;
+    }).join('');
+
+    // Format email for display (show name portion before @)
+    const formatEmail = (email) => {
+        if (!email) return null;
+        const name = email.split('@')[0];
+        return name.replace(/[._-]/g, ' ');
+    };
+
+    // Build authorship info
+    const authorshipHtml = [];
+    if (recipe.created_by) {
+        authorshipHtml.push(`<div class="recipe-meta-item">Created by ${formatEmail(recipe.created_by)}</div>`);
+    }
+    if (recipe.updated_by && recipe.updated_by !== recipe.created_by) {
+        authorshipHtml.push(`<div class="recipe-meta-item">Updated by ${formatEmail(recipe.updated_by)}</div>`);
+    }
+    const authorship = authorshipHtml.length > 0
+        ? `<div class="recipe-authorship">${authorshipHtml.join('')}</div>`
+        : '';
+
+    const ingredientsHtml = `
         <div class="recipe-title">${recipe.title || 'Untitled Recipe'}</div>
 
         <div class="section-header">ingredients:</div>
@@ -425,35 +551,7 @@ function renderRecipe(recipe) {
         </div>
     `;
 
-    // Build preparation steps
-    const stepsList = (recipe.steps || []).map((step, i) => {
-        const duration = step.duration_minutes
-            ? `<span class="step-duration">${step.duration_minutes} min</span>`
-            : '';
-        return `<div class="prep-step">${i + 1}. ${step.instruction}${duration}</div>`;
-    }).join('');
-
-    // Format email for display (show name portion before @)
-    const formatEmail = (email) => {
-        if (!email) return null;
-        const name = email.split('@')[0];
-        return name.replace(/[._-]/g, ' ');
-    };
-
-    // Build authorship info
-    const authorshipHtml = [];
-    if (recipe.created_by) {
-        authorshipHtml.push(`<div class="recipe-meta-item">Created by ${formatEmail(recipe.created_by)}</div>`);
-    }
-    if (recipe.updated_by && recipe.updated_by !== recipe.created_by) {
-        authorshipHtml.push(`<div class="recipe-meta-item">Updated by ${formatEmail(recipe.updated_by)}</div>`);
-    }
-    const authorship = authorshipHtml.length > 0
-        ? `<div class="recipe-authorship">${authorshipHtml.join('')}</div>`
-        : '';
-
-    // Right page - Preparation
-    rightContent.innerHTML = `
+    const preparationHtml = `
         <div class="section-header">preparation</div>
 
         <div class="prep-list">
@@ -464,6 +562,14 @@ function renderRecipe(recipe) {
         ${recipe.description ? `<div class="recipe-note">${recipe.description}</div>` : ''}
         ${authorship}
     `;
+
+    if (isMobile()) {
+        leftContent.innerHTML = ingredientsHtml + '<div style="margin-top: 30px;"></div>' + preparationHtml;
+        rightContent.innerHTML = '';
+    } else {
+        leftContent.innerHTML = ingredientsHtml;
+        rightContent.innerHTML = preparationHtml;
+    }
 }
 
 // eslint-disable-next-line no-unused-vars -- Used in chat.html inline event handler

@@ -31,7 +31,7 @@ export async function authenticate(page: Page): Promise<void> {
 
   // Wait for chat page to load
   try {
-    await expect(page.locator('#message-input')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.app-container')).toBeVisible({ timeout: 5000 });
   } catch (e) {
     console.error(`Failed to load chat page. Current URL: ${page.url()}`);
     throw e;

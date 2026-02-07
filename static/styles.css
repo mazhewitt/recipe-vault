@@ -187,7 +187,8 @@ body::before {
 
 /* ==================== NOTEPAD COMPONENT ==================== */
 .notepad-container {
-    width: 380px;
+    width: 100%;
+    max-width: 380px;
     height: 100%;
     flex-shrink: 0;
     display: flex;
@@ -400,7 +401,6 @@ body::before {
     height: 100%;
     display: flex;
     flex-direction: column;
-    min-width: 700px;
 }
 
 .recipe-book {
@@ -807,34 +807,65 @@ body::before {
     transform: translateX(4px);
 }
 
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1000px) {
-    body {
-        padding: 20px;
-    }
+/* Mobile Tab Bar */
+.mobile-tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    display: none; /* Shown only on mobile via media query */
+    background: var(--color-paper-aged);
+    border-top: 2px solid var(--color-border);
+    z-index: 1000;
+}
 
-    .app-container {
-        flex-direction: column;
-        height: auto;
-        gap: 30px;
-    }
+.mobile-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-handwritten);
+    color: var(--color-ink-medium);
+    padding: 4px 0;
+    transition: all 0.2s ease;
+}
 
-    .notepad-container {
-        width: 100%;
-    }
+.mobile-tab .tab-icon {
+    font-size: 20px;
+    line-height: 1;
+}
 
-    .book-container {
-        min-width: 100%;
-    }
+.mobile-tab .tab-text {
+    font-size: 12px;
+}
 
-    .notepad,
-    .recipe-book {
-        max-height: 90%;
-    }
+.mobile-tab.active {
+    color: var(--color-leather);
+    background: rgba(139, 45, 26, 0.05);
+}
 
-    .timer-widget {
-        top: 10px;
-        right: 20px;
+.mobile-tab.active .tab-text {
+    font-weight: 700;
+}
+
+.mobile-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 40%;
+    height: 3px;
+    background: var(--color-leather);
+    border-radius: 3px 3px 0 0;
+}
+
+@media (max-width: 600px) {
+    .mobile-tab-bar {
+        display: flex;
     }
 }
 
@@ -870,6 +901,221 @@ body::before {
 .logout-link:hover {
     opacity: 1;
     text-decoration: underline;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 1024px) {
+    body {
+        padding: 20px;
+    }
+
+    .app-container {
+        flex-direction: column !important;
+        height: auto;
+        gap: 24px;
+    }
+
+    .book-container {
+        order: -1;
+        width: 100% !important;
+        height: 55vh !important;
+        flex: none;
+    }
+
+    .notepad-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 40vh !important;
+        flex: none;
+    }
+
+    .timer-widget {
+        top: 10px;
+        right: 20px;
+    }
+
+    .user-info {
+        top: 10px;
+        right: 20px;
+    }
+
+    .page-nav {
+        width: 36px;
+        height: 36px;
+    }
+
+    .index-recipe-item {
+        padding: 12px 16px;
+    }
+}
+
+/* Mobile Layout */
+@media (max-width: 600px) {
+    body {
+        padding: 0;
+        background-image: linear-gradient(90deg,
+            var(--color-wood-dark) 0%,
+            var(--color-wood-medium) 15%,
+            var(--color-wood-light) 30%,
+            var(--color-wood-medium) 45%,
+            var(--color-wood-dark) 50%,
+            var(--color-wood-medium) 55%,
+            var(--color-wood-light) 70%,
+            var(--color-wood-medium) 85%,
+            var(--color-wood-dark) 100%
+        ); /* Remove noise texture */
+    }
+
+    body::before {
+        display: none; /* Hide wood grain lines */
+    }
+
+    .app-container {
+        height: 100vh;
+        gap: 0;
+    }
+
+    .section-label {
+        display: none;
+    }
+
+    .book-container,
+    .notepad-container {
+        height: 100% !important;
+        width: 100%;
+        max-width: 100%;
+        display: none; /* Hidden by default, shown by data-active-tab */
+    }
+
+    /* Tab Switching Logic */
+    .app-container[data-active-tab="book"] .book-container {
+        display: flex;
+    }
+
+    .app-container[data-active-tab="chat"] .notepad-container {
+        display: flex;
+    }
+
+    /* Defaults if no attribute present (server-side default) */
+    .app-container:not([data-active-tab]) .book-container {
+        display: flex;
+    }
+
+    .notepad-paper {
+        border-radius: 0;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3); /* Simpler shadow */
+    }
+
+    .notepad-paper::before {
+        display: none; /* Remove paper texture noise */
+    }
+
+    .notepad-header {
+        padding: 12px 16px 10px 16px;
+    }
+
+    .notepad-content {
+        padding: 12px 16px;
+    }
+
+    .notepad-input {
+        padding: 10px 16px 62px 16px; /* Extra bottom padding for tab bar */
+    }
+
+    .timer-widget {
+        top: 10px;
+        right: 12px;
+        padding: 6px 14px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .timer-widget::before,
+    .timer-widget::after {
+        display: none; /* Simplify on mobile */
+    }
+
+    .timer-text {
+        font-size: 16px;
+    }
+
+    .timer-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .user-info {
+        position: static;
+        width: 100%;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--color-border);
+        background: rgba(0,0,0,0.5);
+        padding: 8px 16px;
+        justify-content: space-between;
+    }
+
+    .user-email {
+        font-size: 12px;
+    }
+
+    .logout-link {
+        font-size: 12px;
+    }
+
+    /* Single Page Book View */
+    .page-right {
+        display: none !important;
+    }
+
+    .page-left {
+        width: 100% !important;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 16px;
+    }
+
+    .page-left::after {
+        display: none;
+    }
+
+    .book-cover {
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .book-cover::before {
+        display: none; /* Remove leather texture SVG noise */
+    }
+
+    .book-cover::after {
+        display: none; /* Hide spine shadow */
+    }
+
+    .pages-container {
+        margin: 4px;
+    }
+
+    .page-content {
+        padding-top: 10px;
+    }
+
+    .page-nav {
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
+        top: 2px;
+    }
+
+    .page-nav.prev { left: 2px; }
+    .page-nav.next { right: 2px; }
+
+    .index-recipe-item {
+        padding: 14px 16px;
+    }
 }
 
 /* Recipe authorship */

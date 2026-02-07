@@ -4,6 +4,10 @@ import { authenticate, seedRecipes } from './helpers';
 test.describe('Chat Interface', () => {
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
+    // On mobile, switch to chat tab before interacting
+    if (page.viewportSize()!.width <= 600) {
+      await page.click('#tab-chat');
+    }
   });
 
   test('user can send chat message', async ({ page }) => {
@@ -52,6 +56,11 @@ test.describe('Chat Interface', () => {
     // Reload page to ensure clean state
     await page.reload();
 
+    // On mobile, switch to chat tab again after reload
+    if (page.viewportSize()!.width <= 600) {
+      await page.click('#tab-chat');
+    }
+
     // Wait for page to load
     await expect(page.locator('#message-input')).toBeVisible();
 
@@ -66,6 +75,11 @@ test.describe('Chat Interface', () => {
 
     // Wait for AI response
     await expect(page.locator('#messages')).toContainText('AI:', { timeout: 10000 });
+
+    // On mobile, switch back to book tab to see the recipe
+    if (page.viewportSize()!.width <= 600) {
+      await page.click('#tab-book');
+    }
 
     // Verify recipe panel is updated
     // The mock should trigger display of a recipe - check for recipe title

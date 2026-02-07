@@ -2,14 +2,17 @@ import { test, expect } from '@playwright/test';
 import { authenticate, createRecipe, waitForRecipeList } from './helpers';
 
 test.describe('Recipe Display', () => {
+  const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
   });
 
   test('recipe title, ingredients, and steps render', async ({ page }) => {
+    const title = `Test Recipe ${uniqueSuffix}`;
     // Create a recipe
     const recipeId = await createRecipe(page, {
-      title: 'Test Recipe',
+      title: title,
       description: 'A test recipe for display testing',
       ingredients: [
         { name: 'flour', quantity: 1, unit: 'cup' },
@@ -36,7 +39,7 @@ test.describe('Recipe Display', () => {
     await page.waitForTimeout(500);
 
     // Verify title in the book interface
-    await expect(page.locator('.recipe-title')).toHaveText('Test Recipe');
+    await expect(page.locator('.recipe-title')).toHaveText(title);
 
     // Verify ingredients section exists and contains items
     const ingredientsSection = page.locator('.ingredients-list');
@@ -46,7 +49,8 @@ test.describe('Recipe Display', () => {
     await expect(ingredientsSection).toContainText('0.5 cup milk');
 
     // Verify preparation steps exist in right page
-    const rightContent = page.locator('#page-right-content');
+    const isMobile = await page.viewportSize()!.width <= 600;
+    const rightContent = page.locator(isMobile ? '#page-left-content' : '#page-right-content');
     await expect(rightContent).toBeVisible();
     await expect(rightContent).toContainText('Mix flour and eggs');
     await expect(rightContent).toContainText('Add milk');
@@ -54,6 +58,7 @@ test.describe('Recipe Display', () => {
   });
 
   test('long recipe content scrolls', async ({ page }) => {
+    const title = `Long Recipe ${uniqueSuffix}`;
     // Create a recipe with many ingredients and steps
     const manyIngredients = Array.from({ length: 30 }, (_, i) => ({
       name: `Ingredient ${i + 1}`,
@@ -66,7 +71,7 @@ test.describe('Recipe Display', () => {
     }));
 
     const recipeId = await createRecipe(page, {
-      title: 'Long Recipe',
+      title: title,
       description: 'A recipe with lots of ingredients and steps',
       ingredients: manyIngredients,
       steps: manySteps,
