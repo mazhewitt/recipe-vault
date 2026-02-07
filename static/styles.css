@@ -1104,17 +1104,64 @@ body::before {
     }
 
     .page-nav {
-        width: 44px;
-        height: 44px;
-        font-size: 20px;
-        top: 2px;
+        display: none; /* Hide desktop arrows on mobile */
     }
-
-    .page-nav.prev { left: 2px; }
-    .page-nav.next { right: 2px; }
 
     .index-recipe-item {
         padding: 14px 16px;
+    }
+}
+
+/* Mobile Edge Navigation */
+.mobile-edge-nav {
+    display: none; /* Hidden by default, shown only on mobile */
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 3px;
+    z-index: 10;
+    cursor: pointer;
+    opacity: 0.2;
+    transition: opacity 0.2s ease;
+}
+
+.mobile-edge-nav:active {
+    opacity: 0.5;
+}
+
+.mobile-edge-nav.disabled {
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+.mobile-edge-prev {
+    left: 0;
+    justify-content: flex-start;
+    padding-left: 8px;
+}
+
+.mobile-edge-next {
+    right: 0;
+    justify-content: flex-end;
+    padding-right: 8px;
+}
+
+.edge-chevron {
+    width: 32px;
+    height: 32px;
+    stroke: var(--color-ink-dark);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+@media (max-width: 600px) {
+    .mobile-edge-nav {
+        display: flex;
     }
 }
 

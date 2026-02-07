@@ -24,36 +24,45 @@ function findIndexById(list, id) {
 async function updateNavigationState() {
     const prevBtn = document.getElementById('page-prev');
     const nextBtn = document.getElementById('page-next');
+    const prevEdge = document.getElementById('mobile-edge-prev');
+    const nextEdge = document.getElementById('mobile-edge-next');
 
     const list = await fetchRecipeList();
     if (!prevBtn || !nextBtn) return;
 
+    let prevDisabled, nextDisabled;
+
     if (viewMode === 'index') {
         // On index: back arrow disabled, forward arrow enabled if recipes exist
-        prevBtn.disabled = true;
-        nextBtn.disabled = list.length === 0;
-        return;
-    }
-
-    if (!currentRecipeId) {
+        prevDisabled = true;
+        nextDisabled = list.length === 0;
+    } else if (!currentRecipeId) {
         // Fallback: no recipe displayed and not in index mode
-        prevBtn.disabled = list.length === 0;
-        nextBtn.disabled = list.length === 0;
-        return;
+        prevDisabled = list.length === 0;
+        nextDisabled = list.length === 0;
+    } else {
+        const idx = findIndexById(list, currentRecipeId);
+
+        if (idx === -1) {
+            prevDisabled = list.length === 0;
+            nextDisabled = list.length <= 1;
+        } else {
+            // In recipe view: back arrow always enabled (goes to previous recipe or index)
+            // Forward arrow disabled at end of list
+            prevDisabled = false;
+            nextDisabled = idx >= list.length - 1;
+        }
     }
 
-    const idx = findIndexById(list, currentRecipeId);
+    // Update desktop buttons
+    prevBtn.disabled = prevDisabled;
+    nextBtn.disabled = nextDisabled;
 
-    if (idx === -1) {
-        prevBtn.disabled = list.length === 0;
-        nextBtn.disabled = list.length <= 1;
-        return;
+    // Update mobile edge navigation
+    if (prevEdge && nextEdge) {
+        prevEdge.classList.toggle('disabled', prevDisabled);
+        nextEdge.classList.toggle('disabled', nextDisabled);
     }
-
-    // In recipe view: back arrow always enabled (goes to previous recipe or index)
-    // Forward arrow disabled at end of list
-    prevBtn.disabled = false;
-    nextBtn.disabled = idx >= list.length - 1;
 }
 
 async function loadNextRecipe() {
@@ -122,6 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setupMobileKeyboardHandling();
     setupResponsiveListeners();
+    setupMobileEdgeNavigation();
+    setupMobileSwipeDetection();
 
     // Show index on page load
     showIndex();
@@ -185,6 +196,69 @@ function setupMobileKeyboardHandling() {
             tabBar.style.display = 'flex';
         }
     });
+}
+
+function setupMobileEdgeNavigation() {
+    const prevEdge = document.getElementById('mobile-edge-prev');
+    const nextEdge = document.getElementById('mobile-edge-next');
+
+    if (!prevEdge || !nextEdge) return;
+
+    prevEdge.addEventListener('click', () => {
+        if (!isMobile()) return;
+        const container = document.querySelector('.app-container');
+        if (container && container.getAttribute('data-active-tab') === 'book') {
+            loadPrevRecipe().then(updateNavigationState);
+        }
+    });
+
+    nextEdge.addEventListener('click', () => {
+        if (!isMobile()) return;
+        const container = document.querySelector('.app-container');
+        if (container && container.getAttribute('data-active-tab') === 'book') {
+            loadNextRecipe().then(updateNavigationState);
+        }
+    });
+}
+
+function setupMobileSwipeDetection() {
+    const bookContainer = document.querySelector('.book-container');
+    if (!bookContainer) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    bookContainer.addEventListener('touchstart', (e) => {
+        if (!isMobile()) return;
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    bookContainer.addEventListener('touchend', (e) => {
+        if (!isMobile()) return;
+
+        const container = document.querySelector('.app-container');
+        if (!container || container.getAttribute('data-active-tab') !== 'book') return;
+
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+
+        // Only trigger if horizontal swipe is dominant and exceeds threshold
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+            if (deltaX > 0) {
+                // Swipe right = go back
+                loadPrevRecipe().then(updateNavigationState);
+            } else {
+                // Swipe left = go forward
+                loadNextRecipe().then(updateNavigationState);
+            }
+        }
+    }, { passive: true });
 }
 
 function scrollToBottom() {
