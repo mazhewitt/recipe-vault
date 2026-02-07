@@ -3,17 +3,26 @@ import { authenticate, seedRecipes } from './helpers';
 
 async function clearRecipes(page: any) {
   // Fetch list of recipes
-  const list = await page.request.get('/api/recipes', { 
-    headers: { 'X-API-Key': 'test-api-key-for-playwright' } 
+  const list = await page.request.get('/api/recipes', {
+    headers: { 'X-API-Key': 'test-api-key-for-playwright' }
   });
   const recipes = await list.json();
-  
+
   // Delete each one
   for (const r of recipes) {
     await page.request.delete(`/api/recipes/${r.id}`, {
       headers: { 'X-API-Key': 'test-api-key-for-playwright' }
     });
   }
+}
+
+// Helper to get navigation selectors based on viewport
+function getNavSelectors(page: any) {
+  const isMobile = page.viewportSize()!.width <= 600;
+  return {
+    prev: isMobile ? '#mobile-edge-prev' : '#page-prev',
+    next: isMobile ? '#mobile-edge-next' : '#page-next'
+  };
 }
 
 test.describe('Recipe Index', () => {
@@ -110,9 +119,10 @@ test.describe('Recipe Index', () => {
 
     // Verify recipe view is shown
     await expect(page.locator('.recipe-title')).toHaveText(title);
-    
+
     // Verify navigation state updated (back button enabled)
-    await expect(page.locator('#page-prev')).toBeEnabled();
+    const nav = getNavSelectors(page);
+    await expect(page.locator(nav.prev)).toBeEnabled();
   });
 
   test('forward arrow from index loads first recipe', async ({ page }) => {
@@ -128,7 +138,8 @@ test.describe('Recipe Index', () => {
     if (page.viewportSize()!.width <= 600) await page.click('#tab-book');
 
     // Click next arrow
-    await page.locator('#page-next').click();
+    const nav = getNavSelectors(page);
+    await page.locator(nav.next).click();
 
     // Verify first recipe loaded
     await expect(page.locator('.recipe-title')).toContainText(`AA Apple ${uniqueSuffix}`);

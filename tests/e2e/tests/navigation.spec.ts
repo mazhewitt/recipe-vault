@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { authenticate, seedRecipes, waitForRecipeList } from './helpers';
 
+// Helper to get navigation selectors based on viewport
+function getNavSelectors(page: any) {
+  const isMobile = page.viewportSize()!.width <= 600;
+  return {
+    prev: isMobile ? '#mobile-edge-prev' : '#page-prev',
+    next: isMobile ? '#mobile-edge-next' : '#page-next'
+  };
+}
+
 test.describe('Recipe Navigation', () => {
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
@@ -21,7 +30,8 @@ test.describe('Recipe Navigation', () => {
     const firstTitle = await page.locator('.recipe-title').textContent();
 
     // Click next arrow
-    await page.locator('#page-next').click();
+    const nav = getNavSelectors(page);
+    await page.locator(nav.next).click();
 
     // Wait for new recipe to load
     await page.waitForTimeout(500);
@@ -46,7 +56,8 @@ test.describe('Recipe Navigation', () => {
     const secondTitle = await page.locator('.recipe-title').textContent();
 
     // Click previous arrow
-    await page.locator('#page-prev').click();
+    const nav = getNavSelectors(page);
+    await page.locator(nav.prev).click();
 
     // Wait for new recipe to load
     await page.waitForTimeout(500);
@@ -63,9 +74,17 @@ test.describe('Recipe Navigation', () => {
     // On page load, the index should be displayed
     await page.waitForTimeout(500);
 
+    const nav = getNavSelectors(page);
+    const isMobile = page.viewportSize()!.width <= 600;
+
     // Previous button should be disabled on index (page zero)
-    await expect(page.locator('#page-prev')).toBeDisabled();
-    await expect(page.locator('#page-next')).not.toBeDisabled();
+    if (isMobile) {
+      await expect(page.locator(nav.prev)).toHaveClass(/disabled/);
+      await expect(page.locator(nav.next)).not.toHaveClass(/disabled/);
+    } else {
+      await expect(page.locator(nav.prev)).toBeDisabled();
+      await expect(page.locator(nav.next)).not.toBeDisabled();
+    }
 
     // Fetch the recipe list to see what order they're in
     const recipes = await page.evaluate(async () => {
@@ -86,13 +105,18 @@ test.describe('Recipe Navigation', () => {
     await expect(page.locator('.recipe-title')).toBeVisible();
 
     // Previous button should be ENABLED on first recipe (goes back to index)
-    await expect(page.locator('#page-prev')).not.toBeDisabled();
-    await expect(page.locator('#page-next')).not.toBeDisabled();
+    if (isMobile) {
+      await expect(page.locator(nav.prev)).not.toHaveClass(/disabled/);
+      await expect(page.locator(nav.next)).not.toHaveClass(/disabled/);
+    } else {
+      await expect(page.locator(nav.prev)).not.toBeDisabled();
+      await expect(page.locator(nav.next)).not.toBeDisabled();
+    }
 
     // Navigate to last recipe (we know we have 3 recipes)
     const recipeCount = recipes.length;
     for (let i = 1; i < recipeCount; i++) {
-      await page.locator('#page-next').click();
+      await page.locator(nav.next).click();
       // Wait for navigation to complete and state to update
       await page.evaluate(async () => {
         // @ts-ignore - updateNavigationState is defined in app.js
@@ -102,7 +126,12 @@ test.describe('Recipe Navigation', () => {
     }
 
     // Next button should be disabled on last recipe
-    await expect(page.locator('#page-next')).toBeDisabled();
-    await expect(page.locator('#page-prev')).not.toBeDisabled();
+    if (isMobile) {
+      await expect(page.locator(nav.next)).toHaveClass(/disabled/);
+      await expect(page.locator(nav.prev)).not.toHaveClass(/disabled/);
+    } else {
+      await expect(page.locator(nav.next)).toBeDisabled();
+      await expect(page.locator(nav.prev)).not.toBeDisabled();
+    }
   });
 });

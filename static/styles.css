@@ -929,6 +929,10 @@ body::before {
         flex: none;
     }
 
+    .notepad-container .section-label {
+        display: none;
+    }
+
     .timer-widget {
         top: 10px;
         right: 20px;
@@ -975,7 +979,7 @@ body::before {
         gap: 0;
     }
 
-    .section-label {
+    .notepad-container .section-label {
         display: none;
     }
 
