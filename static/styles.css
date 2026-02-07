@@ -968,6 +968,10 @@ body::before {
             var(--color-wood-medium) 85%,
             var(--color-wood-dark) 100%
         ); /* Remove noise texture */
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
     }
 
     body::before {
@@ -975,8 +979,9 @@ body::before {
     }
 
     .app-container {
-        height: 100vh;
+        flex: 1;
         gap: 0;
+        min-height: 0; /* Allow flex child to shrink */
     }
 
     .notepad-container .section-label {
