@@ -33,31 +33,33 @@ The user SHALL be able to navigate to the next recipe in alphabetical order by c
 
 ### Requirement: User can navigate to previous recipe
 
-The user SHALL be able to navigate to the previous recipe in alphabetical order by clicking the back arrow.
+The user SHALL be able to navigate to the previous recipe in alphabetical order by clicking the back arrow. When on the first recipe, the back arrow SHALL return to the index.
 
 #### Scenario: Navigate to previous recipe
 
 - **WHEN** a recipe is displayed and the user clicks the "<" arrow
 - **THEN** the previous recipe in alphabetical order is loaded and displayed
 
-#### Scenario: Back arrow disabled at start of list
+#### Scenario: Back arrow from first recipe returns to index
 
 - **WHEN** the first recipe in alphabetical order is displayed
-- **THEN** the "<" arrow is visually disabled and clicking it has no effect
+- **THEN** clicking the "<" arrow returns to the index view
+- **AND** the index is re-fetched fresh
 
 ### Requirement: Navigation from placeholder state loads first recipe
 
-When no recipe is displayed, clicking either arrow SHALL load the first recipe.
+When the index is displayed, clicking the forward arrow SHALL load the first recipe. Clicking the back arrow SHALL be disabled. This replaces the previous behavior where both arrows loaded the first recipe from the placeholder state.
 
-#### Scenario: Forward arrow from placeholder
+#### Scenario: Forward arrow from index
 
-- **WHEN** no recipe is displayed (placeholder shown) and the user clicks the ">" arrow
+- **WHEN** the index is displayed and the user clicks the ">" arrow
 - **THEN** the first recipe in alphabetical order is loaded and displayed
+- **AND** the view mode changes to recipe view
 
-#### Scenario: Back arrow from placeholder
+#### Scenario: Back arrow from index
 
-- **WHEN** no recipe is displayed (placeholder shown) and the user clicks the "<" arrow
-- **THEN** the first recipe in alphabetical order is loaded and displayed
+- **WHEN** the index is displayed and the user clicks the "<" arrow
+- **THEN** nothing happens (the arrow is disabled since the index is the first page)
 
 ### Requirement: Current recipe ID is tracked
 
@@ -73,8 +75,12 @@ The frontend SHALL track the ID of the currently displayed recipe to determine p
 - **WHEN** a recipe is displayed (via chat or navigation)
 - **THEN** the stored current recipe ID updates to match the displayed recipe
 
+### Requirement: Current recipe was deleted
+
+When navigating and the current recipe is not found, the system SHALL return to the index.
+
 #### Scenario: Current recipe was deleted
 
 - **WHEN** the user navigates and the current recipe ID is not found in the fresh list
-- **THEN** the first recipe in the list is displayed
+- **THEN** the index view is displayed instead of the first recipe
 

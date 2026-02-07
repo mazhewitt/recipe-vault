@@ -1,6 +1,7 @@
 let conversationId = null;
 let currentRecipeId = null;
 let recipeListCache = null;
+let viewMode = 'index'; // 'index' | 'recipe'
 
 async function fetchRecipeList(forceRefresh = false) {
     if (recipeListCache && !forceRefresh) return recipeListCache;
@@ -27,8 +28,15 @@ async function updateNavigationState() {
     const list = await fetchRecipeList();
     if (!prevBtn || !nextBtn) return;
 
+    if (viewMode === 'index') {
+        // On index: back arrow disabled, forward arrow enabled if recipes exist
+        prevBtn.disabled = true;
+        nextBtn.disabled = list.length === 0;
+        return;
+    }
+
     if (!currentRecipeId) {
-        // When no recipe is displayed, both arrows should be enabled if recipes exist.
+        // Fallback: no recipe displayed and not in index mode
         prevBtn.disabled = list.length === 0;
         nextBtn.disabled = list.length === 0;
         return;
@@ -42,7 +50,9 @@ async function updateNavigationState() {
         return;
     }
 
-    prevBtn.disabled = idx <= 0;
+    // In recipe view: back arrow always enabled (goes to previous recipe or index)
+    // Forward arrow disabled at end of list
+    prevBtn.disabled = false;
     nextBtn.disabled = idx >= list.length - 1;
 }
 
@@ -50,6 +60,13 @@ async function loadNextRecipe() {
     // Fetch fresh list to ensure we're using up-to-date data after chat operations
     const list = await fetchRecipeList(true);
     if (list.length === 0) return;
+
+    // If in index view, load first recipe
+    if (viewMode === 'index') {
+        fetchAndDisplayRecipe(list[0].id);
+        return;
+    }
+
     if (!currentRecipeId) {
         fetchAndDisplayRecipe(list[0].id);
         return;
@@ -68,6 +85,10 @@ async function loadPrevRecipe() {
     // Fetch fresh list to ensure we're using up-to-date data after chat operations
     const list = await fetchRecipeList(true);
     if (list.length === 0) return;
+
+    // If in index view, do nothing (back arrow should be disabled)
+    if (viewMode === 'index') return;
+
     // If no recipe currently shown, clicking back should load the first recipe
     if (!currentRecipeId) {
         fetchAndDisplayRecipe(list[0].id);
@@ -76,11 +97,15 @@ async function loadPrevRecipe() {
 
     const idx = findIndexById(list, currentRecipeId);
     if (idx === -1) {
-        fetchAndDisplayRecipe(list[0].id);
+        // Current recipe not found, return to index
+        showIndex();
         return;
     }
     if (idx > 0) {
         fetchAndDisplayRecipe(list[idx - 1].id);
+    } else {
+        // At first recipe, return to index
+        showIndex();
     }
 }
 
@@ -91,8 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (prevBtn) prevBtn.addEventListener('click', () => { loadPrevRecipe().then(updateNavigationState); });
     if (nextBtn) nextBtn.addEventListener('click', () => { loadNextRecipe().then(updateNavigationState); });
 
-    // ensure navigation state is initialized
-    fetchRecipeList().then(() => updateNavigationState());
+    // Show index on page load
+    showIndex();
 });
 
 function scrollToBottom() {
@@ -181,6 +206,79 @@ function setLoading(loading, text = 'Thinking...') {
     input.disabled = loading;
 }
 
+async function showIndex() {
+    viewMode = 'index';
+    currentRecipeId = null;
+    const list = await fetchRecipeList(true);
+    renderIndex(list);
+    updateNavigationState();
+}
+
+function renderIndex(recipes) {
+    const leftContent = document.getElementById('page-left-content');
+    const rightContent = document.getElementById('page-right-content');
+
+    if (recipes.length === 0) {
+        leftContent.innerHTML = `
+            <div class="recipe-placeholder">
+                <div class="recipe-placeholder-text">
+                    Your recipe book is empty. Ask me to create a recipe!
+                </div>
+            </div>
+        `;
+        rightContent.innerHTML = '';
+        return;
+    }
+
+    // Split recipes in half
+    const midpoint = Math.ceil(recipes.length / 2);
+    const leftRecipes = recipes.slice(0, midpoint);
+    const rightRecipes = recipes.slice(midpoint);
+
+    // Group by first letter
+    function groupByLetter(recipeList) {
+        const groups = {};
+        recipeList.forEach(recipe => {
+            const letter = recipe.title[0].toUpperCase();
+            if (!groups[letter]) groups[letter] = [];
+            groups[letter].push(recipe);
+        });
+        return groups;
+    }
+
+    function renderGroup(groups) {
+        return Object.keys(groups).sort().map(letter => {
+            const recipeItems = groups[letter].map(recipe =>
+                `<div class="index-recipe-item" data-recipe-id="${recipe.id}">${recipe.title}</div>`
+            ).join('');
+            return `
+                <div class="index-letter-group">
+                    <div class="index-letter-header">${letter}</div>
+                    ${recipeItems}
+                </div>
+            `;
+        }).join('');
+    }
+
+    const leftGroups = groupByLetter(leftRecipes);
+    const rightGroups = groupByLetter(rightRecipes);
+
+    leftContent.innerHTML = `
+        <div class="index-title">~ Index ~</div>
+        ${renderGroup(leftGroups)}
+    `;
+
+    rightContent.innerHTML = renderGroup(rightGroups);
+
+    // Add click handlers for recipe names
+    document.querySelectorAll('.index-recipe-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const recipeId = item.getAttribute('data-recipe-id');
+            fetchAndDisplayRecipe(recipeId);
+        });
+    });
+}
+
 // Recipe Display Functions
 function showRecipeLoading() {
     const leftContent = document.getElementById('page-left-content');
@@ -216,6 +314,7 @@ function showRecipeError(message) {
 
 async function fetchAndDisplayRecipe(recipeId) {
     showRecipeLoading();
+    viewMode = 'recipe';
     try {
         const response = await fetch(`/api/recipes/${recipeId}`, {
             credentials: 'same-origin'

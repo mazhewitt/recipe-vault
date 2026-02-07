@@ -768,6 +768,45 @@ body::before {
     100% { background-position: 200% 0; }
 }
 
+/* ==================== INDEX STYLES ==================== */
+.index-title {
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--color-ink-dark);
+    margin-bottom: var(--space-lg);
+    letter-spacing: 1px;
+}
+
+.index-letter-group {
+    margin-bottom: var(--space-lg);
+}
+
+.index-letter-header {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-leather);
+    margin-bottom: var(--space-sm);
+    border-bottom: 2px solid var(--color-border-light);
+    padding-bottom: var(--space-xs);
+}
+
+.index-recipe-item {
+    font-size: 16px;
+    color: var(--color-ink-dark);
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.index-recipe-item:hover {
+    background-color: var(--color-paper-aged-dark);
+    color: var(--color-leather-bright);
+    transform: translateX(4px);
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1000px) {
     body {
