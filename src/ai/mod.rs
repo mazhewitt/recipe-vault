@@ -1,5 +1,5 @@
 mod client;
-mod llm;
+pub mod llm;
 
-pub use client::{AiAgent, AiAgentConfig, ChatMessage, ChatRole};
-pub use llm::{LlmProvider, LlmProviderType};
+pub use client::{AiAgent, AiAgentConfig};
+pub use llm::{LlmProvider, LlmProviderType, Message};

@@ -55,5 +55,5 @@ This change depends on `cloudflare-identity-auth` being deployed first.
 - [x] 7.2 Verify backup was created before migration ran
 - [x] 7.3 Verify migration completed successfully in production
 - [x] 7.4 Verify authorship data is present in production database
-- [ ] 7.5 Test creating recipe via web UI (Cloudflare identity)
-- [ ] 7.6 Test creating recipe via MCP (X-User-Email header)
+- [x] 7.5 Test creating recipe via web UI (Cloudflare identity)
+- [x] 7.6 Test creating recipe via MCP (X-User-Email header)

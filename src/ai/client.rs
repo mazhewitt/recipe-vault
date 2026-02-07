@@ -21,18 +21,6 @@ pub enum AiError {
     ProcessNotRunning,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ChatRole {
-    User,
-    Assistant,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatMessage {
-    pub role: ChatRole,
-    pub content: String,
-}
-
 #[derive(Debug, Clone)]
 pub struct AiAgentConfig {
     pub mcp_binary_path: String,
@@ -47,35 +35,7 @@ impl Default for AiAgentConfig {
             mcp_binary_path: "./target/release/recipe-vault-mcp".to_string(),
             api_base_url: "http://localhost:3000".to_string(),
             api_key: String::new(),
-            system_prompt: Some(
-                "You are a helpful cooking assistant backed by a visual recipe database.\n\n\
-                 ## Tool Use Protocol\n\
-                 1. **Search First**: When you don't know the recipe_id, use `list_recipes` to find it.\n\
-                 2. **Display Always**: When the user wants to see details, cook, view, or read a recipe, you MUST call `display_recipe` with the recipe_id.\n\
-                 3. **Summarize Only**: The chat window is for conversation and brief summaries. The side panel (controlled by `display_recipe`) shows the full recipe content.\n\n\
-                 ## Interaction Strategy\n\
-                 Before calling a tool, briefly reason about which tool fits the user's request and verify you have the necessary arguments (like recipe_id).\n\
-                 - **Input**: User asks for a recipe.\n\
-                 - **Thought Process**: Check if you have the `recipe_id` from a previous `list_recipes` call.\n\
-                 - **Action**: Call `display_recipe(recipe_id=...)` to render the visual card.\n\
-                 - **Response**: Tell the user you've opened it and provide a quick tip or summary (1-2 sentences).\n\n\
-                 ## Examples\n\n\
-                 User: 'Show me the Apple Pie recipe.'\n\
-                 Assistant: [THOUGHT] User wants to view a recipe. I have the ID from the previous list. I should display it.\n\
-                 [Calls display_recipe(recipe_id='abc-123-...')]\n\
-                 Response: I've opened the Apple Pie recipe in the side panel for you. The key to a flaky crust is keeping your butter cold!\n\n\
-                 User: 'What ingredients do I need for the beef stew?'\n\
-                 Assistant: [THOUGHT] User is asking about ingredients. I need to display the recipe so they can see the full list.\n\
-                 [Calls display_recipe(recipe_id='def-456-...')]\n\
-                 Response: I've loaded the Beef Stew recipe—you'll find all the ingredients listed in the side panel.\n\n\
-                 User: 'Find me something with chicken.'\n\
-                 Assistant: [THOUGHT] User is searching. I need to find recipes first before I can display one.\n\
-                 [Calls list_recipes(query='chicken')]\n\
-                 Response: I found 3 chicken recipes: Chicken Parmesan, Lemon Herb Chicken, and Chicken Stir Fry. Which one would you like to see?\n\n\
-                 ## Formatting Guidelines\n\
-                 Use markdown for clear responses. When listing recipes, keep it concise (Title, brief description). Remember recipe_ids from tool results for subsequent display_recipe calls."
-                    .to_string(),
-            ),
+            system_prompt: None,
         }
     }
 }
@@ -404,11 +364,13 @@ impl AiAgent {
     }
 
     /// Chat with the AI agent.
-    /// Returns (response_text, tools_used, recipe_ids_to_display).
+    /// Returns (response_text, tools_used, recipe_ids_to_display, full_messages).
+    /// The full_messages vector contains all messages from the agent loop
+    /// (including tool calls and results) for persisting in the session.
     pub async fn chat(
         &self,
-        conversation: &[ChatMessage],
-    ) -> Result<(String, Vec<String>, Vec<String>), AiError> {
+        conversation: &[Message],
+    ) -> Result<(String, Vec<String>, Vec<String>, Vec<Message>), AiError> {
         // Ensure MCP is running
         {
             let process_guard = self.mcp_process.lock().await;
@@ -420,26 +382,17 @@ impl AiAgent {
 
         let tools = self.tools.lock().await.clone();
 
-        // Convert conversation to LLM messages
-        let mut messages: Vec<Message> = conversation
-            .iter()
-            .map(|m| match m.role {
-                ChatRole::User => Message::User {
-                    content: m.content.clone(),
-                },
-                ChatRole::Assistant => Message::Assistant {
-                    content: Some(m.content.clone()),
-                    tool_calls: None,
-                },
-            })
-            .collect();
+        let mut messages: Vec<Message> = conversation.to_vec();
 
         // Inject reminder for longer conversations (5+ messages)
-        // This helps the model remember critical instructions
+        // This helps the model remember critical tool-use instructions
         if messages.len() >= 5 {
             if let Some(Message::User { content }) = messages.last_mut() {
                 *content = format!(
-                    "{}\n\n(Reminder: Use display_recipe to show recipe details in the side panel. Do not output full ingredient lists or steps in chat.)",
+                    "{}\n\n(Reminder: Use list_recipes when the user asks to see their recipes. \
+                     Use display_recipe to show recipe details in the side panel. \
+                     After creating a recipe, call display_recipe with the new recipe_id. \
+                     Do not output full ingredient lists or steps in chat.)",
                     content
                 );
             }
@@ -450,7 +403,8 @@ impl AiAgent {
         let mut final_text = String::new();
 
         // Agent loop: keep going until we get a text-only response
-        loop {
+        const MAX_ITERATIONS: usize = 10;
+        for _iteration in 0..MAX_ITERATIONS {
             let response = self
                 .llm
                 .complete(
@@ -460,82 +414,57 @@ impl AiAgent {
                 )
                 .await?;
 
-            match response {
+            // Extract interim text and tool calls from response
+            let (interim_text, pending_tool_calls) = match response {
                 LlmResponse::Text(text) => {
                     final_text = text;
                     break;
                 }
-                LlmResponse::ToolUse(tool_calls) => {
-                    // Execute all tool calls
-                    let mut tool_results: Vec<ToolResult> = Vec::new();
-                    for call in &tool_calls {
-                        tool_uses.push(call.name.clone());
-                        let result = self.execute_tool(call).await;
-                        let (content, is_error) = match result {
-                            Ok((text, maybe_recipe_id)) => {
-                                if let Some(rid) = maybe_recipe_id {
-                                    recipe_ids.push(rid);
-                                }
-                                (text, false)
-                            }
-                            Err(e) => (format!("Error: {}", e), true),
-                        };
-                        tool_results.push(ToolResult {
-                            tool_use_id: call.id.clone(),
-                            content,
-                            is_error,
-                        });
+                LlmResponse::ToolUse(tool_calls) => (None, tool_calls),
+                LlmResponse::TextWithToolUse { text, tool_calls } => (Some(text), tool_calls),
+            };
+
+            // Execute all tool calls
+            let mut tool_results: Vec<ToolResult> = Vec::new();
+            for call in &pending_tool_calls {
+                tool_uses.push(call.name.clone());
+                let result = self.execute_tool(call).await;
+                let (content, is_error) = match result {
+                    Ok((text, maybe_recipe_id)) => {
+                        if let Some(rid) = maybe_recipe_id {
+                            recipe_ids.push(rid);
+                        }
+                        (text, false)
                     }
-
-                    // Add assistant message with tool calls
-                    messages.push(Message::Assistant {
-                        content: None,
-                        tool_calls: Some(tool_calls),
-                    });
-
-                    // Add tool results
-                    messages.push(Message::Tool { tool_results });
-                }
-                LlmResponse::TextWithToolUse { text, tool_calls } => {
-                    // Capture the text from this response
-                    final_text = text.clone();
-
-                    // Execute all tool calls
-                    let mut tool_results: Vec<ToolResult> = Vec::new();
-                    for call in &tool_calls {
-                        tool_uses.push(call.name.clone());
-                        let result = self.execute_tool(call).await;
-                        let (content, is_error) = match result {
-                            Ok((text, maybe_recipe_id)) => {
-                                if let Some(rid) = maybe_recipe_id {
-                                    recipe_ids.push(rid);
-                                }
-                                (text, false)
-                            }
-                            Err(e) => (format!("Error: {}", e), true),
-                        };
-                        tool_results.push(ToolResult {
-                            tool_use_id: call.id.clone(),
-                            content,
-                            is_error,
-                        });
-                    }
-
-                    // Add assistant message with text and tool calls
-                    messages.push(Message::Assistant {
-                        content: Some(text),
-                        tool_calls: Some(tool_calls),
-                    });
-
-                    // Add tool results
-                    messages.push(Message::Tool { tool_results });
-
-                    // Break after executing tools - don't loop again
-                    break;
-                }
+                    Err(e) => (format!("Error: {}", e), true),
+                };
+                tool_results.push(ToolResult {
+                    tool_use_id: call.id.clone(),
+                    content,
+                    is_error,
+                });
             }
+
+            // Add assistant message with tool calls (and interim text if any)
+            messages.push(Message::Assistant {
+                content: interim_text,
+                tool_calls: Some(pending_tool_calls),
+            });
+
+            // Add tool results, then continue loop so LLM sees them
+            messages.push(Message::Tool { tool_results });
         }
 
-        Ok((final_text, tool_uses, recipe_ids))
+        // Add the final assistant text to the message sequence
+        if !final_text.is_empty() {
+            messages.push(Message::Assistant {
+                content: Some(final_text.clone()),
+                tool_calls: None,
+            });
+        }
+
+        // Return messages starting after the original conversation
+        let new_messages = messages[conversation.len()..].to_vec();
+        Ok((final_text, tool_uses, recipe_ids, new_messages))
     }
 }

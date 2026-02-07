@@ -14,13 +14,13 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::ai::{AiAgent, AiAgentConfig, ChatMessage, ChatRole, LlmProvider, LlmProviderType};
+use crate::ai::{AiAgent, AiAgentConfig, LlmProvider, LlmProviderType, Message};
 use crate::config::Config;
 
 #[derive(Clone)]
 pub struct ChatState {
     agent: Arc<RwLock<Option<AiAgent>>>,
-    sessions: Arc<RwLock<HashMap<String, Vec<ChatMessage>>>>,
+    sessions: Arc<RwLock<HashMap<String, Vec<Message>>>>,
     config: Arc<Config>,
     api_key: Arc<String>,
 }
@@ -57,22 +57,32 @@ impl ChatState {
                 ),
                 api_key: (*self.api_key).clone(),
                 system_prompt: Some(
-                    "You are a helpful cooking assistant with access to a recipe database. \
-                     You can list recipes, get recipe details, create new recipes, update existing ones, \
-                     and delete recipes. Use the available tools to help users manage their recipes.\n\n\
-                     ## Recipe Display Strategy (CRITICAL)\n\n\
-                     The interface has a side panel for displaying structured recipes. \
-                     - **`get_recipe` vs `display_recipe`**: \
-                       - `get_recipe` returns text for YOUR internal knowledge only. It does NOT show anything to the user.\n\
-                       - `display_recipe` renders the visual card for the USER. \
-                     - NEVER render full ingredient lists or step-by-step instructions in the chat box.\n\
-                     - When the user asks to see a recipe, wants to cook something, or you are providing recipe details, \
-                       ALWAYS call the `display_recipe` tool with the appropriate `recipe_id`.\n\
-                     - **IMPORTANT**: Always use the exact `recipe_id` returned by the `list_recipes` or `get_recipe` tools. Do not guess IDs.\n\
-                     - After calling the tool, provide a brief (1-3 sentence) summary or helpful tip in the chat.\n\
-                     - Example chat response: \"I've pulled up that Pork Pie recipe in the side panel for you. It's a classic! Make sure to keep your pastry warm while working with it.\"\n\n\
-                     ## Formatting Guidelines\n\n\
-                     Use markdown for clear responses. When listing recipes, keep it concise (Title, Description, Times). You don't need to show IDs to the user, but remember them for tool calls."
+                    "You are a helpful cooking assistant with access to a recipe database.\n\n\
+                     ## Tool Use Protocol (CRITICAL)\n\n\
+                     You MUST call the right tool for each user intent:\n\
+                     - **Listing recipes** (\"list recipes\", \"show all recipes\", \"what recipes do I have\"): \
+                       MUST call `list_recipes`. It takes no parameters. Present the results as a concise list.\n\
+                     - **Viewing a specific recipe** (\"show me\", \"view\", \"read\", \"cook\", \"what ingredients\"): \
+                       MUST call `display_recipe` with the recipe_id. This renders the recipe in the side panel for the user.\n\
+                     - **After creating a recipe**: When `create_recipe` succeeds and returns a new recipe_id, \
+                       you MUST immediately call `display_recipe` with that recipe_id so the user can see it.\n\
+                     - **`get_recipe`** returns data for YOUR internal use only. It does NOT display anything to the user.\n\n\
+                     ## Rules\n\
+                     - NEVER output full ingredient lists or step-by-step instructions in chat. The side panel shows those.\n\
+                     - NEVER fabricate recipe IDs. Only use exact UUIDs from `list_recipes` or `create_recipe` results.\n\
+                     - After calling `display_recipe`, provide a brief (1-2 sentence) summary or tip in chat.\n\n\
+                     ## Examples\n\n\
+                     User: \"List all my recipes\"\n\
+                     Action: Call list_recipes()\n\
+                     Response: List the recipe titles and brief descriptions from the tool result.\n\n\
+                     User: \"Show me the Apple Pie recipe\"\n\
+                     Action: Call display_recipe(recipe_id=<id from previous list_recipes>)\n\
+                     Response: \"I've opened Apple Pie in the side panel! The key to a flaky crust is keeping your butter cold.\"\n\n\
+                     User: \"Create a recipe for banana bread\"\n\
+                     Action: Call create_recipe(...), then call display_recipe(recipe_id=<new id from create result>)\n\
+                     Response: \"I've saved your Banana Bread recipe and opened it in the side panel!\"\n\n\
+                     ## Formatting Guidelines\n\
+                     Use markdown. Keep chat responses concise. Do not show UUIDs to the user."
                         .to_string(),
                 ),
             };
@@ -157,8 +167,7 @@ pub async fn chat(
         .or_insert_with(Vec::new);
 
     // Add user message to history
-    history.push(ChatMessage {
-        role: ChatRole::User,
+    history.push(Message::User {
         content: request.message.clone(),
     });
 
@@ -177,7 +186,7 @@ pub async fn chat(
         let agent_guard = state.agent.read().await;
         if let Some(agent) = agent_guard.as_ref() {
             match agent.chat(&conversation).await {
-                Ok((response_text, tools_used, recipe_ids)) => {
+                Ok((response_text, tools_used, recipe_ids, new_messages)) => {
                     // Send tool use events
                     for tool in &tools_used {
                         yield Ok(Event::default()
@@ -199,22 +208,17 @@ pub async fn chat(
                     }
 
                     // Stream the response text in chunks
-                    // For now, send as a single chunk (real streaming would require
-                    // modifying the LLM client to stream)
                     if !response_text.is_empty() {
                         yield Ok(Event::default()
                             .event("chunk")
                             .data(serde_json::json!({"text": response_text.clone()}).to_string()));
                     }
 
-                    // Add assistant response to history
+                    // Persist all new messages (tool calls, tool results, final text)
                     {
                         let mut sessions = state.sessions.write().await;
                         if let Some(history) = sessions.get_mut(&conv_id) {
-                            history.push(ChatMessage {
-                                role: ChatRole::Assistant,
-                                content: response_text,
-                            });
+                            history.extend(new_messages);
                         }
                     }
 

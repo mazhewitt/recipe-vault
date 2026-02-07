@@ -48,7 +48,7 @@ pub fn get_recipe_tool() -> ToolDefinition {
 pub fn create_recipe_tool() -> ToolDefinition {
     ToolDefinition::new(
         "create_recipe",
-        "Create and save a new recipe to the database. Use this when the user asks to 'save', 'store', or 'remember' a recipe.",
+        "Create and save a new recipe to the database. Use this when the user asks to 'save', 'store', 'create', or 'remember' a recipe. After successful creation, the assistant MUST call display_recipe with the new recipe_id to show it in the side panel.",
         json!({
             "type": "object",
             "properties": {
