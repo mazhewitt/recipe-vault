@@ -94,6 +94,7 @@ async fn main() {
 
     // UI routes
     let ui_routes = Router::new()
+        .route("/", get(ui::root))
         .route("/chat", get(ui::chat_page))
         .with_state(ui_state);
 

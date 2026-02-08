@@ -1,7 +1,7 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Redirect},
 };
 use tracing::error;
 
@@ -10,6 +10,11 @@ use crate::auth::UserIdentity;
 /// Shared state for UI handlers
 #[derive(Clone)]
 pub struct UiState {}
+
+/// GET / - Redirect to /chat
+pub async fn root() -> impl IntoResponse {
+    Redirect::permanent("/chat")
+}
 
 /// GET /chat - Render the chat page
 pub async fn chat_page(
