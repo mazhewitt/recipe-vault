@@ -170,14 +170,14 @@ async function setupImagePasteHandler() {
 
     messageInput.addEventListener('paste', async (e) => {
         const items = e.clipboardData.items;
-        let imageFound = false;
 
-        // Try to find an image in clipboard items
+        // Find and extract image file from clipboard items
         // On Android, images may be reported with different MIME types or as file objects
+        let imageFile = null;
         for (let item of items) {
-            // Check if this is an image type or if getAsFile() returns a valid image file
+            // Check if this is an image type
             if (item.type.startsWith('image/')) {
-                imageFound = true;
+                imageFile = item.getAsFile();
                 break;
             }
 
@@ -185,58 +185,38 @@ async function setupImagePasteHandler() {
             // but getAsFile() still returns the image file
             const file = item.getAsFile();
             if (file && file.type && file.type.startsWith('image/')) {
-                imageFound = true;
+                imageFile = file;
                 break;
             }
         }
 
-        // Prevent default paste if we detected an image to avoid pasting gibberish
-        if (imageFound) {
+        // Prevent default paste if we found an image to avoid pasting gibberish
+        if (imageFile) {
             e.preventDefault();
-        }
 
-        // Process the image
-        for (let item of items) {
-            let file = null;
-
-            // Try to get image directly
-            if (item.type.startsWith('image/')) {
-                file = item.getAsFile();
-            } else {
-                // On Android, try getAsFile() even if type doesn't indicate image
-                const potentialFile = item.getAsFile();
-                if (potentialFile && potentialFile.type && potentialFile.type.startsWith('image/')) {
-                    file = potentialFile;
-                }
+            // Validate size
+            if (imageFile.size > MAX_IMAGE_SIZE) {
+                const sizeMB = (imageFile.size / (1024 * 1024)).toFixed(1);
+                showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
+                return;
             }
 
-            if (file && file.type && file.type.startsWith('image/')) {
-                // Validate size
-                if (file.size > MAX_IMAGE_SIZE) {
-                    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-                    showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
-                    return;
-                }
+            try {
+                const base64 = await fileToBase64(imageFile);
 
-                try {
-                    const base64 = await fileToBase64(file);
+                // Strip data URL prefix
+                const base64Data = base64.split(',')[1];
 
-                    // Strip data URL prefix
-                    const base64Data = base64.split(',')[1];
+                attachedImage = {
+                    data: base64Data,
+                    media_type: imageFile.type,
+                    size: imageFile.size
+                };
 
-                    attachedImage = {
-                        data: base64Data,
-                        media_type: file.type,
-                        size: file.size
-                    };
-
-                    showImageAttached(file.size);
-                } catch (error) {
-                    console.error('Error processing image:', error);
-                    showError('Failed to process image. Please try again.');
-                }
-
-                break; // Only handle first image
+                showImageAttached(imageFile.size);
+            } catch (error) {
+                console.error('Error processing image:', error);
+                showError('Failed to process image. Please try again.');
             }
         }
     });
