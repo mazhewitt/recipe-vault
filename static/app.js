@@ -170,19 +170,47 @@ async function setupImagePasteHandler() {
 
     messageInput.addEventListener('paste', async (e) => {
         const items = e.clipboardData.items;
+        let imageFound = false;
 
-        // Check if there's an image in the clipboard first
-        const hasImage = Array.from(items).some(item => item.type.startsWith('image/'));
+        // Try to find an image in clipboard items
+        // On Android, images may be reported with different MIME types or as file objects
+        for (let item of items) {
+            // Check if this is an image type or if getAsFile() returns a valid image file
+            if (item.type.startsWith('image/')) {
+                imageFound = true;
+                break;
+            }
 
-        if (hasImage) {
-            // Prevent default paste behavior (which would paste the data URL as text)
+            // On Android, sometimes images are reported as text/plain or other types
+            // but getAsFile() still returns the image file
+            const file = item.getAsFile();
+            if (file && file.type && file.type.startsWith('image/')) {
+                imageFound = true;
+                break;
+            }
+        }
+
+        // Prevent default paste if we detected an image to avoid pasting gibberish
+        if (imageFound) {
             e.preventDefault();
         }
 
+        // Process the image
         for (let item of items) {
-            if (item.type.startsWith('image/')) {
-                const file = item.getAsFile();
+            let file = null;
 
+            // Try to get image directly
+            if (item.type.startsWith('image/')) {
+                file = item.getAsFile();
+            } else {
+                // On Android, try getAsFile() even if type doesn't indicate image
+                const potentialFile = item.getAsFile();
+                if (potentialFile && potentialFile.type && potentialFile.type.startsWith('image/')) {
+                    file = potentialFile;
+                }
+            }
+
+            if (file && file.type && file.type.startsWith('image/')) {
                 // Validate size
                 if (file.size > MAX_IMAGE_SIZE) {
                     const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
@@ -198,7 +226,7 @@ async function setupImagePasteHandler() {
 
                     attachedImage = {
                         data: base64Data,
-                        media_type: item.type,
+                        media_type: file.type,
                         size: file.size
                     };
 
