@@ -2,20 +2,23 @@ name: Create Tag v2.3.1
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     branches:
-      - copilot/tag-release-v2-3-1
+      - main
+    types: [closed]
 
 jobs:
   create-tag:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'copilot/tag-release-v2-3-1')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     
     steps:
-      - name: Checkout repository
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       
       - name: Create and push tag v2.3.1
@@ -24,10 +27,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Create annotated tag on commit 0056384b7f4ea1cbde887ee6ca462e777466d1a9
-          git tag -a v2.3.1 0056384b7f4ea1cbde887ee6ca462e777466d1a9 -m "Release v2.3.1"
+          # Get the current commit on main
+          MAIN_SHA=$(git rev-parse HEAD)
+          echo "Creating tag v2.3.1 on commit $MAIN_SHA"
+          
+          # Check if tag already exists
+          if git rev-parse v2.3.1 >/dev/null 2>&1; then
+            echo "Tag v2.3.1 already exists, skipping creation"
+            exit 0
+          fi
+          
+          # Create annotated tag on current main commit
+          git tag -a v2.3.1 -m "Release v2.3.1"
           
           # Push the tag
           git push origin v2.3.1
+          
+          echo "Successfully created and pushed tag v2.3.1"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
