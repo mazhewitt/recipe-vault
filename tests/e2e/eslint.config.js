@@ -14,7 +14,9 @@ export default [
         alert: "readonly",
         sessionStorage: "readonly",
         marked: "readonly",
-        TextDecoder: "readonly"
+        TextDecoder: "readonly",
+        FileReader: "readonly",
+        setTimeout: "readonly"
       }
     },
     rules: {

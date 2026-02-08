@@ -171,44 +171,52 @@ async function setupImagePasteHandler() {
     messageInput.addEventListener('paste', async (e) => {
         const items = e.clipboardData.items;
 
-        // Check if there's an image in the clipboard first
-        const hasImage = Array.from(items).some(item => item.type.startsWith('image/'));
+        // Find and extract image file from clipboard items
+        // On Android, images may be reported with different MIME types or as file objects
+        let imageFile = null;
+        for (let item of items) {
+            // Check if this is an image type
+            if (item.type.startsWith('image/')) {
+                imageFile = item.getAsFile();
+                break;
+            }
 
-        if (hasImage) {
-            // Prevent default paste behavior (which would paste the data URL as text)
-            e.preventDefault();
+            // On Android, sometimes images are reported as text/plain or other types
+            // but getAsFile() still returns the image file
+            const file = item.getAsFile();
+            if (file && file.type && file.type.startsWith('image/')) {
+                imageFile = file;
+                break;
+            }
         }
 
-        for (let item of items) {
-            if (item.type.startsWith('image/')) {
-                const file = item.getAsFile();
+        // Prevent default paste if we found an image to avoid pasting gibberish
+        if (imageFile) {
+            e.preventDefault();
 
-                // Validate size
-                if (file.size > MAX_IMAGE_SIZE) {
-                    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-                    showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
-                    return;
-                }
+            // Validate size
+            if (imageFile.size > MAX_IMAGE_SIZE) {
+                const sizeMB = (imageFile.size / (1024 * 1024)).toFixed(1);
+                showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
+                return;
+            }
 
-                try {
-                    const base64 = await fileToBase64(file);
+            try {
+                const base64 = await fileToBase64(imageFile);
 
-                    // Strip data URL prefix
-                    const base64Data = base64.split(',')[1];
+                // Strip data URL prefix
+                const base64Data = base64.split(',')[1];
 
-                    attachedImage = {
-                        data: base64Data,
-                        media_type: item.type,
-                        size: file.size
-                    };
+                attachedImage = {
+                    data: base64Data,
+                    media_type: imageFile.type,
+                    size: imageFile.size
+                };
 
-                    showImageAttached(file.size);
-                } catch (error) {
-                    console.error('Error processing image:', error);
-                    showError('Failed to process image. Please try again.');
-                }
-
-                break; // Only handle first image
+                showImageAttached(imageFile.size);
+            } catch (error) {
+                console.error('Error processing image:', error);
+                showError('Failed to process image. Please try again.');
             }
         }
     });
