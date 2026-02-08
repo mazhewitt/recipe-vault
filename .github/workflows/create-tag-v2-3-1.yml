@@ -1,0 +1,33 @@
+name: Create Tag v2.3.1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - copilot/tag-release-v2-3-1
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Create and push tag v2.3.1
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create annotated tag on commit 0056384b7f4ea1cbde887ee6ca462e777466d1a9
+          git tag -a v2.3.1 0056384b7f4ea1cbde887ee6ca462e777466d1a9 -m "Release v2.3.1"
+          
+          # Push the tag
+          git push origin v2.3.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
