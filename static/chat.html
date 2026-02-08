@@ -51,6 +51,11 @@
                         <span id="loading-text">Thinking...</span>
                     </div>
                     <div class="notepad-input">
+                        <div id="image-attachment" class="image-attachment" style="display: none;">
+                            <span class="image-icon">🖼️</span>
+                            <span class="image-text">Image attached</span>
+                            <button class="remove-image" onclick="removeImage()" type="button">✕</button>
+                        </div>
                         <textarea class="text-input" id="message-input" placeholder="Type your message..." onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
                     </div>
                 </div>

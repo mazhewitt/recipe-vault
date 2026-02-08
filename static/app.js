@@ -2,6 +2,13 @@ let conversationId = null;
 let currentRecipeId = null;
 let recipeListCache = null;
 let viewMode = 'index'; // 'index' | 'recipe'
+let attachedImage = null; // Stores pasted image data
+
+// Image size limit (5MB)
+// This matches Claude API's ~5MB limit for vision inputs. Images larger than this
+// are rejected before upload to provide immediate feedback and avoid wasting bandwidth.
+// The backend has a higher limit (10MB) to accommodate JSON payload overhead.
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 async function fetchRecipeList(forceRefresh = false) {
     if (recipeListCache && !forceRefresh) return recipeListCache;
@@ -118,6 +125,95 @@ async function loadPrevRecipe() {
     }
 }
 
+// Image handling functions
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function showImageAttached(size) {
+    const sizeMB = (size / (1024 * 1024)).toFixed(1);
+    const indicator = document.getElementById('image-attachment');
+    if (indicator) {
+        indicator.querySelector('.image-text').textContent = `Image attached (${sizeMB}MB)`;
+        indicator.style.display = 'flex';
+    }
+}
+
+function removeImage() {
+    attachedImage = null;
+    const indicator = document.getElementById('image-attachment');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'paste-error';
+    errorDiv.textContent = message;
+
+    const notepadInput = document.querySelector('.notepad-input');
+    if (notepadInput) {
+        notepadInput.insertBefore(errorDiv, notepadInput.firstChild);
+        setTimeout(() => errorDiv.remove(), 3000);
+    }
+}
+
+async function setupImagePasteHandler() {
+    const messageInput = document.getElementById('message-input');
+    if (!messageInput) return;
+
+    messageInput.addEventListener('paste', async (e) => {
+        const items = e.clipboardData.items;
+
+        // Check if there's an image in the clipboard first
+        const hasImage = Array.from(items).some(item => item.type.startsWith('image/'));
+
+        if (hasImage) {
+            // Prevent default paste behavior (which would paste the data URL as text)
+            e.preventDefault();
+        }
+
+        for (let item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+
+                // Validate size
+                if (file.size > MAX_IMAGE_SIZE) {
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+                    showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
+                    return;
+                }
+
+                try {
+                    const base64 = await fileToBase64(file);
+
+                    // Strip data URL prefix
+                    const base64Data = base64.split(',')[1];
+
+                    attachedImage = {
+                        data: base64Data,
+                        media_type: item.type,
+                        size: file.size
+                    };
+
+                    showImageAttached(file.size);
+                } catch (error) {
+                    console.error('Error processing image:', error);
+                    showError('Failed to process image. Please try again.');
+                }
+
+                break; // Only handle first image
+            }
+        }
+    });
+}
+
 // attach handlers once DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     const prevBtn = document.getElementById('page-prev');
@@ -136,6 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Show index on page load
     showIndex();
+
+    // Setup image paste handler
+    setupImagePasteHandler();
 });
 
 function setupResponsiveListeners() {
@@ -651,7 +750,8 @@ async function sendMessage() {
     const input = document.getElementById('message-input');
     const message = input.value.trim();
 
-    if (!message) return;
+    // Require either message text or an attached image
+    if (!message && !attachedImage) return;
 
     input.value = '';
     addMessage(message, 'user');
@@ -660,20 +760,53 @@ async function sendMessage() {
     let streamedText = '';
 
     try {
+        const payload = {
+            message: message || "",  // Ensure message is never undefined
+            conversation_id: conversationId
+        };
+
+        // Include image if attached
+        if (attachedImage) {
+            payload.image = {
+                data: attachedImage.data,
+                media_type: attachedImage.media_type
+            };
+            console.log('Sending message with image:', {
+                textLength: message.length,
+                imageSize: attachedImage.size,
+                mediaType: attachedImage.media_type
+            });
+        }
+
+        console.log('Sending chat request...', payload.message ? 'with text' : 'image only');
+
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             credentials: 'same-origin',
-            body: JSON.stringify({
-                message: message,
-                conversation_id: conversationId
-            })
+            body: JSON.stringify(payload)
         });
+
+        console.log('Response received:', response.status, response.statusText);
 
         if (response.status === 401) {
             window.location.href = '/chat';
+            return;
+        }
+
+        if (!response.ok) {
+            // Handle non-200 responses
+            const errorText = await response.text();
+            console.error('Server error:', response.status, errorText);
+
+            if (response.status === 413) {
+                addMessage('Error: Image too large for server. Try a smaller image or compress it first.', 'error');
+            } else {
+                addMessage(`Error: ${response.statusText || 'Server error'}`, 'error');
+            }
+            setLoading(false);
             return;
         }
 
@@ -724,6 +857,11 @@ async function sendMessage() {
     } catch (error) {
         console.error('Error:', error);
         addMessage('Connection error. Please try again.', 'error');
+    }
+
+    // Clear attached image after successful send
+    if (attachedImage) {
+        removeImage();
     }
 
     setLoading(false);

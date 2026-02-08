@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::ai::{AiAgent, AiAgentConfig, LlmProvider, LlmProviderType, Message};
+use crate::ai::{AiAgent, AiAgentConfig, LlmProvider, LlmProviderType, Message, ContentBlock, ImageSource};
 use crate::config::Config;
 
 #[derive(Clone)]
@@ -58,6 +58,14 @@ impl ChatState {
                 api_key: (*self.api_key).clone(),
                 system_prompt: Some(
                     "You are a helpful cooking assistant with access to a recipe database.\n\n\
+                     ## Image-Based Recipe Extraction\n\n\
+                     When the user sends an image with their message:\n\
+                     - If the image contains a recipe (handwritten, printed, cookbook page, recipe card), extract it\n\
+                     - Use any accompanying text from the user as additional context (e.g., for description, notes, family history)\n\
+                     - Extract: title, description, ingredients (with quantities and units), preparation steps, timing, temperature\n\
+                     - Format the extracted recipe nicely using markdown with clear sections\n\
+                     - After showing the extracted recipe, ask: \"Would you like me to edit it or add it to the book?\"\n\
+                     - If the image doesn't contain a recipe, politely say \"I couldn't find a recipe in that image\" and suggest they paste a recipe image\n\n\
                      ## Tool Use Protocol (CRITICAL)\n\n\
                      You MUST call the right tool for each user intent:\n\
                      - **Listing recipes** (\"list recipes\", \"show all recipes\", \"what recipes do I have\"): \
@@ -117,9 +125,17 @@ impl IntoResponse for ChatError {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ImageAttachment {
+    pub data: String,       // base64-encoded image data
+    pub media_type: String, // MIME type (e.g., "image/jpeg", "image/png")
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ChatRequest {
     pub message: String,
     pub conversation_id: Option<String>,
+    #[serde(default)]
+    pub image: Option<ImageAttachment>,
 }
 
 #[derive(Debug, Serialize)]
@@ -166,9 +182,44 @@ pub async fn chat(
         .entry(conversation_id.clone())
         .or_insert_with(Vec::new);
 
+    // Build content blocks for the user message
+    let mut content_blocks = Vec::new();
+
+    // Add text block only if message is non-empty
+    if !request.message.trim().is_empty() {
+        content_blocks.push(ContentBlock::Text {
+            text: request.message.clone(),
+        });
+    }
+
+    // Add image if present
+    if let Some(img) = &request.image {
+        tracing::info!(
+            "Received image attachment: media_type={}, size={} bytes",
+            img.media_type,
+            img.data.len()
+        );
+        content_blocks.push(ContentBlock::Image {
+            source: ImageSource {
+                source_type: "base64".to_string(),
+                media_type: img.media_type.clone(),
+                data: img.data.clone(),
+            },
+        });
+    }
+
+    // Ensure we have at least one content block
+    if content_blocks.is_empty() {
+        tracing::warn!("Received message with no content (no text and no image)");
+        // This shouldn't happen due to frontend validation, but handle it gracefully
+        content_blocks.push(ContentBlock::Text {
+            text: "...".to_string(),
+        });
+    }
+
     // Add user message to history
     history.push(Message::User {
-        content: request.message.clone(),
+        content: content_blocks,
     });
 
     let conversation = history.clone();

@@ -6,6 +6,7 @@ A recipe management system built with Rust, featuring a REST API, Claude Desktop
 
 - **REST API**: Full CRUD operations for recipes via HTTP
 - **Web Chat Interface**: Browser-based AI assistant for natural language recipe management
+- **Image Recipe Extraction**: Paste images of handwritten or printed recipes to extract structured data using Claude's vision capabilities
 - **Claude Desktop Integration**: Natural language recipe management through MCP
 - **SQLite Database**: Lightweight, file-based storage
 - **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, and servings
@@ -271,10 +272,16 @@ Changes tagged with `v*` (e.g., `v1.0.0`) are automatically built and pushed to 
 ### Run Tests
 
 ```bash
+# Rust tests
 cargo test                          # All tests
 cargo test --test recipes_test      # REST API integration tests
 cargo test --test chat_test         # Chat endpoint tests
 cargo test --lib                    # Unit tests
+
+# End-to-end tests (Playwright)
+cd tests/e2e
+npm test                            # Run all e2e tests
+npm test -- image-paste.spec.ts     # Run specific test file
 ```
 
 ### Test Coverage
@@ -287,8 +294,9 @@ cargo test --lib                    # Unit tests
 | HTTP Client | 7 | Error mapping, client configuration |
 | Auth | 5 | API key generation, constant-time comparison |
 | Integration | 9 | Ignored by default, require running server |
+| E2E (Playwright) | 31 | Chat interface, image paste, navigation, responsive |
 
-**Total: 45 passing tests + 9 integration tests**
+**Total: 45 passing Rust tests + 9 integration tests + 31 passing e2e tests**
 
 ### Project Structure
 
@@ -326,7 +334,16 @@ recipe-vault/
 ├── tests/                         # Integration tests
 │   ├── chat_test.rs               # Chat endpoint tests
 │   ├── mcp_integration_test.rs    # MCP integration tests
-│   └── recipes_test.rs            # REST API tests
+│   ├── recipes_test.rs            # REST API tests
+│   └── e2e/                       # End-to-end tests (Playwright)
+│       ├── tests/
+│       │   ├── chat.spec.ts       # Chat interface tests
+│       │   ├── image-paste.spec.ts # Image paste tests
+│       │   ├── navigation.spec.ts # Navigation tests
+│       │   ├── recipe-display.spec.ts # Recipe display tests
+│       │   └── responsive.spec.ts # Responsive layout tests
+│       ├── playwright.config.ts
+│       └── package.json
 └── openspec/                      # Specifications and archives
 ```
 

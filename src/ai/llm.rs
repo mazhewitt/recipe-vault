@@ -49,11 +49,74 @@ pub struct ToolResult {
     pub is_error: bool,
 }
 
+/// Content block for multi-modal messages (text, images, etc.)
+///
+/// Represents a single piece of content within a user message. Messages can contain
+/// multiple content blocks to support rich content like text combined with images.
+///
+/// # Examples
+///
+/// Text-only message:
+/// ```
+/// vec![ContentBlock::Text { text: "What's in this recipe?".to_string() }]
+/// ```
+///
+/// Text with image:
+/// ```
+/// vec![
+///     ContentBlock::Text { text: "This is grandma's recipe".to_string() },
+///     ContentBlock::Image { source: ImageSource { ... } }
+/// ]
+/// ```
+///
+/// This structure matches the Anthropic Messages API format directly, enabling
+/// seamless serialization to the API's expected format.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ContentBlock {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "image")]
+    Image { source: ImageSource },
+}
+
+/// Image source for image content blocks
+///
+/// Contains the image data and metadata required to send images to the Claude API.
+/// Images are encoded as base64 strings and transmitted inline with the message.
+///
+/// # Size Limits
+///
+/// - Frontend validation: 5MB max (enforced before sending to backend)
+/// - Backend body limit: 10MB max (allows overhead for JSON payload)
+/// - Claude API limit: ~5MB per image
+///
+/// # Supported Formats
+///
+/// JPEG, PNG, GIF, WebP (specified via `media_type`)
+///
+/// # Example
+///
+/// ```
+/// ImageSource {
+///     source_type: "base64".to_string(),
+///     media_type: "image/jpeg".to_string(),
+///     data: "iVBORw0KGgo...".to_string(), // base64-encoded image (no data URL prefix)
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageSource {
+    #[serde(rename = "type")]
+    pub source_type: String, // "base64"
+    pub media_type: String,  // "image/jpeg", "image/png", etc.
+    pub data: String,        // base64-encoded image data (without data URL prefix)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "role")]
 pub enum Message {
     #[serde(rename = "user")]
-    User { content: String },
+    User { content: Vec<ContentBlock> },
     #[serde(rename = "assistant")]
     Assistant {
         content: Option<String>,
@@ -122,7 +185,13 @@ impl LlmProvider {
                 .iter()
                 .rev()
                 .find_map(|m| match m {
-                    Message::User { content } => Some(content.as_str()),
+                    Message::User { content } => {
+                        // Extract text from first Text block
+                        content.iter().find_map(|block| match block {
+                            ContentBlock::Text { text } => Some(text.as_str()),
+                            _ => None,
+                        })
+                    }
                     _ => None,
                 })
                 .unwrap_or("");
@@ -153,7 +222,13 @@ impl LlmProvider {
             .iter()
             .rev()
             .find_map(|m| match m {
-                Message::User { content } => Some(content.as_str()),
+                Message::User { content } => {
+                    // Extract text from first Text block
+                    content.iter().find_map(|block| match block {
+                        ContentBlock::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                }
                 _ => None,
             })
             .unwrap_or("");
@@ -248,9 +323,32 @@ impl LlmProvider {
     fn message_to_anthropic(&self, message: &Message) -> serde_json::Value {
         match message {
             Message::User { content } => {
+                // Convert content blocks to Anthropic API format
+                let content_json: Vec<serde_json::Value> = content
+                    .iter()
+                    .map(|block| match block {
+                        ContentBlock::Text { text } => {
+                            serde_json::json!({
+                                "type": "text",
+                                "text": text
+                            })
+                        }
+                        ContentBlock::Image { source } => {
+                            serde_json::json!({
+                                "type": "image",
+                                "source": {
+                                    "type": source.source_type,
+                                    "media_type": source.media_type,
+                                    "data": source.data
+                                }
+                            })
+                        }
+                    })
+                    .collect();
+
                 serde_json::json!({
                     "role": "user",
-                    "content": content
+                    "content": content_json
                 })
             }
             Message::Assistant { content, tool_calls } => {
@@ -404,9 +502,41 @@ impl LlmProvider {
     fn message_to_openai(&self, message: &Message) -> serde_json::Value {
         match message {
             Message::User { content } => {
+                // OpenAI also supports content blocks similar to Anthropic
+                // If only text, we can simplify to just a string for compatibility
+                if content.len() == 1 {
+                    if let Some(ContentBlock::Text { text }) = content.first() {
+                        return serde_json::json!({
+                            "role": "user",
+                            "content": text
+                        });
+                    }
+                }
+
+                // For multi-modal content, use array format
+                let content_json: Vec<serde_json::Value> = content
+                    .iter()
+                    .map(|block| match block {
+                        ContentBlock::Text { text } => {
+                            serde_json::json!({
+                                "type": "text",
+                                "text": text
+                            })
+                        }
+                        ContentBlock::Image { source } => {
+                            serde_json::json!({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": format!("data:{};base64,{}", source.media_type, source.data)
+                                }
+                            })
+                        }
+                    })
+                    .collect();
+
                 serde_json::json!({
                     "role": "user",
-                    "content": content
+                    "content": content_json
                 })
             }
             Message::Assistant { content, tool_calls } => {

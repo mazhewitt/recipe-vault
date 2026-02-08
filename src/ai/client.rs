@@ -1,4 +1,4 @@
-use crate::ai::llm::{LlmError, LlmProvider, LlmResponse, Message, ToolCall, ToolDefinition, ToolResult, tools};
+use crate::ai::llm::{ContentBlock, LlmError, LlmProvider, LlmResponse, Message, ToolCall, ToolDefinition, ToolResult, tools};
 use serde::{Deserialize, Serialize};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -388,13 +388,15 @@ impl AiAgent {
         // This helps the model remember critical tool-use instructions
         if messages.len() >= 5 {
             if let Some(Message::User { content }) = messages.last_mut() {
-                *content = format!(
-                    "{}\n\n(Reminder: Use list_recipes when the user asks to see their recipes. \
-                     Use display_recipe to show recipe details in the side panel. \
-                     After creating a recipe, call display_recipe with the new recipe_id. \
-                     Do not output full ingredient lists or steps in chat.)",
-                    content
-                );
+                // Find the last Text block and append the reminder to it
+                if let Some(ContentBlock::Text { text }) = content.iter_mut().rev().find(|b| matches!(b, ContentBlock::Text { .. })) {
+                    text.push_str(
+                        "\n\n(Reminder: Use list_recipes when the user asks to see their recipes. \
+                         Use display_recipe to show recipe details in the side panel. \
+                         After creating a recipe, call display_recipe with the new recipe_id. \
+                         Do not output full ingredient lists or steps in chat.)"
+                    );
+                }
             }
         }
 

@@ -1,4 +1,5 @@
 use axum::{
+    extract::DefaultBodyLimit,
     middleware,
     routing::{delete, get, post, put},
     Router,
@@ -108,7 +109,11 @@ async fn main() {
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         )
-        .layer(CorsLayer::permissive());
+        .layer(CorsLayer::permissive())
+        // 10MB body limit for image uploads
+        // Frontend validates images at 5MB (Claude API limit), but backend allows 10MB
+        // to accommodate base64 encoding overhead (~33% larger) plus JSON structure
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024));
 
     // Parse bind address
     let addr: SocketAddr = config

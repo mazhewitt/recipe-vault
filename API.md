@@ -114,6 +114,55 @@ DELETE /api/recipes/{id}
 # Note: Cascades to delete all ingredients and steps
 ```
 
+#### Chat with AI Assistant
+```bash
+POST /api/chat
+Content-Type: application/json
+
+{
+  "message": "What recipes do I have?",
+  "conversation_id": "optional-conversation-id",
+  "image": {
+    "data": "base64-encoded-image-data",
+    "media_type": "image/jpeg"
+  }
+}
+
+# Response: Server-Sent Events (SSE) stream
+# Each event contains a chunk of the AI's response
+# The AI can use tools to create/list/search recipes
+# Image field is optional and supports recipe extraction from photos
+
+# Image Requirements:
+# - Max size: 5MB (frontend validation)
+# - Supported formats: JPEG, PNG, GIF, WebP
+# - Data must be base64-encoded without data URL prefix
+# - Use for extracting recipes from handwritten notes or cookbook photos
+```
+
+Example with image:
+```bash
+# Extract recipe from image
+curl -X POST http://localhost:3000/api/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -d '{
+    "message": "This is my grandmas cookie recipe",
+    "image": {
+      "data": "'"$(base64 -i recipe-photo.jpg | tr -d '\n')"'",
+      "media_type": "image/jpeg"
+    }
+  }'
+
+# Text-only chat
+curl -X POST http://localhost:3000/api/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -d '{
+    "message": "Show me all my pasta recipes"
+  }'
+```
+
 ### Example cURL Commands
 
 ```bash
