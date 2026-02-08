@@ -965,6 +965,7 @@ body::before {
 @media (max-width: 600px) {
     .mobile-tab-bar {
         display: flex;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 }
 
@@ -1056,7 +1057,7 @@ body::before {
 @media (max-width: 600px) {
     body {
         padding: 0;
-        padding-bottom: 52px; /* Reserve space for fixed mobile tab bar */
+        padding-bottom: 52px; /* Reserve space for fixed tab bar */
         background-image: linear-gradient(90deg,
             var(--color-wood-dark) 0%,
             var(--color-wood-medium) 15%,
@@ -1071,7 +1072,7 @@ body::before {
         display: flex;
         flex-direction: column;
         height: 100vh;
-        height: 100dvh; /* dvh accounts for mobile browser chrome on Android */
+        height: 100dvh;
         overflow: hidden;
     }
 
@@ -1082,10 +1083,11 @@ body::before {
     .app-container {
         flex: 1;
         gap: 0;
-        min-height: 0; /* Allow flex child to shrink */
+        min-height: 0;
+        overflow: hidden; /* Contain children within flex-allocated space */
     }
 
-    .notepad-container .section-label {
+    .section-label {
         display: none;
     }
 
@@ -1113,7 +1115,7 @@ body::before {
 
     .notepad-paper {
         border-radius: 0;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3); /* Simpler shadow */
+        box-shadow: none;
     }
 
     .notepad-paper::before {
@@ -1129,7 +1131,7 @@ body::before {
     }
 
     .notepad-input {
-        padding: 10px 16px 16px 16px;
+        padding: 10px 16px 62px 16px; /* Extra bottom padding to clear fixed tab bar */
     }
 
     .input-controls {
