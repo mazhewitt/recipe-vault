@@ -57,16 +57,28 @@ pub struct ToolResult {
 /// # Examples
 ///
 /// Text-only message:
-/// ```
-/// vec![ContentBlock::Text { text: "What's in this recipe?".to_string() }]
+/// ```rust
+/// use recipe_vault::ai::ContentBlock;
+///
+/// let blocks = vec![ContentBlock::Text { text: "What's in this recipe?".to_string() }];
+/// assert_eq!(blocks.len(), 1);
 /// ```
 ///
 /// Text with image:
-/// ```
-/// vec![
+/// ```rust
+/// use recipe_vault::ai::{ContentBlock, ImageSource};
+///
+/// let blocks = vec![
 ///     ContentBlock::Text { text: "This is grandma's recipe".to_string() },
-///     ContentBlock::Image { source: ImageSource { ... } }
-/// ]
+///     ContentBlock::Image {
+///         source: ImageSource {
+///             source_type: "base64".to_string(),
+///             media_type: "image/jpeg".to_string(),
+///             data: "iVBORw0KGgo=".to_string(),
+///         },
+///     },
+/// ];
+/// assert_eq!(blocks.len(), 2);
 /// ```
 ///
 /// This structure matches the Anthropic Messages API format directly, enabling
@@ -97,12 +109,15 @@ pub enum ContentBlock {
 ///
 /// # Example
 ///
-/// ```
-/// ImageSource {
+/// ```rust
+/// use recipe_vault::ai::ImageSource;
+///
+/// let source = ImageSource {
 ///     source_type: "base64".to_string(),
 ///     media_type: "image/jpeg".to_string(),
-///     data: "iVBORw0KGgo...".to_string(), // base64-encoded image (no data URL prefix)
-/// }
+///     data: "iVBORw0KGgo=".to_string(), // base64-encoded image (no data URL prefix)
+/// };
+/// assert_eq!(source.media_type, "image/jpeg");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageSource {

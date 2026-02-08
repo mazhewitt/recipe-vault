@@ -1,6 +1,5 @@
 use axum::http::StatusCode;
 use serde_json::json;
-use sqlx::SqlitePool;
 
 mod common;
 use common::{create_test_db, create_test_app, send_request};
@@ -61,7 +60,7 @@ async fn deletion_fallback_and_creation_visibility() {
     assert_eq!(arr[0]["id"].as_str().unwrap(), id2.as_str());
 
     // Create a new recipe and ensure it appears
-    let (s, body) = send_request(&app, "POST", "/api/recipes", Some(json!({ "title": "Zed" }))).await;
+    let (s, _) = send_request(&app, "POST", "/api/recipes", Some(json!({ "title": "Zed" }))).await;
     assert_eq!(s, StatusCode::CREATED);
     // List should now have 2 items
     let (s, body) = send_request(&app, "GET", "/api/recipes", None).await;

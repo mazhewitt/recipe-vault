@@ -394,6 +394,7 @@ impl AiAgent {
                         "\n\n(Reminder: Use list_recipes when the user asks to see their recipes. \
                          Use display_recipe to show recipe details in the side panel. \
                          After creating a recipe, call display_recipe with the new recipe_id. \
+                         If current_recipe context is provided, treat it as the active recipe and call get_recipe when needed. \
                          Do not output full ingredient lists or steps in chat.)"
                     );
                 }

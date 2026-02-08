@@ -63,7 +63,7 @@ When the index is displayed, clicking the forward arrow SHALL load the first rec
 
 ### Requirement: Current recipe ID is tracked
 
-The frontend SHALL track the ID of the currently displayed recipe to determine position in the list during navigation.
+The frontend SHALL track the ID of the currently displayed recipe to determine position in the list during navigation and to populate the current recipe context used by chat requests.
 
 #### Scenario: Position determined from current recipe ID
 
@@ -74,6 +74,13 @@ The frontend SHALL track the ID of the currently displayed recipe to determine p
 
 - **WHEN** a recipe is displayed (via chat or navigation)
 - **THEN** the stored current recipe ID updates to match the displayed recipe
+- **AND** the current recipe context for chat requests updates to match
+
+#### Scenario: Current recipe context cleared on index view
+
+- **WHEN** the recipe index is displayed
+- **THEN** the stored current recipe ID is cleared
+- **AND** the current recipe context for chat requests is cleared
 
 ### Requirement: Current recipe was deleted
 

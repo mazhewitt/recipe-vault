@@ -30,7 +30,7 @@ pub fn list_recipes_tool() -> ToolDefinition {
 pub fn get_recipe_tool() -> ToolDefinition {
     ToolDefinition::new(
         "get_recipe",
-        "Get complete details for a specific recipe by ID, including all ingredients and cooking steps.",
+        "Get complete details for a specific recipe by ID, including all ingredients and cooking steps. If current_recipe context is provided in the chat request, prefer using its recipe_id for follow-up questions.",
         json!({
             "type": "object",
             "properties": {

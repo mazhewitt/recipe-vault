@@ -1,5 +1,6 @@
 let conversationId = null;
 let currentRecipeId = null;
+let currentRecipeTitle = null;
 let recipeListCache = null;
 let viewMode = 'index'; // 'index' | 'recipe'
 let attachedImage = null; // Stores pasted image data
@@ -507,6 +508,7 @@ function setLoading(loading, text = 'Thinking...') {
 async function showIndex() {
     viewMode = 'index';
     currentRecipeId = null;
+    currentRecipeTitle = null;
     const list = await fetchRecipeList(true);
     renderIndex(list);
     updateNavigationState();
@@ -657,9 +659,11 @@ async function fetchAndDisplayRecipe(recipeId) {
                 if (list.length > 0) {
                     const firstId = list[0].id;
                     currentRecipeId = firstId;
+                    currentRecipeTitle = list[0].title || null;
                     await fetchAndDisplayRecipe(firstId);
                 } else {
                     currentRecipeId = null;
+                    currentRecipeTitle = null;
                     showRecipeError('Recipe not found');
                     updateNavigationState();
                 }
@@ -671,6 +675,7 @@ async function fetchAndDisplayRecipe(recipeId) {
         const recipe = await response.json();
         renderRecipe(recipe);
         currentRecipeId = recipe.id || recipe.recipe?.id || currentRecipeId;
+        currentRecipeTitle = recipe.title || recipe.recipe?.title || currentRecipeTitle;
         // Refresh recipe list to include newly created recipes
         await fetchRecipeList(true);
         updateNavigationState();
@@ -824,6 +829,15 @@ async function sendMessage() {
             message: message || "",  // Ensure message is never undefined
             conversation_id: conversationId
         };
+
+        if (viewMode === 'recipe' && currentRecipeId) {
+            payload.current_recipe = {
+                recipe_id: String(currentRecipeId)
+            };
+            if (currentRecipeTitle) {
+                payload.current_recipe.title = currentRecipeTitle;
+            }
+        }
 
         // Include image if attached
         if (attachedImage) {

@@ -8,6 +8,7 @@ use sqlx::SqlitePool;
 use tower::ServiceExt;
 
 /// Create an in-memory test database with migrations
+#[allow(dead_code)]
 pub async fn create_test_db() -> SqlitePool {
     let pool = SqlitePool::connect(":memory:")
         .await
@@ -22,6 +23,7 @@ pub async fn create_test_db() -> SqlitePool {
 }
 
 /// Create test router with database pool
+#[allow(dead_code)]
 pub fn create_test_app(pool: SqlitePool) -> Router {
     use recipe_vault::handlers::recipes;
     use recipe_vault::auth::cloudflare_auth;
@@ -50,6 +52,7 @@ pub fn create_test_app(pool: SqlitePool) -> Router {
 }
 
 /// Helper to send JSON request and get response
+#[allow(dead_code)]
 pub async fn send_request(
     app: &Router,
     method: &str,

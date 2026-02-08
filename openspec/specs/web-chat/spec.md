@@ -3,9 +3,7 @@
 ## Purpose
 
 The Web Chat feature provides a browser-based interface for conversing with Claude, with Claude having access to Recipe Vault tools via MCP. This replicates the Claude Desktop + MCP experience in a web browser.
-
 ## Requirements
-
 ### Requirement: Chat Message Handling
 
 The system SHALL accept chat messages via API and return AI responses. Messages MAY include optional image attachments alongside text.
@@ -90,13 +88,30 @@ The system SHALL stream AI responses to the browser in real-time.
 
 ### Requirement: Conversation Context
 
-The system SHALL maintain conversation context within a browser session, including the full message sequence of user messages, assistant messages (with any tool calls), and tool results.
+The system SHALL maintain conversation context within a browser session, including the full message sequence of user messages, assistant messages (with any tool calls), tool results, and explicit current recipe context from the UI when available.
 
 #### Scenario: Follow-up questions
 - **WHEN** a user has asked about a recipe
 - **AND** they ask a follow-up question like "How long does it take?"
 - **THEN** Claude understands "it" refers to the previous recipe
 - **AND** responds with relevant timing information
+
+#### Scenario: Current recipe context included in chat request
+- **WHEN** a recipe is displayed in the UI
+- **AND** the user sends a chat message
+- **THEN** the conversation context sent to the LLM includes `current_recipe` with `recipe_id`
+- **AND** includes `title` when available
+
+#### Scenario: No current recipe context
+- **WHEN** the recipe index is displayed
+- **AND** the user sends a chat message
+- **THEN** the conversation context omits `current_recipe` or sets it to null
+
+#### Scenario: LLM uses current recipe context for details
+- **WHEN** `current_recipe` is present in the chat request
+- **AND** the user asks about "this recipe"
+- **THEN** Claude treats `current_recipe` as the active recipe
+- **AND** calls `get_recipe` if it needs full recipe details
 
 #### Scenario: New session
 - **WHEN** a user refreshes the page
