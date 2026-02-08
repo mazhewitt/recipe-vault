@@ -227,53 +227,24 @@ async function setupImagePasteHandler() {
 
 async function setupClipboardButton() {
     const clipboardButton = document.getElementById('clipboard-button');
-    if (!clipboardButton) return;
+    const imageUpload = document.getElementById('image-upload');
+    if (!clipboardButton || !imageUpload) return;
 
-    clipboardButton.addEventListener('click', async () => {
-        try {
-            // Check if Clipboard API is available
-            if (!navigator.clipboard || !navigator.clipboard.read) {
-                showError('Clipboard API not supported on this browser');
-                return;
-            }
+    clipboardButton.addEventListener('click', () => {
+        imageUpload.click();
+    });
+}
 
-            // Disable button while reading
-            clipboardButton.disabled = true;
+function setupImageUploadHandler() {
+    const imageUpload = document.getElementById('image-upload');
+    if (!imageUpload) return;
 
-            // Read from clipboard
-            const clipboardItems = await navigator.clipboard.read();
-
-            // Find image in clipboard
-            let imageBlob = null;
-            for (const item of clipboardItems) {
-                for (const type of item.types) {
-                    if (type.startsWith('image/')) {
-                        imageBlob = await item.getType(type);
-                        break;
-                    }
-                }
-                if (imageBlob) break;
-            }
-
-            if (imageBlob) {
-                // Create a File object from the Blob
-                const imageFile = new File([imageBlob], 'clipboard-image.png', {
-                    type: imageBlob.type
-                });
-                await handleImageFile(imageFile);
-            } else {
-                showError('No image found in clipboard');
-            }
-        } catch (error) {
-            console.error('Error reading clipboard:', error);
-            if (error.name === 'NotAllowedError') {
-                showError('Clipboard access denied. Please grant permission.');
-            } else {
-                showError('Failed to read clipboard. Try using long-press paste instead.');
-            }
-        } finally {
-            // Re-enable button
-            clipboardButton.disabled = false;
+    imageUpload.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            await handleImageFile(file);
+            // Clear input so the same file can be chosen again if removed
+            imageUpload.value = '';
         }
     });
 }
@@ -319,6 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Setup image paste handler
     setupImagePasteHandler();
+    setupImageUploadHandler();
     setupClipboardButton();
     setupTextareaAutoResize();
 });
