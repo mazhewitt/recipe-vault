@@ -1056,6 +1056,7 @@ body::before {
 @media (max-width: 600px) {
     body {
         padding: 0;
+        padding-bottom: 52px; /* Reserve space for fixed mobile tab bar */
         background-image: linear-gradient(90deg,
             var(--color-wood-dark) 0%,
             var(--color-wood-medium) 15%,
@@ -1070,6 +1071,7 @@ body::before {
         display: flex;
         flex-direction: column;
         height: 100vh;
+        height: 100dvh; /* dvh accounts for mobile browser chrome on Android */
         overflow: hidden;
     }
 
@@ -1127,7 +1129,7 @@ body::before {
     }
 
     .notepad-input {
-        padding: 10px 16px 62px 16px; /* Extra bottom padding for tab bar */
+        padding: 10px 16px 16px 16px;
     }
 
     .input-controls {
