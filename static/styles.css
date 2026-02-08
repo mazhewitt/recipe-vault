@@ -341,18 +341,59 @@ body::before {
     margin-top: auto;
 }
 
+.input-controls {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .text-input {
-    width: 100%;
-    height: 60px;
+    flex: 1;
+    min-height: 48px;
+    max-height: 200px;
     padding: 12px;
     border: 2px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: #fff;
     font-family: var(--font-handwritten);
     font-size: 15px;
+    line-height: 1.5;
     resize: none;
     outline: none;
+    overflow-y: auto;
     transition: border-color 0.15s ease;
+}
+
+.clipboard-button {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--color-ink-medium);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.clipboard-button:hover {
+    background: var(--color-paper-aged-light);
+    border-color: var(--color-ink-medium);
+    color: var(--color-ink);
+}
+
+.clipboard-button:active {
+    transform: scale(0.95);
+}
+
+.clipboard-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .text-input::placeholder {
@@ -1079,6 +1120,15 @@ body::before {
 
     .notepad-input {
         padding: 10px 16px 62px 16px; /* Extra bottom padding for tab bar */
+    }
+
+    .input-controls {
+        gap: 6px;
+    }
+
+    .clipboard-button {
+        width: 36px;
+        height: 36px;
     }
 
     .timer-widget {

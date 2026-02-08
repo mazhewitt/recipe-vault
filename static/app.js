@@ -164,6 +164,33 @@ function showError(message) {
     }
 }
 
+async function handleImageFile(imageFile) {
+    // Validate size
+    if (imageFile.size > MAX_IMAGE_SIZE) {
+        const sizeMB = (imageFile.size / (1024 * 1024)).toFixed(1);
+        showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
+        return;
+    }
+
+    try {
+        const base64 = await fileToBase64(imageFile);
+
+        // Strip data URL prefix
+        const base64Data = base64.split(',')[1];
+
+        attachedImage = {
+            data: base64Data,
+            media_type: imageFile.type,
+            size: imageFile.size
+        };
+
+        showImageAttached(imageFile.size);
+    } catch (error) {
+        console.error('Error processing image:', error);
+        showError('Failed to process image. Please try again.');
+    }
+}
+
 async function setupImagePasteHandler() {
     const messageInput = document.getElementById('message-input');
     if (!messageInput) return;
@@ -193,33 +220,82 @@ async function setupImagePasteHandler() {
         // Prevent default paste if we found an image to avoid pasting gibberish
         if (imageFile) {
             e.preventDefault();
+            await handleImageFile(imageFile);
+        }
+    });
+}
 
-            // Validate size
-            if (imageFile.size > MAX_IMAGE_SIZE) {
-                const sizeMB = (imageFile.size / (1024 * 1024)).toFixed(1);
-                showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
+async function setupClipboardButton() {
+    const clipboardButton = document.getElementById('clipboard-button');
+    if (!clipboardButton) return;
+
+    clipboardButton.addEventListener('click', async () => {
+        try {
+            // Check if Clipboard API is available
+            if (!navigator.clipboard || !navigator.clipboard.read) {
+                showError('Clipboard API not supported on this browser');
                 return;
             }
 
-            try {
-                const base64 = await fileToBase64(imageFile);
+            // Disable button while reading
+            clipboardButton.disabled = true;
 
-                // Strip data URL prefix
-                const base64Data = base64.split(',')[1];
+            // Read from clipboard
+            const clipboardItems = await navigator.clipboard.read();
 
-                attachedImage = {
-                    data: base64Data,
-                    media_type: imageFile.type,
-                    size: imageFile.size
-                };
-
-                showImageAttached(imageFile.size);
-            } catch (error) {
-                console.error('Error processing image:', error);
-                showError('Failed to process image. Please try again.');
+            // Find image in clipboard
+            let imageBlob = null;
+            for (const item of clipboardItems) {
+                for (const type of item.types) {
+                    if (type.startsWith('image/')) {
+                        imageBlob = await item.getType(type);
+                        break;
+                    }
+                }
+                if (imageBlob) break;
             }
+
+            if (imageBlob) {
+                // Create a File object from the Blob
+                const imageFile = new File([imageBlob], 'clipboard-image.png', {
+                    type: imageBlob.type
+                });
+                await handleImageFile(imageFile);
+            } else {
+                showError('No image found in clipboard');
+            }
+        } catch (error) {
+            console.error('Error reading clipboard:', error);
+            if (error.name === 'NotAllowedError') {
+                showError('Clipboard access denied. Please grant permission.');
+            } else {
+                showError('Failed to read clipboard. Try using long-press paste instead.');
+            }
+        } finally {
+            // Re-enable button
+            clipboardButton.disabled = false;
         }
     });
+}
+
+function setupTextareaAutoResize() {
+    const textarea = document.getElementById('message-input');
+    if (!textarea) return;
+
+    const autoResize = () => {
+        // Reset height to recalculate
+        textarea.style.height = 'auto';
+
+        // Set height to scrollHeight (content height) up to max-height
+        const newHeight = Math.min(textarea.scrollHeight, 200);
+        textarea.style.height = newHeight + 'px';
+    };
+
+    // Auto-resize on input
+    textarea.addEventListener('input', autoResize);
+
+    // Initial resize in case there's pre-filled content
+    autoResize();
 }
 
 // attach handlers once DOM is ready
@@ -243,6 +319,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Setup image paste handler
     setupImagePasteHandler();
+    setupClipboardButton();
+    setupTextareaAutoResize();
 });
 
 function setupResponsiveListeners() {
@@ -762,6 +840,8 @@ async function sendMessage() {
     if (!message && !attachedImage) return;
 
     input.value = '';
+    // Reset textarea height after clearing
+    input.style.height = 'auto';
     addMessage(message, 'user');
     setLoading(true);
 
