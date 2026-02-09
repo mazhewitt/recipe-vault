@@ -5,6 +5,8 @@ use axum::{
 };
 use serde_json::Value;
 use sqlx::SqlitePool;
+use std::io::Write;
+use std::sync::Arc;
 use tower::ServiceExt;
 
 /// Create an in-memory test database with migrations
@@ -22,12 +24,75 @@ pub async fn create_test_db() -> SqlitePool {
     pool
 }
 
-/// Create test router with database pool
+/// Create a test families config YAML and return the FamiliesConfig
+#[allow(dead_code)]
+pub fn create_test_families_config() -> recipe_vault::config::FamiliesConfig {
+    let yaml = r#"
+families:
+  test-family:
+    members:
+      - test@example.com
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(yaml.as_bytes()).unwrap();
+    recipe_vault::config::FamiliesConfig::load(file.path()).unwrap()
+}
+
+/// Create a test families config with 2 families for isolation testing
+#[allow(dead_code)]
+pub fn create_two_family_config() -> recipe_vault::config::FamiliesConfig {
+    let yaml = r#"
+families:
+  family-a:
+    members:
+      - alice@example.com
+      - alice2@example.com
+  family-b:
+    members:
+      - bob@example.com
+      - bob2@example.com
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(yaml.as_bytes()).unwrap();
+    recipe_vault::config::FamiliesConfig::load(file.path()).unwrap()
+}
+
+/// Create test router with database pool (single-family, backward compatible)
 #[allow(dead_code)]
 pub fn create_test_app(pool: SqlitePool) -> Router {
+    create_test_app_with_email(pool, "test@example.com")
+}
+
+/// Create test router with a specific dev user email and auto-generated families config
+#[allow(dead_code)]
+pub fn create_test_app_with_email(pool: SqlitePool, email: &str) -> Router {
+    let families_config = create_test_families_config();
+    create_test_app_with_config(pool, Some(email.to_string()), families_config)
+}
+
+/// Create test router with custom families config (for multi-family tests)
+#[allow(dead_code)]
+pub fn create_test_app_with_config(
+    pool: SqlitePool,
+    dev_email: Option<String>,
+    families_config: recipe_vault::config::FamiliesConfig,
+) -> Router {
+    use recipe_vault::auth::{api_key_auth, cloudflare_auth, ApiKeyState, CloudflareAuthState};
     use recipe_vault::handlers::recipes;
-    use recipe_vault::auth::cloudflare_auth;
     use axum::middleware;
+
+    let families_config = Arc::new(families_config);
+
+    let api_key_state = ApiKeyState {
+        key: Arc::new("test-api-key".to_string()),
+        families_config: families_config.clone(),
+        dev_user_email: dev_email.clone(),
+    };
+
+    let cloudflare_auth_state = CloudflareAuthState {
+        dev_user_email: dev_email,
+        families_config: families_config.clone(),
+    };
 
     Router::new()
         .route("/api/recipes", axum::routing::post(recipes::create_recipe))
@@ -45,8 +110,12 @@ pub fn create_test_app(pool: SqlitePool) -> Router {
             axum::routing::delete(recipes::delete_recipe),
         )
         .with_state(pool)
+        .route_layer(middleware::from_fn_with_state(
+            api_key_state,
+            api_key_auth,
+        ))
         .layer(middleware::from_fn_with_state(
-            Some("test@example.com".to_string()),
+            cloudflare_auth_state,
             cloudflare_auth,
         ))
 }
@@ -59,10 +128,26 @@ pub async fn send_request(
     uri: &str,
     body: Option<Value>,
 ) -> (StatusCode, Option<Value>) {
-    let request = Request::builder()
+    send_request_with_headers(app, method, uri, body, &[]).await
+}
+
+/// Helper to send JSON request with custom headers
+#[allow(dead_code)]
+pub async fn send_request_with_headers(
+    app: &Router,
+    method: &str,
+    uri: &str,
+    body: Option<Value>,
+    headers: &[(&str, &str)],
+) -> (StatusCode, Option<Value>) {
+    let mut request = Request::builder()
         .method(method)
         .uri(uri)
         .header("content-type", "application/json");
+
+    for (key, value) in headers {
+        request = request.header(*key, *value);
+    }
 
     let request = if let Some(json) = body {
         request.body(Body::from(json.to_string())).unwrap()

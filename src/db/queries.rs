@@ -9,6 +9,13 @@ use crate::{
     },
 };
 
+/// Build a SQL IN clause with placeholders for the given number of items.
+/// Returns (clause_string, bindings) where clause_string is like "LOWER(created_by) IN (?, ?, ?)"
+fn family_filter_clause(family_members: &[String]) -> String {
+    let placeholders: Vec<&str> = family_members.iter().map(|_| "?").collect();
+    format!("LOWER(created_by) IN ({})", placeholders.join(", "))
+}
+
 /// Create a new recipe with ingredients and steps
 pub async fn create_recipe(
     pool: &SqlitePool,
@@ -89,17 +96,37 @@ pub async fn create_recipe(
 
     tx.commit().await?;
 
-    // Fetch and return the complete recipe
-    get_recipe(pool, &recipe_id).await
+    // Fetch and return the complete recipe (no family filter needed — user just created it)
+    get_recipe(pool, &recipe_id, None).await
 }
 
-/// Get a recipe by ID with all ingredients and steps
-pub async fn get_recipe(pool: &SqlitePool, recipe_id: &str) -> ApiResult<RecipeWithDetails> {
-    // Fetch recipe
-    let recipe: Option<Recipe> = sqlx::query_as("SELECT * FROM recipes WHERE id = ?")
-        .bind(recipe_id)
-        .fetch_optional(pool)
-        .await?;
+/// Get a recipe by ID with all ingredients and steps.
+/// When family_members is Some, only returns the recipe if created_by is in the list.
+/// When family_members is None (god mode), returns any recipe.
+pub async fn get_recipe(
+    pool: &SqlitePool,
+    recipe_id: &str,
+    family_members: Option<&[String]>,
+) -> ApiResult<RecipeWithDetails> {
+    // Fetch recipe with optional family filtering
+    let recipe: Option<Recipe> = match family_members {
+        Some(members) if !members.is_empty() => {
+            let filter = family_filter_clause(members);
+            let sql = format!("SELECT * FROM recipes WHERE id = ? AND {}", filter);
+            let mut query = sqlx::query_as(&sql).bind(recipe_id);
+            for member in members {
+                query = query.bind(member);
+            }
+            query.fetch_optional(pool).await?
+        }
+        _ => {
+            // God mode or empty members — no filtering
+            sqlx::query_as("SELECT * FROM recipes WHERE id = ?")
+                .bind(recipe_id)
+                .fetch_optional(pool)
+                .await?
+        }
+    };
 
     let recipe = recipe.ok_or_else(|| ApiError::NotFound(recipe_id.to_string()))?;
 
@@ -126,29 +153,64 @@ pub async fn get_recipe(pool: &SqlitePool, recipe_id: &str) -> ApiResult<RecipeW
     })
 }
 
-/// List all recipes (without ingredients/steps)
-pub async fn list_recipes(pool: &SqlitePool) -> ApiResult<Vec<Recipe>> {
-    let recipes = sqlx::query_as("SELECT * FROM recipes ORDER BY LOWER(title)")
-        .fetch_all(pool)
-        .await?;
+/// List all recipes (without ingredients/steps).
+/// When family_members is Some, only returns recipes created by family members.
+/// When family_members is None (god mode), returns all recipes.
+pub async fn list_recipes(
+    pool: &SqlitePool,
+    family_members: Option<&[String]>,
+) -> ApiResult<Vec<Recipe>> {
+    let recipes = match family_members {
+        Some(members) if !members.is_empty() => {
+            let filter = family_filter_clause(members);
+            let sql = format!("SELECT * FROM recipes WHERE {} ORDER BY LOWER(title)", filter);
+            let mut query = sqlx::query_as(&sql);
+            for member in members {
+                query = query.bind(member);
+            }
+            query.fetch_all(pool).await?
+        }
+        _ => {
+            // God mode or empty members — return all
+            sqlx::query_as("SELECT * FROM recipes ORDER BY LOWER(title)")
+                .fetch_all(pool)
+                .await?
+        }
+    };
 
     Ok(recipes)
 }
 
-/// Update a recipe
+/// Update a recipe.
+/// When family_members is Some, only updates if the recipe was created by a family member.
+/// When family_members is None (god mode), updates any recipe.
 pub async fn update_recipe(
     pool: &SqlitePool,
     recipe_id: &str,
     input: UpdateRecipeInput,
     user_email: Option<String>,
+    family_members: Option<&[String]>,
 ) -> ApiResult<RecipeWithDetails> {
     let mut tx = pool.begin().await?;
 
-    // Check if recipe exists
-    let exists: Option<(i32,)> = sqlx::query_as("SELECT 1 FROM recipes WHERE id = ?")
-        .bind(recipe_id)
-        .fetch_optional(&mut *tx)
-        .await?;
+    // Check if recipe exists (with family filtering)
+    let exists: Option<(i32,)> = match family_members {
+        Some(members) if !members.is_empty() => {
+            let filter = family_filter_clause(members);
+            let sql = format!("SELECT 1 FROM recipes WHERE id = ? AND {}", filter);
+            let mut query = sqlx::query_as(&sql).bind(recipe_id);
+            for member in members {
+                query = query.bind(member);
+            }
+            query.fetch_optional(&mut *tx).await?
+        }
+        _ => {
+            sqlx::query_as("SELECT 1 FROM recipes WHERE id = ?")
+                .bind(recipe_id)
+                .fetch_optional(&mut *tx)
+                .await?
+        }
+    };
 
     if exists.is_none() {
         return Err(ApiError::NotFound(recipe_id.to_string()));
@@ -297,16 +359,35 @@ pub async fn update_recipe(
 
     tx.commit().await?;
 
-    // Fetch and return updated recipe
-    get_recipe(pool, recipe_id).await
+    // Fetch and return updated recipe (no family filter needed — already verified access)
+    get_recipe(pool, recipe_id, None).await
 }
 
-/// Delete a recipe (cascade deletes ingredients and steps)
-pub async fn delete_recipe(pool: &SqlitePool, recipe_id: &str) -> ApiResult<()> {
-    let result = sqlx::query("DELETE FROM recipes WHERE id = ?")
-        .bind(recipe_id)
-        .execute(pool)
-        .await?;
+/// Delete a recipe (cascade deletes ingredients and steps).
+/// When family_members is Some, only deletes if the recipe was created by a family member.
+/// When family_members is None (god mode), deletes any recipe.
+pub async fn delete_recipe(
+    pool: &SqlitePool,
+    recipe_id: &str,
+    family_members: Option<&[String]>,
+) -> ApiResult<()> {
+    let result = match family_members {
+        Some(members) if !members.is_empty() => {
+            let filter = family_filter_clause(members);
+            let sql = format!("DELETE FROM recipes WHERE id = ? AND {}", filter);
+            let mut query = sqlx::query(&sql).bind(recipe_id);
+            for member in members {
+                query = query.bind(member);
+            }
+            query.execute(pool).await?
+        }
+        _ => {
+            sqlx::query("DELETE FROM recipes WHERE id = ?")
+                .bind(recipe_id)
+                .execute(pool)
+                .await?
+        }
+    };
 
     if result.rows_affected() == 0 {
         return Err(ApiError::NotFound(recipe_id.to_string()));

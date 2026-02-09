@@ -13,11 +13,22 @@ use std::sync::Arc;
 use tower::ServiceExt;
 
 use recipe_vault::auth::{api_key_auth, ApiKeyState};
+use recipe_vault::config::FamiliesConfig;
+
+fn test_families_config() -> FamiliesConfig {
+    use std::io::Write;
+    let yaml = "families:\n  test-family:\n    members:\n      - test@example.com\n";
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(yaml.as_bytes()).unwrap();
+    FamiliesConfig::load(file.path()).unwrap()
+}
 
 // ==== Helper to create a test app with auth middleware ====
 fn create_auth_test_app(api_key: &str) -> Router {
     let api_key_state = ApiKeyState {
         key: Arc::new(api_key.to_string()),
+        families_config: Arc::new(test_families_config()),
+        dev_user_email: None,
     };
 
     // Simple handler that returns OK if auth passes

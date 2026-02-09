@@ -43,14 +43,18 @@ fn main() {
         }
     };
 
-    // Get default author email from environment (optional, for authorship tracking)
-    let user_email = match env::var("DEFAULT_AUTHOR_EMAIL") {
+    // Get user email from environment (optional, for family scoping).
+    // USER_EMAIL takes priority; falls back to DEFAULT_AUTHOR_EMAIL for backward compatibility.
+    // When set, requests are scoped to the user's family.
+    // When not set, MCP operates in god mode (access to all recipes).
+    let user_email = match env::var("USER_EMAIL").or_else(|_| env::var("DEFAULT_AUTHOR_EMAIL")) {
         Ok(email) => {
-            tracing::info!("Default author email configured: {}", email);
-            Some(email)
+            let normalized = email.trim().to_lowercase();
+            tracing::info!("User email configured: {} (scoped mode)", normalized);
+            Some(normalized)
         }
         Err(_) => {
-            tracing::info!("DEFAULT_AUTHOR_EMAIL not set - recipes created via MCP will have null author");
+            tracing::info!("USER_EMAIL not set - MCP operating in god mode (all recipes accessible)");
             None
         }
     };

@@ -14,7 +14,7 @@ use tower_http::{
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use recipe_vault::{
-    auth::{api_key_auth, cloudflare_auth, load_or_generate_api_key, ApiKeyState},
+    auth::{api_key_auth, cloudflare_auth, load_or_generate_api_key, ApiKeyState, CloudflareAuthState},
     config::Config,
     db,
     handlers::{chat, recipes, ui::{self, UiState}},
@@ -45,8 +45,17 @@ async fn main() {
     let api_key = load_or_generate_api_key();
     let api_key_for_chat = api_key.clone();
 
+    let families_config = Arc::new(config.families_config.clone());
+
     let api_key_state = ApiKeyState {
         key: Arc::new(api_key),
+        families_config: families_config.clone(),
+        dev_user_email: config.dev_user_email.clone(),
+    };
+
+    let cloudflare_auth_state = CloudflareAuthState {
+        dev_user_email: config.dev_user_email.clone(),
+        families_config: families_config.clone(),
     };
 
     let ui_state = UiState {};
@@ -103,7 +112,7 @@ async fn main() {
         .merge(ui_routes)
         .nest("/api", api_routes)
         .layer(middleware::from_fn_with_state(
-            config.dev_user_email.clone(),
+            cloudflare_auth_state,
             cloudflare_auth,
         ))
         .layer(
@@ -124,6 +133,7 @@ async fn main() {
 
     tracing::info!("Listening on http://{}", addr);
     tracing::info!("API key authentication enabled");
+    tracing::info!("Family multi-tenancy enabled");
     if config.dev_user_email.is_some() {
         tracing::info!("Development user email enabled: {}", config.dev_user_email.as_ref().unwrap());
     }

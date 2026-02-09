@@ -17,6 +17,9 @@
 secrets/
 credentials/
 
+# Family config contains real email addresses
+families.yaml
+
 .claude/commands/opsx/
 .claude/skills/
 .gemini/commands/opsx/
@@ -32,3 +35,5 @@ credentials/
 tests/e2e/node_modules/
 tests/e2e/playwright-report/
 tests/e2e/test-results/
+
+deploy/families.yaml

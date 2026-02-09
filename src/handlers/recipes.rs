@@ -28,24 +28,32 @@ pub async fn create_recipe(
     Ok((StatusCode::CREATED, Json(recipe)))
 }
 
-/// List all recipes
+/// List all recipes (filtered by family membership)
 pub async fn list_recipes(
     State(pool): State<SqlitePool>,
+    extensions: axum::http::Extensions,
 ) -> ApiResult<Json<Vec<Recipe>>> {
-    let recipes = queries::list_recipes(&pool).await?;
+    let identity = extensions.get::<UserIdentity>();
+    let family_members = identity.and_then(|i| i.family_members.as_ref());
+
+    let recipes = queries::list_recipes(&pool, family_members.map(|v| v.as_slice())).await?;
     Ok(Json(recipes))
 }
 
-/// Get a single recipe by ID
+/// Get a single recipe by ID (filtered by family membership)
 pub async fn get_recipe(
     State(pool): State<SqlitePool>,
     Path(id): Path<String>,
+    extensions: axum::http::Extensions,
 ) -> ApiResult<Json<RecipeWithDetails>> {
-    let recipe = queries::get_recipe(&pool, &id).await?;
+    let identity = extensions.get::<UserIdentity>();
+    let family_members = identity.and_then(|i| i.family_members.as_ref());
+
+    let recipe = queries::get_recipe(&pool, &id, family_members.map(|v| v.as_slice())).await?;
     Ok(Json(recipe))
 }
 
-/// Update a recipe
+/// Update a recipe (filtered by family membership)
 pub async fn update_recipe(
     State(pool): State<SqlitePool>,
     Path(id): Path<String>,
@@ -54,16 +62,28 @@ pub async fn update_recipe(
 ) -> ApiResult<Json<RecipeWithDetails>> {
     let identity = extensions.get::<UserIdentity>();
     let user_email = identity.and_then(|i| i.email.clone());
+    let family_members = identity.and_then(|i| i.family_members.as_ref());
 
-    let recipe = queries::update_recipe(&pool, &id, input, user_email).await?;
+    let recipe = queries::update_recipe(
+        &pool,
+        &id,
+        input,
+        user_email,
+        family_members.map(|v| v.as_slice()),
+    )
+    .await?;
     Ok(Json(recipe))
 }
 
-/// Delete a recipe
+/// Delete a recipe (filtered by family membership)
 pub async fn delete_recipe(
     State(pool): State<SqlitePool>,
     Path(id): Path<String>,
+    extensions: axum::http::Extensions,
 ) -> ApiResult<StatusCode> {
-    queries::delete_recipe(&pool, &id).await?;
+    let identity = extensions.get::<UserIdentity>();
+    let family_members = identity.and_then(|i| i.family_members.as_ref());
+
+    queries::delete_recipe(&pool, &id, family_members.map(|v| v.as_slice())).await?;
     Ok(StatusCode::NO_CONTENT)
 }
