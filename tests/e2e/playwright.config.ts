@@ -40,6 +40,7 @@ export default defineConfig({
       DATABASE_URL: 'sqlite::memory:',
       ANTHROPIC_API_KEY: 'mock-key',
       DEV_USER_EMAIL: 'test@example.com',
+      FAMILIES_CONFIG_PATH: 'families.yaml',
       BIND_ADDRESS: '127.0.0.1:3001',
       API_KEY: 'test-api-key-for-playwright',
       RUST_LOG: 'debug',
