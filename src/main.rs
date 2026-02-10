@@ -65,12 +65,37 @@ async fn main() {
         .await
         .expect("Failed to create database pool");
 
-    // Run migrations
+    // Run migrations with automatic reset on missing migration versions
     tracing::info!("Running database migrations");
-    sqlx::migrate!()
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
+    let migration_result = sqlx::migrate!().run(&pool).await;
+
+    if let Err(e) = migration_result {
+        // Check if error is due to missing migration versions
+        let error_msg = e.to_string();
+        if error_msg.contains("VersionMissing") || error_msg.contains("previously applied but is missing") {
+            tracing::warn!("Detected missing migration versions - resetting migrations table");
+            tracing::warn!("This is expected during migration consolidation (v2.6.2)");
+
+            // Clear the migrations table
+            sqlx::query("DELETE FROM _sqlx_migrations")
+                .execute(&pool)
+                .await
+                .expect("Failed to clear migrations table");
+
+            tracing::info!("Migrations table cleared, re-running migrations");
+
+            // Re-run migrations
+            sqlx::migrate!()
+                .run(&pool)
+                .await
+                .expect("Failed to run migrations after reset");
+
+            tracing::info!("Migrations completed successfully after reset");
+        } else {
+            // Other migration error - panic
+            panic!("Failed to run migrations: {}", e);
+        }
+    }
 
     // Create chat state with AI agent
     let chat_state = chat::ChatState::new(config.clone(), api_key_for_chat);
