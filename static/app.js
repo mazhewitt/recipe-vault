@@ -686,6 +686,28 @@ async function fetchAndDisplayRecipe(recipeId) {
     }
 }
 
+function getTotalTimeMinutes(recipe) {
+    const prepTime = Number(recipe.prep_time);
+    const cookTime = Number(recipe.cook_time);
+    const hasPrep = Number.isFinite(prepTime) && prepTime > 0;
+    const hasCook = Number.isFinite(cookTime) && cookTime > 0;
+
+    if (hasPrep || hasCook) {
+        return (hasPrep ? prepTime : 0) + (hasCook ? cookTime : 0);
+    }
+
+    const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+    const stepTotal = steps.reduce((sum, step) => {
+        const duration = Number(step.duration_minutes);
+        if (!Number.isFinite(duration) || duration <= 0) {
+            return sum;
+        }
+        return sum + duration;
+    }, 0);
+
+    return stepTotal > 0 ? stepTotal : null;
+}
+
 function renderRecipe(recipe) {
     const leftContent = document.getElementById('page-left-content');
     const rightContent = document.getElementById('page-right-content');
@@ -734,6 +756,8 @@ function renderRecipe(recipe) {
     const authorship = authorshipHtml.length > 0
         ? `<div class="recipe-authorship">${authorshipHtml.join('')}</div>`
         : '';
+
+    const totalTimeMinutes = getTotalTimeMinutes(recipe);
 
     const ingredientsHtml = `
         <div class="recipe-title">${recipe.title || 'Untitled Recipe'}</div>
@@ -786,6 +810,18 @@ function renderRecipe(recipe) {
                     </svg>
                 </div>
                 <span class="meta-value">${recipe.cook_time} min</span>
+            </div>
+            ` : ''}
+            ${totalTimeMinutes ? `
+            <div class="meta-item">
+                <span class="meta-label">Total time</span>
+                <div class="meta-icon">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <span class="meta-value">${totalTimeMinutes} min</span>
             </div>
             ` : ''}
         </div>
