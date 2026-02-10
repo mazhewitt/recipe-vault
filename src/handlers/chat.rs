@@ -70,16 +70,29 @@ impl ChatState {
                 .collect(),
             };
 
-            // Fetch server config
-            let fetch_server = McpServerConfig {
-                name: "fetch".to_string(),
-                command: "uvx".to_string(),
-                args: vec!["mcp-server-fetch".to_string()],
-                env: HashMap::new(),
-            };
+            // Fetch server config (only if uvx is available)
+            let mut mcp_servers = vec![recipes_server];
+
+            // Check if uvx is available before adding fetch server
+            if std::process::Command::new("uvx")
+                .arg("--version")
+                .output()
+                .is_ok()
+            {
+                let fetch_server = McpServerConfig {
+                    name: "fetch".to_string(),
+                    command: "uvx".to_string(),
+                    args: vec!["mcp-server-fetch".to_string()],
+                    env: HashMap::new(),
+                };
+                mcp_servers.push(fetch_server);
+                tracing::info!("uvx available - fetch server enabled");
+            } else {
+                tracing::warn!("uvx not available - fetch server disabled. Install uv to enable URL recipe fetching.");
+            }
 
             let agent_config = AiAgentConfig {
-                mcp_servers: vec![recipes_server, fetch_server],
+                mcp_servers,
                                 system_prompt: Some(
                                         "You are a helpful cooking assistant with access to a recipe database.\n\n\
                                          ## Fetching Recipes from URLs\n\n\
