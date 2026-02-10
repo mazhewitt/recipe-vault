@@ -27,19 +27,6 @@ services:
     depends_on:
       - recipe-vault
 
-  api-proxy:
-    image: nginx:alpine
-    container_name: api-proxy
-    restart: unless-stopped
-    ports:
-      - "3500:3500"
-    volumes:
-      - ./nginx-api-only.conf:/etc/nginx/nginx.conf:ro
-    networks:
-      - recipe-net
-    depends_on:
-      - recipe-vault
-
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower

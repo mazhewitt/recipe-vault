@@ -4,9 +4,9 @@ This document provides detailed information about the Model Context Protocol (MC
 
 ## Overview
 
-Recipe Vault exposes five MCP tools that enable natural language interaction with your recipe database through Claude Desktop. These tools wrap the existing database operations and provide structured interfaces for recipe management.
+Recipe Vault uses MCP (Model Context Protocol) internally to provide AI-powered recipe management through the web chat interface. The MCP server is spawned as a child process by the web chat and provides five core tools for recipe management.
 
-The web chat interface (`/chat`) also includes a `display_recipe` tool for visual recipe rendering in the side panel. This tool is not part of the standalone MCP server but is documented here for completeness.
+The web chat interface (`/chat`) also includes a `display_recipe` tool for visual recipe rendering in the side panel. This tool is handled natively by the chat backend and is not part of the MCP server.
 
 ## Tools
 
@@ -463,123 +463,111 @@ All tools return standard JSON-RPC 2.0 error codes:
 | -32001 | Not found (custom) | Recipe doesn't exist |
 | -32002 | Conflict (custom) | Duplicate recipe title |
 
-### 2. Configure Claude Desktop
+## Internal Architecture
 
-Edit your Claude Desktop configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+The MCP server (`recipe-vault-mcp`) is an internal component spawned by the web chat handler. It communicates via JSON-RPC over stdin/stdout and makes authenticated HTTP requests to the Recipe Vault API on behalf of the chat interface.
 
-```json
-{
-  "mcpServers": {
-    "recipe-vault": {
-      "command": "/absolute/path/to/recipe-vault-mcp",
-      "env": {
-        "API_BASE_URL": "http://localhost:3000",
-        "API_KEY": "your-api-key",
-        "DEFAULT_AUTHOR_EMAIL": "your-email@example.com"
-      }
-    }
-  }
-}
+This architecture provides:
+- **Process isolation**: MCP server crashes don't affect the main API
+- **Clean separation**: Tool execution logic is separated from the web application
+- **Reusability**: The MCP protocol allows for potential future integrations
+
+## Testing MCP Tools via Web Chat
+
+Open the web chat at `http://localhost:3000/chat` and test the following:
+
+### 1. Verify Tools Are Available
+
+```
+You: What recipe tools do you have available?
 ```
 
-**Optional Environment Variables:**
-- `DEFAULT_AUTHOR_EMAIL`: Email address to attribute recipes created via MCP. If not set, MCP-created recipes will have null authors.
-
-#### Remote Setup (e.g., Synology NAS)
-
-If your Recipe Vault API is running on a remote server like a Synology NAS, update the `env` section in the config above:
-
-1.  **Get the API Key from the NAS:**
-    ```bash
-    # Run via SSH on your Synology
-    sudo docker exec recipe-vault cat /app/data/.api_key
-    ```
-2.  **Update Config:**
-    - `API_BASE_URL`: Change to `http://<your-nas-ip>:3000`
-    - `API_KEY`: Paste the key retrieved in step 1
-    - `DEFAULT_AUTHOR_EMAIL`: (Optional) Your email address for recipe attribution
-
-3.  **Restart Claude Desktop.**
-
-### 3. Restart Claude Desktop
-
-## Testing Your Setup
-
-### 1. Verify Tools Are Loaded
-
-Ask Claude:
-> "What recipe tools do you have available?"
-
-Expected response: Claude lists the five tools (list_recipes, get_recipe, create_recipe, update_recipe, delete_recipe)
+Expected: The AI lists the five MCP tools (list_recipes, get_recipe, create_recipe, update_recipe, delete_recipe) plus the display_recipe tool.
 
 ### 2. Test Empty Database
 
-> "List all recipes"
+```
+You: List all recipes
+```
 
-Expected: Empty list or message indicating no recipes
+Expected: Empty list or message indicating no recipes exist yet.
 
 ### 3. Create First Recipe
 
-> "Create a simple recipe for toast"
+```
+You: Create a simple recipe for toast
+```
 
-Expected: Recipe created with generated ID
+Expected: Recipe created successfully with a generated UUID. The AI should call `create_recipe` and then `display_recipe`.
 
 ### 4. List Recipes Again
 
-> "List my recipes"
+```
+You: List my recipes
+```
 
-Expected: Shows the toast recipe
+Expected: Shows the toast recipe in the response.
 
-### 5. Get Recipe Details
+### 5. Display Recipe
 
-> "Show me the toast recipe"
+```
+You: Show me the toast recipe
+```
 
-Expected: Full recipe with all details
+Expected: Recipe appears in the side panel. The AI should call `display_recipe` with the recipe_id.
 
 ### 6. Update a Recipe
 
-> "Change the toast recipe to serve 2 people"
+```
+You: Change the toast recipe to serve 2 people
+```
 
-Expected: Recipe updated with new servings value
+Expected: Recipe updated with new servings value. The AI calls `update_recipe`.
 
 ### 7. Test Error Handling
 
-> "Create another recipe called toast"
+```
+You: Create another recipe called toast
+```
 
-Expected: Error about duplicate title
+Expected: Error message about duplicate title.
 
 ## Debugging
 
 ### Check MCP Server Logs
 
-The MCP server logs to stderr. To see logs, you can run it manually:
+The MCP server logs to stderr. When running the web application, MCP server logs will appear in the main application logs with the prefix `recipe_vault_mcp`.
+
+To test the MCP server manually:
 
 ```bash
+export API_BASE_URL=http://localhost:3000
+export API_KEY=your-api-key
 echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' | ./target/release/recipe-vault-mcp 2>&1
 ```
 
 You should see:
 - Server startup logs
 - Request processing logs
-- Response sent confirmation
+- JSON-RPC response with available tools
 
 ### Common Issues
 
-**Tools not appearing:**
-- Check Claude Desktop config has correct absolute paths
-- Restart Claude Desktop after config changes
-- Verify binary is executable
+**Tools not working in web chat:**
+- Check that the MCP binary exists at `./target/release/recipe-vault-mcp` or the path specified in `MCP_BINARY_PATH`
+- Verify the binary is executable: `chmod +x ./target/release/recipe-vault-mcp`
+- Check application logs for MCP server spawn errors
 
 **"Recipe not found" errors:**
-- Use list_recipes to get valid recipe IDs
+- Use `list_recipes` to get valid recipe IDs
 - Recipe IDs are UUIDs, not titles
 
 **Duplicate title errors:**
-- Recipe titles must be unique
+- Recipe titles must be unique within your family
 - Delete or rename existing recipe first
 
 **Database errors:**
-- Check DATABASE_URL points to writable location
+- Check `DATABASE_URL` points to a writable location
 - Verify database file permissions
 - Check disk space
 

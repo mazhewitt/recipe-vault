@@ -94,6 +94,14 @@ impl AiAgent {
         }
     }
 
+    // MCP Architecture Decision:
+    // We spawn the MCP server as a separate child process rather than calling the API directly
+    // to maintain clean architectural separation and follow the MCP specification.
+    // Benefits:
+    // - Process isolation: MCP server crashes don't affect the main web application
+    // - Protocol compliance: Follows the standard MCP JSON-RPC stdio interface
+    // - Testability: MCP tools can be tested independently of the web chat
+    // - Reusability: The same MCP server binary could be used by other tools if needed
     async fn spawn_mcp_server(&self, config: &McpServerConfig) -> Result<McpProcess, AiError> {
         let mut command = Command::new(&config.command);
         command.args(&config.args);

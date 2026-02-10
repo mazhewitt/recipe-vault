@@ -1,3 +1,16 @@
+// This binary implements an MCP (Model Context Protocol) server for Recipe Vault.
+// It is spawned as a child process by the web chat handler (src/handlers/chat.rs)
+// to provide recipe management tools to the AI agent.
+//
+// The server communicates via JSON-RPC 2.0 over stdin/stdout and makes authenticated
+// HTTP requests to the Recipe Vault API on behalf of the chat interface.
+//
+// Architecture:
+// - Web chat spawns this process and communicates via stdin/stdout
+// - This process acts as an MCP tool provider (5 recipe tools)
+// - Tool calls are translated to HTTP API requests to the Recipe Vault server
+// - Provides process isolation and follows the MCP specification
+
 use recipe_vault::mcp::{http_client::ApiClient, server};
 use std::env;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

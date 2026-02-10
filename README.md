@@ -1,13 +1,13 @@
 # Recipe Vault
 
-A recipe management system built with Rust, featuring a REST API, Claude Desktop integration via MCP, and a web-based AI chat interface.
+A recipe management system built with Rust, featuring a REST API and a web-based AI chat interface with MCP-powered recipe tools.
 
 ## Features
 
 - **REST API**: Full CRUD operations for recipes via HTTP
 - **Web Chat Interface**: Browser-based AI assistant for natural language recipe management
 - **Image Recipe Extraction**: Paste images of handwritten or printed recipes to extract structured data using Claude's vision capabilities
-- **Claude Desktop Integration**: Natural language recipe management through MCP
+- **URL Recipe Extraction**: Paste recipe URLs to automatically fetch and extract recipe data using the MCP fetch server
 - **AI Difficulty Assessment**: Automatic recipe difficulty ratings (1-5 scale) based on ingredients, techniques, and complexity
 - **SQLite Database**: Lightweight, file-based storage
 - **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, servings, and difficulty ratings
@@ -17,20 +17,20 @@ A recipe management system built with Rust, featuring a REST API, Claude Desktop
 
 ## Architecture
 
-Recipe Vault provides three ways to interact with your recipes:
+Recipe Vault provides two ways to interact with your recipes:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Recipe Vault                                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐         │
-│  │   Web Browser   │    │  Claude Desktop │    │   REST Client   │         │
-│  │   /chat         │    │                 │    │   curl/Postman  │         │
-│  └────────┬────────┘    └────────┬────────┘    └────────┬────────┘         │
-│           │                      │                      │                   │
-│           │ HTTP/SSE             │ stdio                │ HTTP              │
-│           ▼                      ▼                      ▼                   │
+│  ┌─────────────────┐                          ┌─────────────────┐           │
+│  │   Web Browser   │                          │   REST Client   │           │
+│  │   /chat         │                          │   curl/Postman  │           │
+│  └────────┬────────┘                          └────────┬────────┘           │
+│           │                                            │                     │
+│           │ HTTP/SSE                                   │ HTTP                │
+│           ▼                                            ▼                     │
 │  ┌─────────────────────────────────────────────────────────────────┐       │
 │  │                    recipe-vault (API Server)                     │       │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │       │
@@ -38,7 +38,16 @@ Recipe Vault provides three ways to interact with your recipes:
 │  │  │ /api/chat   │  │ (spawns MCP)│  │    /api/recipes/*       │ │       │
 │  │  └──────┬──────┘  └──────┬──────┘  └────────────┬────────────┘ │       │
 │  │         │                │                      │               │       │
-│  │         ▼                ▼                      ▼               │       │
+│  │         │                │ Spawns child         │               │       │
+│  │         │                │ processes            │               │       │
+│  │         │                ▼                      │               │       │
+│  │         │        ┌───────────────────┐          │               │       │
+│  │         │        │ recipe-vault-mcp  │          │               │       │
+│  │         │        │ (internal process)│          │               │       │
+│  │         │        │ + fetch server    │          │               │       │
+│  │         │        └─────────┬─────────┘          │               │       │
+│  │         │                  │                    │               │       │
+│  │         ▼                  ▼                    ▼               │       │
 │  │  ┌─────────────────────────────────────────────────────────────┐   │   │
 │  │  │                    AI Agent Layer                            │   │   │
 │  │  │  • Anthropic Claude API    • MCP Tool Execution             │   │   │
@@ -51,12 +60,6 @@ Recipe Vault provides three ways to interact with your recipes:
 │  │  └──────────────────────────────────────────────────────────────┘  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────┐       │
-│  │              recipe-vault-mcp (Standalone MCP Server)            │       │
-│  │  • JSON-RPC over stdio        • HTTP client to API server       │       │
-│  │  • 5 recipe tools             • For Claude Desktop integration  │       │
-│  └─────────────────────────────────────────────────────────────────┘       │
-│                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -65,7 +68,7 @@ Recipe Vault provides three ways to interact with your recipes:
 | Binary | Purpose |
 |--------|---------|
 | `recipe-vault` | Main API server with REST endpoints, web chat UI, and embedded AI agent |
-| `recipe-vault-mcp` | Standalone MCP server for Claude Desktop (communicates with API via HTTP) |
+| `recipe-vault-mcp` | Internal MCP server spawned by web chat to provide recipe management tools |
 
 ## Quick Start
 
@@ -199,47 +202,9 @@ curl -H "X-API-Key: $API_KEY" http://localhost:3000/api/recipes
 
 See [API.md](API.md) for complete documentation.
 
-## Claude Desktop Integration
+## MCP Tools
 
-Use natural language to manage recipes through Claude Desktop.
-
-### Setup
-
-1. Build the MCP server:
-   ```bash
-   cargo build --release --bin recipe-vault-mcp
-   ```
-
-2. Configure Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-   ```json
-   {
-     "mcpServers": {
-       "recipe-vault": {
-         "command": "/absolute/path/to/recipe-vault-mcp",
-         "env": {
-           "API_BASE_URL": "http://localhost:3500",
-           "API_KEY": "your-api-key"
-         }
-       }
-     }
-   }
-   ```
-
-   > **Note**: Port 3500 is the API-only port that strips Cloudflare headers, ensuring MCP clients authenticate via API key only.
-
-3. Restart Claude Desktop
-
-### Available MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `list_recipes` | List all recipes with titles and descriptions |
-| `get_recipe` | Get complete recipe details by ID |
-| `create_recipe` | Create a new recipe with ingredients and steps |
-| `update_recipe` | Update an existing recipe (partial or full) |
-| `delete_recipe` | Delete a recipe by ID |
-
-See [MCP.md](MCP.md) for detailed tool documentation.
+The web chat uses MCP (Model Context Protocol) internally to provide AI-powered recipe management. See [MCP.md](MCP.md) for detailed documentation of the available tools and their usage.
 
 ## Deployment
 
@@ -354,14 +319,15 @@ recipe-vault/
 
 1. Verify `ANTHROPIC_API_KEY` is set in `.env`
 2. Check browser console for errors
-3. Ensure you entered the correct Recipe Vault API key
+3. Ensure you're authenticated (check for email in UI header)
+4. Check application logs for MCP server spawn errors
 
-### MCP Server Not Loading
+### MCP Tools Not Working
 
-1. Use absolute paths in Claude Desktop config
-2. Verify binary is executable: `chmod +x target/release/recipe-vault-mcp`
-3. Check Claude Desktop logs for errors
-4. Test API is reachable: `curl -H "X-API-Key: your-key" http://localhost:3500/api/recipes`
+1. Verify the `recipe-vault-mcp` binary exists: `ls target/release/recipe-vault-mcp`
+2. Ensure binary is executable: `chmod +x target/release/recipe-vault-mcp`
+3. Check application logs for MCP initialization errors
+4. Test manually: `echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' | ./target/release/recipe-vault-mcp`
 
 ### Authentication Errors (401)
 
