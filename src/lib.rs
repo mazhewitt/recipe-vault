@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod auth;
+pub mod backfill;
 pub mod config;
 pub mod db;
 pub mod error;

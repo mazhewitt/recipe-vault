@@ -79,9 +79,10 @@ pub fn create_test_app_with_config(
 ) -> Router {
     use recipe_vault::auth::{api_key_auth, cloudflare_auth, ApiKeyState, CloudflareAuthState};
     use recipe_vault::handlers::recipes;
+    use recipe_vault::config::Config;
     use axum::middleware;
 
-    let families_config = Arc::new(families_config);
+    let families_config = Arc::new(families_config.clone());
 
     let api_key_state = ApiKeyState {
         key: Arc::new("test-api-key".to_string()),
@@ -92,6 +93,23 @@ pub fn create_test_app_with_config(
     let cloudflare_auth_state = CloudflareAuthState {
         dev_user_email: dev_email,
         families_config: families_config.clone(),
+    };
+
+    // Create RecipeState with Config for handlers
+    let config = Config {
+        database_url: ":memory:".to_string(),
+        bind_address: "127.0.0.1:3000".to_string(),
+        anthropic_api_key: "test-key".to_string(),
+        ai_model: "test-model".to_string(),
+        mock_llm: true,
+        mock_recipe_id: None,
+        families_config: (*families_config).clone(),
+        dev_user_email: None,
+    };
+
+    let recipe_state = recipes::RecipeState {
+        pool: pool.clone(),
+        config: Arc::new(config),
     };
 
     Router::new()
@@ -109,7 +127,7 @@ pub fn create_test_app_with_config(
             "/api/recipes/:id",
             axum::routing::delete(recipes::delete_recipe),
         )
-        .with_state(pool)
+        .with_state(recipe_state)
         .route_layer(middleware::from_fn_with_state(
             api_key_state,
             api_key_auth,

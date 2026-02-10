@@ -699,10 +699,14 @@ function renderRecipe(recipe) {
     }).join('');
 
     // Build difficulty dots
-    const difficulty = recipe.difficulty || 1;
-    const difficultyDots = Array(5).fill(0).map((_, i) =>
-        `<span class="difficulty-dot${i < difficulty ? ' filled' : ''}"></span>`
-    ).join('');
+    const difficulty = recipe.difficulty;
+    const difficultyDots = difficulty
+        ? Array(5).fill(0).map((_, i) =>
+            `<span class="difficulty-dot${i < difficulty ? ' filled' : ''}"></span>`
+          ).join('')
+        : Array(5).fill(0).map(() =>
+            `<span class="difficulty-dot"></span>`
+          ).join('');
 
     // Build preparation steps
     const stepsList = (recipe.steps || []).map((step, i) => {
@@ -744,7 +748,7 @@ function renderRecipe(recipe) {
             <div class="meta-item">
                 <span class="meta-label">Difficulty</span>
                 <div class="difficulty-dots">${difficultyDots}</div>
-                <span class="meta-value">${difficulty}/5</span>
+                <span class="meta-value">${difficulty ? `${difficulty}/5` : 'Not rated'}</span>
             </div>
             ${recipe.servings ? `
             <div class="meta-item">

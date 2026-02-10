@@ -72,6 +72,12 @@ pub fn create_recipe_tool() -> ToolDefinition {
                     "type": "integer",
                     "description": "Cooking time in minutes (optional)"
                 },
+                "difficulty": {
+                    "type": "integer",
+                    "description": "Recipe difficulty rating from 1 (Easy) to 5 (Hard) (optional, will be auto-assigned by AI if not specified)",
+                    "minimum": 1,
+                    "maximum": 5
+                },
                 "ingredients": {
                     "type": "array",
                     "description": "List of ingredients",
@@ -136,6 +142,12 @@ pub fn update_recipe_tool() -> ToolDefinition {
                 "cook_time_minutes": {
                     "type": "integer",
                     "description": "New cook time (optional)"
+                },
+                "difficulty": {
+                    "type": "integer",
+                    "description": "Recipe difficulty rating from 1 (Easy) to 5 (Hard) (optional)",
+                    "minimum": 1,
+                    "maximum": 5
                 },
                 "ingredients": {
                     "type": "array",
@@ -243,12 +255,20 @@ pub fn handle_update_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
         None
     };
 
+    // Validate difficulty if provided
+    if let Some(d) = params.get("difficulty").and_then(|v| v.as_i64()) {
+        if d < 1 || d > 5 {
+            return Err(JsonRpcError::invalid_params("Difficulty must be between 1 and 5"));
+        }
+    }
+
     let update_input = UpdateRecipeInput {
         title: params.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()),
         description: params.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
         servings: params.get("servings").and_then(|v| v.as_i64()).map(|v| v as i32),
         prep_time_minutes: params.get("prep_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32),
         cook_time_minutes: params.get("cook_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32),
+        difficulty: params.get("difficulty").and_then(|v| v.as_i64()).map(|v| v as i32),
         ingredients,
         steps,
     };
@@ -286,11 +306,19 @@ pub fn handle_create_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
     let servings = params.get("servings").and_then(|v| v.as_i64()).map(|v| v as i32);
     let prep_time_minutes = params.get("prep_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
     let cook_time_minutes = params.get("cook_time_minutes").and_then(|v| v.as_i64()).map(|v| v as i32);
+    let difficulty = params.get("difficulty").and_then(|v| v.as_i64()).map(|v| v as i32);
 
     // Validate servings if provided
     if let Some(s) = servings {
         if s <= 0 {
             return Err(JsonRpcError::invalid_params("Servings must be greater than 0"));
+        }
+    }
+
+    // Validate difficulty if provided
+    if let Some(d) = difficulty {
+        if d < 1 || d > 5 {
+            return Err(JsonRpcError::invalid_params("Difficulty must be between 1 and 5"));
         }
     }
 
@@ -314,6 +342,7 @@ pub fn handle_create_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
         servings,
         prep_time_minutes,
         cook_time_minutes,
+        difficulty,
         ingredients,
         steps,
     };
@@ -473,5 +502,69 @@ mod tests {
         assert_eq!(parsed[0].duration_minutes, Some(5));
         assert_eq!(parsed[1].temperature_value, Some(180));
         assert_eq!(parsed[1].temperature_unit, Some("Celsius".to_string()));
+    }
+
+    /// Test 6.6: Verify update_recipe tool exposes difficulty parameter
+    #[test]
+    fn test_update_recipe_tool_has_difficulty_field() {
+        let tool = update_recipe_tool();
+        let properties = tool.input_schema
+            .get("properties")
+            .expect("Should have properties");
+
+        let difficulty = properties
+            .get("difficulty")
+            .expect("Should have difficulty field");
+
+        assert_eq!(
+            difficulty.get("type").and_then(|v| v.as_str()),
+            Some("integer"),
+            "Difficulty should be integer type"
+        );
+        assert_eq!(
+            difficulty.get("minimum").and_then(|v| v.as_i64()),
+            Some(1),
+            "Difficulty minimum should be 1"
+        );
+        assert_eq!(
+            difficulty.get("maximum").and_then(|v| v.as_i64()),
+            Some(5),
+            "Difficulty maximum should be 5"
+        );
+
+        let description = difficulty.get("description")
+            .and_then(|v| v.as_str())
+            .expect("Should have description");
+        assert!(description.contains("1") && description.contains("5"),
+            "Description should mention range 1-5");
+    }
+
+    /// Test: Verify create_recipe tool exposes difficulty parameter
+    #[test]
+    fn test_create_recipe_tool_has_difficulty_field() {
+        let tool = create_recipe_tool();
+        let properties = tool.input_schema
+            .get("properties")
+            .expect("Should have properties");
+
+        let difficulty = properties
+            .get("difficulty")
+            .expect("Should have difficulty field");
+
+        assert_eq!(
+            difficulty.get("type").and_then(|v| v.as_str()),
+            Some("integer"),
+            "Difficulty should be integer type"
+        );
+        assert_eq!(
+            difficulty.get("minimum").and_then(|v| v.as_i64()),
+            Some(1),
+            "Difficulty minimum should be 1"
+        );
+        assert_eq!(
+            difficulty.get("maximum").and_then(|v| v.as_i64()),
+            Some(5),
+            "Difficulty maximum should be 5"
+        );
     }
 }

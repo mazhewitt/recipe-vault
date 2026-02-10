@@ -8,8 +8,9 @@ A recipe management system built with Rust, featuring a REST API, Claude Desktop
 - **Web Chat Interface**: Browser-based AI assistant for natural language recipe management
 - **Image Recipe Extraction**: Paste images of handwritten or printed recipes to extract structured data using Claude's vision capabilities
 - **Claude Desktop Integration**: Natural language recipe management through MCP
+- **AI Difficulty Assessment**: Automatic recipe difficulty ratings (1-5 scale) based on ingredients, techniques, and complexity
 - **SQLite Database**: Lightweight, file-based storage
-- **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, and servings
+- **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, servings, and difficulty ratings
 - **Multi-Model Support**: Works with Anthropic Claude and OpenAI models
 - **API Key Authentication**: Secure API access with auto-generated keys
 - **Remote Access**: Run API server on one machine, access from anywhere

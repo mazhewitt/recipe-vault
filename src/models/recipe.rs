@@ -15,6 +15,8 @@ pub struct Recipe {
     pub cook_time_minutes: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub servings: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub difficulty: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -44,6 +46,8 @@ pub struct CreateRecipeInput {
     pub cook_time_minutes: Option<i32>,
     #[serde(default)]
     pub servings: Option<i32>,
+    #[serde(default)]
+    pub difficulty: Option<i32>,
     #[serde(default)]
     pub ingredients: Vec<CreateIngredientInput>,
     #[serde(default)]
@@ -85,6 +89,8 @@ pub struct UpdateRecipeInput {
     pub cook_time_minutes: Option<i32>,
     #[serde(default)]
     pub servings: Option<i32>,
+    #[serde(default)]
+    pub difficulty: Option<i32>,
     #[serde(default)]
     pub ingredients: Option<Vec<CreateIngredientInput>>,
     #[serde(default)]

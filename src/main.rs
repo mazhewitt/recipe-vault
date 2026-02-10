@@ -72,17 +72,40 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
+    // Trigger difficulty backfill if not yet completed (non-blocking)
+    {
+        let pool_for_backfill = pool.clone();
+        let config_for_backfill = config.clone();
+
+        tokio::spawn(async move {
+            match recipe_vault::backfill::run_backfill(&pool_for_backfill, &config_for_backfill).await {
+                Ok(()) => {
+                    tracing::info!("Difficulty backfill completed successfully");
+                }
+                Err(e) => {
+                    tracing::error!("Difficulty backfill failed: {}", e);
+                }
+            }
+        });
+    }
+
     // Create chat state with AI agent
     let chat_state = chat::ChatState::new(config.clone(), api_key_for_chat);
 
-    // Build recipe routes with database state
+    // Create recipe state with database and AI configuration
+    let recipe_state = recipes::RecipeState {
+        pool: pool.clone(),
+        config: Arc::new(config.clone()),
+    };
+
+    // Build recipe routes with recipe state
     let recipe_routes = Router::new()
         .route("/recipes", post(recipes::create_recipe))
         .route("/recipes", get(recipes::list_recipes))
         .route("/recipes/:id", get(recipes::get_recipe))
         .route("/recipes/:id", put(recipes::update_recipe))
         .route("/recipes/:id", delete(recipes::delete_recipe))
-        .with_state(pool);
+        .with_state(recipe_state);
 
     // Build chat routes with chat state
     let chat_routes = Router::new()

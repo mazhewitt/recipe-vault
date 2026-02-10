@@ -35,7 +35,7 @@ impl ChatState {
         }
     }
 
-    async fn get_or_create_agent(&self) -> Result<(), ChatError> {
+    async fn get_or_create_agent(&self, user_email: &str) -> Result<(), ChatError> {
         let mut agent_guard = self.agent.write().await;
         if agent_guard.is_none() {
             let llm = if self.config.mock_llm {
@@ -56,6 +56,7 @@ impl ChatState {
                     self.config.bind_address.split(':').last().unwrap_or("3000")
                 ),
                 api_key: (*self.api_key).clone(),
+                user_email: Some(user_email.to_string()),
                                 system_prompt: Some(
                                         "You are a helpful cooking assistant with access to a recipe database.\n\n\
                                          ## Image-Based Recipe Extraction\n\n\
@@ -77,6 +78,9 @@ impl ChatState {
                                          - **`get_recipe`** returns data for YOUR internal use only. It does NOT display anything to the user.\n\
                                          - **Current recipe context**: If `current_recipe` is provided, treat it as the active recipe. \
                                              Use `get_recipe` with its recipe_id when you need full details (e.g., scaling or substitutions).\n\
+                                         - **Updating recipe difficulty** (\"make this recipe harder\", \"set difficulty to 3\", \"this should be easy\"): \
+                                            Use `update_recipe` with the recipe_id and difficulty parameter (1-5 scale: 1=Easy, 2=Medium-Easy, 3=Medium, 4=Medium-Hard, 5=Hard). \
+                                            If difficulty is not specified when creating a recipe, the AI will automatically assess and assign it.\n\
                                          ## Rules\n\
                                          - NEVER output full ingredient lists or step-by-step instructions in chat. The side panel shows those.\n\
                                          - NEVER fabricate recipe IDs. Only use exact UUIDs from `list_recipes` or `create_recipe` results.\n\
@@ -91,6 +95,9 @@ impl ChatState {
                                          User: \"Create a recipe for banana bread\"\n\
                                          Action: Call create_recipe(...), then call display_recipe(recipe_id=<new id from create result>)\n\
                                          Response: \"I've saved your Banana Bread recipe and opened it in the side panel!\"\n\n\
+                                         User: \"Make the Apple Pie recipe difficulty 4\" (assuming current_recipe is Apple Pie)\n\
+                                         Action: Call update_recipe(recipe_id=<id from current_recipe>, difficulty=4)\n\
+                                         Response: \"I've updated the Apple Pie difficulty to 4 (Medium-Hard). This rating reflects the advanced techniques required.\"\n\n\
                                          ## Formatting Guidelines\n\
                                          Use markdown. Keep chat responses concise. Do not show UUIDs to the user."
                                                 .to_string(),
@@ -177,10 +184,17 @@ pub enum SseEvent {
 /// POST /api/chat - Send a message and receive a streaming response
 pub async fn chat(
     State(state): State<ChatState>,
+    extensions: axum::http::Extensions,
     Json(request): Json<ChatRequest>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ChatError> {
-    // Ensure agent is running
-    state.get_or_create_agent().await?;
+    // Get authenticated user identity
+    let identity = extensions.get::<crate::auth::UserIdentity>();
+    let user_email = identity
+        .and_then(|i| i.email.clone())
+        .ok_or_else(|| ChatError::Session("User not authenticated".to_string()))?;
+
+    // Ensure agent is running with the authenticated user's context
+    state.get_or_create_agent(&user_email).await?;
 
     // Get or create conversation
     let conversation_id = request

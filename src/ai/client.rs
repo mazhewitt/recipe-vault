@@ -26,6 +26,7 @@ pub struct AiAgentConfig {
     pub mcp_binary_path: String,
     pub api_base_url: String,
     pub api_key: String,
+    pub user_email: Option<String>,
     pub system_prompt: Option<String>,
 }
 
@@ -35,6 +36,7 @@ impl Default for AiAgentConfig {
             mcp_binary_path: "./target/release/recipe-vault-mcp".to_string(),
             api_base_url: "http://localhost:3000".to_string(),
             api_key: String::new(),
+            user_email: None,
             system_prompt: None,
         }
     }
@@ -93,9 +95,17 @@ impl AiAgent {
             return Ok(());
         }
 
-        let child = Command::new(&self.config.mcp_binary_path)
+        let mut command = Command::new(&self.config.mcp_binary_path);
+        command
             .env("API_BASE_URL", &self.config.api_base_url)
-            .env("API_KEY", &self.config.api_key)
+            .env("API_KEY", &self.config.api_key);
+
+        // Pass user email to MCP for family-scoped access
+        if let Some(ref email) = self.config.user_email {
+            command.env("USER_EMAIL", email);
+        }
+
+        let child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())

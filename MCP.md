@@ -108,6 +108,7 @@ The web chat interface (`/chat`) also includes a `display_recipe` tool for visua
   "prep_time_minutes": 15,
   "cook_time_minutes": 12,
   "servings": 24,
+  "difficulty": 2,
   "created_at": "2024-01-24T10:30:00Z",
   "updated_at": "2024-01-24T10:30:00Z",
   "ingredients": [
@@ -190,6 +191,7 @@ Claude will use the recipe context to provide relevant answers.
 - `servings` (integer, optional): Number of servings this recipe makes
 - `prep_time_minutes` (integer, optional): Time needed for preparation
 - `cook_time_minutes` (integer, optional): Time needed for cooking
+- `difficulty` (integer, optional): Recipe difficulty rating from 1 (Easy) to 5 (Hard). If omitted, AI will automatically assess and assign difficulty based on ingredients, techniques, and complexity
 - `ingredients` (array, optional): List of ingredients, each with:
   - `name` (string, required): Name of the ingredient
   - `quantity` (number, optional): Amount needed
@@ -302,6 +304,7 @@ Claude will use the recipe context to provide relevant answers.
 - `servings` (integer, optional): New number of servings
 - `prep_time_minutes` (integer, optional): New preparation time
 - `cook_time_minutes` (integer, optional): New cooking time
+- `difficulty` (integer, optional): Recipe difficulty rating from 1 (Easy) to 5 (Hard)
 - `ingredients` (array, optional): New list of ingredients (replaces ALL existing ingredients)
 - `steps` (array, optional): New cooking instructions (replaces ALL existing steps)
 

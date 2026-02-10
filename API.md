@@ -40,6 +40,7 @@ Content-Type: application/json
   "prep_time_minutes": 15,
   "cook_time_minutes": 12,
   "servings": 24,
+  "difficulty": 2,
   "ingredients": [
     {
       "name": "flour",
@@ -68,6 +69,14 @@ Content-Type: application/json
 
 # Response: 201 Created
 # Returns the created recipe with id
+
+# Note: difficulty is optional (1-5 scale)
+# - 1 = Easy (simple, few steps, common ingredients)
+# - 2 = Medium-Easy
+# - 3 = Medium (requires some technique)
+# - 4 = Medium-Hard (advanced techniques)
+# - 5 = Hard (complex, many steps, precise timing)
+# If omitted, AI will automatically assess and assign difficulty
 ```
 
 #### List All Recipes
@@ -93,6 +102,7 @@ Content-Type: application/json
 
 {
   "title": "Updated Title",
+  "difficulty": 3,
   "ingredients": [
     {"name": "new ingredient"}
   ]

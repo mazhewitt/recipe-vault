@@ -251,7 +251,10 @@ impl LlmProvider {
         let lower_message = last_message.to_lowercase();
 
         // Pattern match on input to return appropriate response
-        if lower_message.contains("list") {
+        if lower_message.contains("difficulty") && lower_message.contains("rating") {
+            // Difficulty assessment query - return a valid rating (3 = medium)
+            LlmResponse::Text("3".to_string())
+        } else if lower_message.contains("list") {
             // Return list_recipes tool call; the agent loop will execute the tool,
             // then call us again with the tool results, and we'll return Text above.
             LlmResponse::ToolUse(vec![ToolCall {

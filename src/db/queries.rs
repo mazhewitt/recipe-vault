@@ -44,8 +44,8 @@ pub async fn create_recipe(
 
     // Insert recipe
     sqlx::query(
-        "INSERT INTO recipes (id, title, description, prep_time_minutes, cook_time_minutes, servings, created_by, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO recipes (id, title, description, prep_time_minutes, cook_time_minutes, servings, difficulty, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&recipe_id)
     .bind(&input.title)
@@ -53,6 +53,7 @@ pub async fn create_recipe(
     .bind(&input.prep_time_minutes)
     .bind(&input.cook_time_minutes)
     .bind(&input.servings)
+    .bind(&input.difficulty)
     .bind(&user_email)
     .bind(&user_email)
     .execute(&mut *tx)
@@ -265,6 +266,10 @@ pub async fn update_recipe(
         updates.push("servings = ?");
         has_update = true;
     }
+    if input.difficulty.is_some() {
+        updates.push("difficulty = ?");
+        has_update = true;
+    }
 
     if has_update {
         updates.push("updated_at = datetime('now')");
@@ -286,6 +291,9 @@ pub async fn update_recipe(
         }
         if let Some(servings) = input.servings {
             query = query.bind(servings);
+        }
+        if let Some(difficulty) = input.difficulty {
+            query = query.bind(difficulty);
         }
         query = query.bind(&user_email);
         query = query.bind(recipe_id);
