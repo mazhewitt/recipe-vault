@@ -72,23 +72,6 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
-    // Trigger difficulty backfill if not yet completed (non-blocking)
-    {
-        let pool_for_backfill = pool.clone();
-        let config_for_backfill = config.clone();
-
-        tokio::spawn(async move {
-            match recipe_vault::backfill::run_backfill(&pool_for_backfill, &config_for_backfill).await {
-                Ok(()) => {
-                    tracing::info!("Difficulty backfill completed successfully");
-                }
-                Err(e) => {
-                    tracing::error!("Difficulty backfill failed: {}", e);
-                }
-            }
-        });
-    }
-
     // Create chat state with AI agent
     let chat_state = chat::ChatState::new(config.clone(), api_key_for_chat);
 
