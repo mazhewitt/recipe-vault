@@ -4,6 +4,7 @@ let currentRecipeTitle = null;
 let recipeListCache = null;
 let viewMode = 'index'; // 'index' | 'recipe'
 let attachedImage = null; // Stores pasted image data
+let activeTimer = null; // Stores active timer {interval, label}
 
 // Image size limit (5MB)
 // This matches Claude API's ~5MB limit for vision inputs. Images larger than this
@@ -270,6 +271,75 @@ function setupTextareaAutoResize() {
     autoResize();
 }
 
+// Timer functions
+function startTimer(durationMinutes, label) {
+    // Clear any existing timer
+    if (activeTimer) {
+        clearInterval(activeTimer.interval);
+    }
+
+    const widget = document.getElementById('timer-widget');
+    const timerText = document.getElementById('timer-text');
+
+    let secondsLeft = Math.round(durationMinutes * 60);
+
+    // Update display
+    const updateDisplay = () => {
+        const mins = Math.floor(secondsLeft / 60);
+        const secs = secondsLeft % 60;
+        timerText.textContent = `${label}: ${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    updateDisplay();
+    widget.style.display = 'flex';
+
+    // Count down every second
+    const interval = setInterval(() => {
+        secondsLeft--;
+
+        if (secondsLeft <= 0) {
+            clearInterval(interval);
+            onTimerComplete(label);
+        } else {
+            updateDisplay();
+        }
+    }, 1000);
+
+    activeTimer = { interval, label };
+}
+
+function onTimerComplete(label) {
+    const timerText = document.getElementById('timer-text');
+    timerText.textContent = `${label} - Done! ✓`;
+
+    // Show browser notification if permission granted
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Recipe Vault Timer', {
+            body: `${label} - Time's up!`,
+            icon: '/favicon.ico',
+            tag: 'recipe-timer'
+        });
+    }
+
+    activeTimer = null;
+
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        const widget = document.getElementById('timer-widget');
+        widget.style.display = 'none';
+    }, 3000);
+}
+
+// eslint-disable-next-line no-unused-vars -- Called from HTML onclick attribute
+function cancelTimer() {
+    if (activeTimer) {
+        clearInterval(activeTimer.interval);
+        activeTimer = null;
+    }
+    const widget = document.getElementById('timer-widget');
+    widget.style.display = 'none';
+}
+
 // attach handlers once DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     const prevBtn = document.getElementById('page-prev');
@@ -294,6 +364,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setupImageUploadHandler();
     setupClipboardButton();
     setupTextareaAutoResize();
+
+    // Request notification permission for timers
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                console.log('Notification permission granted');
+            }
+        });
+    }
 });
 
 function setupResponsiveListeners() {
@@ -953,6 +1032,9 @@ async function sendMessage() {
                             }
                         } else if (parsed.recipe_id !== undefined) {
                             fetchAndDisplayRecipe(parsed.recipe_id);
+                        } else if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
+                            // timer_start event
+                            startTimer(parsed.duration_minutes, parsed.label);
                         } else if (parsed.tool) {
                             setLoading(true, `Using ${parsed.tool}...`);
                             addMessage(`Using tool: ${parsed.tool}`, 'tool-use');

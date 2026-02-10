@@ -347,9 +347,10 @@ impl AiAgent {
         None
     }
 
-    /// Execute a tool call. Returns (result_text, optional_recipe_id).
+    /// Execute a tool call. Returns (result_text, optional_recipe_id, optional_timer_data).
     /// If the tool is display_recipe, returns the recipe_id for the chat handler to emit SSE.
-    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>), AiError> {
+    /// If the tool is start_timer, returns (duration_minutes, label) for the chat handler to emit SSE.
+    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>, Option<(f64, String)>), AiError> {
         // Handle native tools (not MCP)
         if tool_call.name == "display_recipe" {
             tracing::info!("Tool call detected: display_recipe with args: {:?}", tool_call.arguments);
@@ -395,10 +396,11 @@ impl AiAgent {
                 return Ok((
                     "Recipe displayed in side panel. STOP. Do not read the recipe out loud. Do not call get_recipe. Just provide a brief summary.".to_string(),
                     Some(id),
+                    None,
                 ));
             } else {
                 tracing::warn!("Failed to resolve recipe_id from args: {:?}", tool_call.arguments);
-                return Ok(("Error: Could not find the recipe. Please use list_recipes first to get the correct recipe_id.".to_string(), None));
+                return Ok(("Error: Could not find the recipe. Please use list_recipes first to get the correct recipe_id.".to_string(), None, None));
             }
         }
 
@@ -432,21 +434,43 @@ impl AiAgent {
                 &""
             });
 
-        if content.is_empty() {
-            Ok((serde_json::to_string_pretty(&result)?, None))
+        // Check if this is a start_timer tool call and extract timer data
+        let timer_data = if tool_call.name == "start_timer" {
+            // Parse the result JSON to extract duration and label
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(content) {
+                let duration = parsed.get("duration_minutes").and_then(|v| v.as_f64());
+                let label = parsed.get("label").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+                match (duration, label) {
+                    (Some(d), Some(l)) => {
+                        tracing::info!("Timer data extracted: duration={}, label={}", d, l);
+                        Some((d, l))
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            }
         } else {
-            Ok((content.to_string(), None))
+            None
+        };
+
+        if content.is_empty() {
+            Ok((serde_json::to_string_pretty(&result)?, None, timer_data))
+        } else {
+            Ok((content.to_string(), None, timer_data))
         }
     }
 
     /// Chat with the AI agent.
-    /// Returns (response_text, tools_used, recipe_ids_to_display, full_messages).
+    /// Returns (response_text, tools_used, recipe_ids_to_display, timer_data, full_messages).
+    /// Timer_data is Vec<(duration_minutes, label)> for start_timer tool calls.
     /// The full_messages vector contains all messages from the agent loop
     /// (including tool calls and results) for persisting in the session.
     pub async fn chat(
         &self,
         conversation: &[Message],
-    ) -> Result<(String, Vec<String>, Vec<String>, Vec<Message>), AiError> {
+    ) -> Result<(String, Vec<String>, Vec<String>, Vec<(f64, String)>, Vec<Message>), AiError> {
         // Ensure MCP is running
         {
             let processes_guard = self.mcp_processes.lock().await;
@@ -471,6 +495,7 @@ impl AiAgent {
                          Use display_recipe to show recipe details in the side panel. \
                          After creating a recipe, call display_recipe with the new recipe_id. \
                          If current_recipe context is provided, treat it as the active recipe and call get_recipe when needed. \
+                         When guiding cooking, ask servings first, scale ingredients intelligently, break into phases, and call start_timer for waiting periods. \
                          Do not output full ingredient lists or steps in chat.)"
                     );
                 }
@@ -479,6 +504,7 @@ impl AiAgent {
 
         let mut tool_uses: Vec<String> = Vec::new();
         let mut recipe_ids: Vec<String> = Vec::new();
+        let mut timer_data: Vec<(f64, String)> = Vec::new();
         let mut final_text = String::new();
 
         // Agent loop: keep going until we get a text-only response
@@ -509,9 +535,12 @@ impl AiAgent {
                 tool_uses.push(call.name.clone());
                 let result = self.execute_tool(call).await;
                 let (content, is_error) = match result {
-                    Ok((text, maybe_recipe_id)) => {
+                    Ok((text, maybe_recipe_id, maybe_timer_data)) => {
                         if let Some(rid) = maybe_recipe_id {
                             recipe_ids.push(rid);
+                        }
+                        if let Some(timer) = maybe_timer_data {
+                            timer_data.push(timer);
                         }
                         (text, false)
                     }
@@ -544,6 +573,6 @@ impl AiAgent {
 
         // Return messages starting after the original conversation
         let new_messages = messages[conversation.len()..].to_vec();
-        Ok((final_text, tool_uses, recipe_ids, new_messages))
+        Ok((final_text, tool_uses, recipe_ids, timer_data, new_messages))
     }
 }

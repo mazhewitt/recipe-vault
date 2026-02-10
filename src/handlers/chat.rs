@@ -145,6 +145,38 @@ impl ChatState {
                                          User: \"Make the Apple Pie recipe difficulty 4\" (assuming current_recipe is Apple Pie)\n\
                                          Action: Call update_recipe(recipe_id=<id from current_recipe>, difficulty=4)\n\
                                          Response: \"I've updated the Apple Pie difficulty to 4 (Medium-Hard). This rating reflects the advanced techniques required.\"\n\n\
+                                         ## Guided Cooking Mode\n\n\
+                                         When the user asks to cook, make, or prepare a recipe:\n\n\
+                                         1. **Get the recipe first**: If not already displayed, call `display_recipe` or `get_recipe`\n\n\
+                                         2. **Check servings**: Always ask how many people they're cooking for before proceeding\n\n\
+                                         3. **Scale intelligently**: \n\
+                                            - Calculate scaled ingredient quantities (you're good at math!)\n\
+                                            - Handle unit conversions naturally (1.5 tsp becomes \"1½ tsp or ½ tbsp\")\n\
+                                            - Round to practical measurements (0.33 cups becomes \"⅓ cup\")\n\
+                                            - Present the complete scaled ingredient list clearly\n\n\
+                                         4. **Guide in phases, not micro-steps**:\n\
+                                            - These are experienced cooks - they don't need hand-holding\n\
+                                            - Break into logical phases: prep, marinate/rest, cook, finish\n\
+                                            - Wait for user confirmation (\"done\", \"ok\", \"ready\") before continuing to next phase\n\
+                                            - Be conversational and adaptive to their pace\n\n\
+                                         5. **Offer timers for waiting periods**:\n\
+                                            - Suggest timers for: marinating, resting, simmering, baking, etc.\n\
+                                            - When the user agrees, call `start_timer` with duration and descriptive label\n\
+                                            - Example: start_timer(30, \"Marinate chicken\")\n\
+                                            - Keep timer labels short and clear\n\n\
+                                         6. **Remember context**:\n\
+                                            - Track which phase they're on based on conversation history\n\
+                                            - If they say \"done\", \"finished\", or \"ready\", move to the next phase\n\
+                                            - Answer questions mid-cooking without losing place\n\n\
+                                         ## Example Cooking Flow\n\n\
+                                         User: \"Help me cook this\"\n\
+                                         You: [Check current recipe, ask servings]\n\n\
+                                         User: \"2 people\"\n\
+                                         You: [Scale all ingredients, present list, ask if they have everything]\n\n\
+                                         User: \"Got them\"\n\
+                                         You: \"Phase 1: Prep the marinade by mixing [ingredients]. Let me know when done.\"\n\n\
+                                         User: \"Done\"\n\
+                                         You: [Call start_timer if needed] \"Great! Let that sit for 30 min. I've started a timer.\"\n\n\
                                          ## Formatting Guidelines\n\
                                          Use markdown. Keep chat responses concise. Do not show UUIDs to the user."
                                                 .to_string(),
@@ -219,6 +251,11 @@ pub enum SseEvent {
     ToolUse { tool: String, status: String },
     #[serde(rename = "recipe_artifact")]
     RecipeArtifact { recipe_id: String },
+    #[serde(rename = "timer_start")]
+    TimerStart {
+        duration_minutes: f64,
+        label: String,
+    },
     #[serde(rename = "done")]
     Done {
         conversation_id: String,
@@ -321,7 +358,7 @@ pub async fn chat(
         let agent_guard = state.agent.read().await;
         if let Some(agent) = agent_guard.as_ref() {
             match agent.chat(&conversation).await {
-                Ok((response_text, tools_used, recipe_ids, new_messages)) => {
+                Ok((response_text, tools_used, recipe_ids, timer_data, new_messages)) => {
                     // Send tool use events
                     for tool in &tools_used {
                         yield Ok(Event::default()
@@ -339,6 +376,17 @@ pub async fn chat(
                             .event("recipe_artifact")
                             .data(serde_json::json!({
                                 "recipe_id": recipe_id
+                            }).to_string()));
+                    }
+
+                    // Send timer_start events (for start_timer tool calls)
+                    for (duration_minutes, label) in &timer_data {
+                        tracing::info!("Emitting timer_start event: duration={}, label={}", duration_minutes, label);
+                        yield Ok(Event::default()
+                            .event("timer_start")
+                            .data(serde_json::json!({
+                                "duration_minutes": duration_minutes,
+                                "label": label
                             }).to_string()));
                     }
 

@@ -16,7 +16,10 @@ export default [
         marked: "readonly",
         TextDecoder: "readonly",
         FileReader: "readonly",
-        setTimeout: "readonly"
+        setTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        Notification: "readonly"
       }
     },
     rules: {

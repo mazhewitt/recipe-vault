@@ -11,6 +11,7 @@ pub fn get_all_tools() -> Vec<ToolDefinition> {
         create_recipe_tool(),
         update_recipe_tool(),
         delete_recipe_tool(),
+        start_timer_tool(),
     ]
 }
 
@@ -200,6 +201,28 @@ pub fn delete_recipe_tool() -> ToolDefinition {
     )
 }
 
+/// Tool definition for starting a cooking timer
+pub fn start_timer_tool() -> ToolDefinition {
+    ToolDefinition::new(
+        "start_timer",
+        "Start a cooking timer for the user. Use this when guiding through a recipe and the user needs to wait for something (marinating, simmering, resting, baking, etc.).",
+        json!({
+            "type": "object",
+            "properties": {
+                "duration_minutes": {
+                    "type": "number",
+                    "description": "How long the timer should run (in minutes). Can be decimal (e.g., 1.5 for 90 seconds)."
+                },
+                "label": {
+                    "type": "string",
+                    "description": "Short description of what the timer is for (e.g., 'Marinate chicken', 'Simmer sauce')"
+                }
+            },
+            "required": ["duration_minutes", "label"]
+        })
+    )
+}
+
 /// Handle list_recipes tool call
 pub fn handle_list_recipes(client: &ApiClient, _params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let recipes = client.list_recipes()?;
@@ -287,6 +310,35 @@ pub fn handle_delete_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
 
     client.delete_recipe(recipe_id)?;
     Ok(json!({ "status": "success", "message": format!("Recipe {} deleted", recipe_id) }))
+}
+
+/// Handle start_timer tool call
+pub fn handle_start_timer(_client: &ApiClient, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+    let duration_minutes = params
+        .get("duration_minutes")
+        .and_then(|v| v.as_f64())
+        .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid duration_minutes parameter"))?;
+
+    let label = params
+        .get("label")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid label parameter"))?
+        .to_string();
+
+    // Validate duration is positive
+    if duration_minutes <= 0.0 {
+        return Err(JsonRpcError::invalid_params("duration_minutes must be greater than 0"));
+    }
+
+    // Generate a timer ID
+    let timer_id = uuid::Uuid::new_v4().to_string();
+
+    Ok(json!({
+        "timer_id": timer_id,
+        "duration_minutes": duration_minutes,
+        "label": label,
+        "message": format!("Timer started: {} for {} minutes", label, duration_minutes)
+    }))
 }
 
 /// Handle create_recipe tool call
@@ -468,12 +520,13 @@ mod tests {
     #[test]
     fn test_get_all_tools() {
         let tools = get_all_tools();
-        assert_eq!(tools.len(), 5);
+        assert_eq!(tools.len(), 6);
         assert_eq!(tools[0].name, "list_recipes");
         assert_eq!(tools[1].name, "get_recipe");
         assert_eq!(tools[2].name, "create_recipe");
         assert_eq!(tools[3].name, "update_recipe");
         assert_eq!(tools[4].name, "delete_recipe");
+        assert_eq!(tools[5].name, "start_timer");
     }
 
     #[test]
