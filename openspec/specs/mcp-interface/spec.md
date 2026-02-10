@@ -4,7 +4,7 @@
 
 The MCP Interface capability enables natural language interaction with the Recipe Vault database through Claude Desktop using the Model Context Protocol (MCP). This provides an alternative interface to the REST API, optimized for conversational AI interaction.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: List Recipes via MCP
 
@@ -177,6 +177,48 @@ The MCP server SHALL optionally read a user email from the `USER_EMAIL` environm
 - **AND** the MCP server operates in god mode (access to all recipes)
 - **AND** no warning is logged (god mode is valid)
 
+### Requirement: Update Recipe via MCP
+
+The system SHALL expose recipe updating through an MCP tool that accepts recipe ID and fields to update, including difficulty.
+
+#### Scenario: Update recipe difficulty via MCP
+- **WHEN** Claude calls `update_recipe` with recipe_id and difficulty (1-5)
+- **THEN** the recipe's difficulty is updated in the database
+- **AND** the updated recipe is returned
+- **AND** updated_at timestamp is refreshed
+
+#### Scenario: Update multiple fields including difficulty
+- **WHEN** Claude calls `update_recipe` with recipe_id, title, and difficulty
+- **THEN** both title and difficulty are updated
+- **AND** other fields remain unchanged
+- **AND** the complete updated recipe is returned
+
+#### Scenario: Update recipe with invalid difficulty
+- **WHEN** Claude calls `update_recipe` with difficulty outside range 1-5
+- **THEN** a JSON-RPC error is returned
+- **AND** the error code is -32602 (invalid params)
+- **AND** the error message indicates valid difficulty range is 1-5
+- **AND** no changes are persisted
+
+#### Scenario: Update recipe that doesn't exist
+- **WHEN** Claude calls `update_recipe` with an invalid recipe_id
+- **THEN** a JSON-RPC error is returned
+- **AND** the error code is -32001 (not found)
+- **AND** the error message indicates the recipe was not found
+
+#### Scenario: Update recipe in different family
+- **WHEN** USER_EMAIL is configured (scoped mode)
+- **AND** Claude calls `update_recipe` for a recipe created by a different family
+- **THEN** a JSON-RPC error is returned
+- **AND** the error code is -32001 (not found)
+- **AND** the recipe details are not disclosed
+
+#### Scenario: Update recipe in god mode
+- **WHEN** USER_EMAIL is NOT configured (god mode)
+- **AND** Claude calls `update_recipe` for any recipe
+- **THEN** the recipe is updated regardless of which family created it
+- **AND** the updated recipe is returned
+
 ### Requirement: Error Handling
 
 The system SHALL map application errors to appropriate JSON-RPC error codes.
@@ -231,6 +273,19 @@ JsonRpcResponse {
 JsonRpcError {
     code: i32
     message: String
+}
+```
+
+### UpdateRecipeParams
+```
+UpdateRecipeParams {
+    recipe_id: String (UUID)                  // Required
+    title: Option<String> (1-200 chars)       // Optional
+    description: Option<String> (max 2000)    // Optional
+    prep_time_minutes: Option<u32>            // Optional
+    cook_time_minutes: Option<u32>            // Optional
+    servings: Option<u32>                     // Optional
+    difficulty: Option<u8> (1-5)              // Optional
 }
 ```
 
