@@ -1,0 +1,5 @@
+families:
+  test-family:
+    members:
+      - test@example.com
+      - ci-test@example.com
