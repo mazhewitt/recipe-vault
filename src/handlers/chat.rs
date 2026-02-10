@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::ai::{AiAgent, AiAgentConfig, LlmProvider, LlmProviderType, Message, ContentBlock, ImageSource};
+use crate::ai::{AiAgent, AiAgentConfig, McpServerConfig, LlmProvider, LlmProviderType, Message, ContentBlock, ImageSource};
 use crate::config::Config;
 
 #[derive(Clone)]
@@ -48,17 +48,51 @@ impl ChatState {
                 )
             };
 
+            // Configure MCP servers
+            let mcp_binary_path = std::env::var("MCP_BINARY_PATH")
+                .unwrap_or_else(|_| "./target/release/recipe-vault-mcp".to_string());
+            let api_base_url = format!(
+                "http://127.0.0.1:{}",
+                self.config.bind_address.split(':').last().unwrap_or("3000")
+            );
+
+            // Recipes server config
+            let recipes_server = McpServerConfig {
+                name: "recipes".to_string(),
+                command: mcp_binary_path,
+                args: vec![],
+                env: vec![
+                    ("API_BASE_URL".to_string(), api_base_url),
+                    ("API_KEY".to_string(), (*self.api_key).clone()),
+                    ("USER_EMAIL".to_string(), user_email.to_string()),
+                ]
+                .into_iter()
+                .collect(),
+            };
+
+            // Fetch server config
+            let fetch_server = McpServerConfig {
+                name: "fetch".to_string(),
+                command: "uvx".to_string(),
+                args: vec!["mcp-server-fetch".to_string()],
+                env: HashMap::new(),
+            };
+
             let agent_config = AiAgentConfig {
-                mcp_binary_path: std::env::var("MCP_BINARY_PATH")
-                    .unwrap_or_else(|_| "./target/release/recipe-vault-mcp".to_string()),
-                api_base_url: format!(
-                    "http://127.0.0.1:{}",
-                    self.config.bind_address.split(':').last().unwrap_or("3000")
-                ),
-                api_key: (*self.api_key).clone(),
-                user_email: Some(user_email.to_string()),
+                mcp_servers: vec![recipes_server, fetch_server],
                                 system_prompt: Some(
                                         "You are a helpful cooking assistant with access to a recipe database.\n\n\
+                                         ## Fetching Recipes from URLs\n\n\
+                                         When the user provides a URL to a recipe:\n\
+                                         - Use the `fetch` tool with the URL parameter to retrieve the webpage content\n\
+                                         - The content will be returned as markdown\n\
+                                         - Extract the recipe details from the markdown (title, ingredients, steps, timing, etc.)\n\
+                                         - **IMPORTANT**: Display the extracted recipe in chat using nice markdown formatting with clear sections\n\
+                                         - After showing the recipe, ask: \"Would you like me to edit it or add it to the book?\"\n\
+                                         - Wait for the user's response before saving\n\
+                                         - If user wants to edit: make the requested changes, show the updated recipe, and ask again\n\
+                                         - If user wants to save/add: use `create_recipe` to save it, then use `display_recipe` to show it in the side panel\n\
+                                         - If the fetched content doesn't contain a recipe, inform the user and suggest alternatives\n\n\
                                          ## Image-Based Recipe Extraction\n\n\
                                          When the user sends an image with their message:\n\
                                          - If the image contains a recipe (handwritten, printed, cookbook page, recipe card), extract it\n\

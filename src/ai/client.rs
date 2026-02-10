@@ -1,5 +1,6 @@
 use crate::ai::llm::{ContentBlock, LlmError, LlmProvider, LlmResponse, Message, ToolCall, ToolDefinition, ToolResult, tools};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
 use thiserror::Error;
@@ -22,27 +23,30 @@ pub enum AiError {
 }
 
 #[derive(Debug, Clone)]
+pub struct McpServerConfig {
+    pub name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub env: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AiAgentConfig {
-    pub mcp_binary_path: String,
-    pub api_base_url: String,
-    pub api_key: String,
-    pub user_email: Option<String>,
+    pub mcp_servers: Vec<McpServerConfig>,
     pub system_prompt: Option<String>,
 }
 
 impl Default for AiAgentConfig {
     fn default() -> Self {
         Self {
-            mcp_binary_path: "./target/release/recipe-vault-mcp".to_string(),
-            api_base_url: "http://localhost:3000".to_string(),
-            api_key: String::new(),
-            user_email: None,
+            mcp_servers: Vec::new(),
             system_prompt: None,
         }
     }
 }
 
 struct McpProcess {
+    name: String,
     child: Child,
     request_id: u64,
 }
@@ -50,7 +54,8 @@ struct McpProcess {
 pub struct AiAgent {
     llm: LlmProvider,
     config: AiAgentConfig,
-    mcp_process: Arc<Mutex<Option<McpProcess>>>,
+    mcp_processes: Arc<Mutex<HashMap<String, McpProcess>>>,
+    tool_registry: Arc<Mutex<HashMap<String, String>>>,
     tools: Arc<Mutex<Vec<ToolDefinition>>>,
 }
 
@@ -83,26 +88,19 @@ impl AiAgent {
         Self {
             llm,
             config,
-            mcp_process: Arc::new(Mutex::new(None)),
+            mcp_processes: Arc::new(Mutex::new(HashMap::new())),
+            tool_registry: Arc::new(Mutex::new(HashMap::new())),
             tools: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    pub async fn start(&self) -> Result<(), AiError> {
-        let mut process_guard = self.mcp_process.lock().await;
+    async fn spawn_mcp_server(&self, config: &McpServerConfig) -> Result<McpProcess, AiError> {
+        let mut command = Command::new(&config.command);
+        command.args(&config.args);
 
-        if process_guard.is_some() {
-            return Ok(());
-        }
-
-        let mut command = Command::new(&self.config.mcp_binary_path);
-        command
-            .env("API_BASE_URL", &self.config.api_base_url)
-            .env("API_KEY", &self.config.api_key);
-
-        // Pass user email to MCP for family-scoped access
-        if let Some(ref email) = self.config.user_email {
-            command.env("USER_EMAIL", email);
+        // Set environment variables for this server
+        for (key, value) in &config.env {
+            command.env(key, value);
         }
 
         let child = command
@@ -111,27 +109,80 @@ impl AiAgent {
             .stderr(Stdio::inherit())
             .spawn()?;
 
-        *process_guard = Some(McpProcess { child, request_id: 0 });
-        drop(process_guard);
+        Ok(McpProcess {
+            name: config.name.clone(),
+            child,
+            request_id: 0,
+        })
+    }
 
-        // Initialize MCP and get tools
-        self.initialize_mcp().await?;
-        self.fetch_tools().await?;
+    pub async fn start(&self) -> Result<(), AiError> {
+        let mut processes_guard = self.mcp_processes.lock().await;
+
+        // If already started, return early
+        if !processes_guard.is_empty() {
+            return Ok(());
+        }
+
+        // Spawn and initialize each server sequentially
+        for server_config in &self.config.mcp_servers {
+            tracing::info!("Starting MCP server: {}", server_config.name);
+
+            // Spawn the server process
+            let process = self.spawn_mcp_server(server_config).await?;
+            processes_guard.insert(server_config.name.clone(), process);
+        }
+        drop(processes_guard);
+
+        // Initialize each server and fetch tools
+        let mut all_tools = Vec::new();
+        let mut registry = HashMap::new();
+
+        for server_config in &self.config.mcp_servers {
+            // Initialize this server
+            self.initialize_mcp_server(&server_config.name).await?;
+
+            // Fetch tools from this server
+            let tools = self.fetch_tools_from_server(&server_config.name).await?;
+
+            // Register each tool -> server mapping
+            for tool in &tools {
+                if let Some(existing_server) = registry.get(&tool.name) {
+                    tracing::warn!(
+                        "Duplicate tool '{}' found in servers '{}' and '{}' - using latter",
+                        tool.name, existing_server, server_config.name
+                    );
+                }
+                registry.insert(tool.name.clone(), server_config.name.clone());
+            }
+
+            all_tools.extend(tools);
+        }
+
+        // Add native tools
+        all_tools.push(tools::display_recipe_tool());
+        registry.insert("display_recipe".to_string(), "native".to_string());
+
+        // Store registry and tools
+        *self.tool_registry.lock().await = registry;
+        *self.tools.lock().await = all_tools;
 
         Ok(())
     }
 
     pub async fn stop(&self) -> Result<(), AiError> {
-        let mut process_guard = self.mcp_process.lock().await;
-        if let Some(mut mcp) = process_guard.take() {
-            let _ = mcp.child.kill().await;
+        let mut processes_guard = self.mcp_processes.lock().await;
+        for (name, mut process) in processes_guard.drain() {
+            tracing::info!("Stopping MCP server: {}", name);
+            let _ = process.child.kill().await;
         }
         Ok(())
     }
 
-    async fn initialize_mcp(&self) -> Result<(), AiError> {
+    async fn initialize_mcp_server(&self, server_name: &str) -> Result<(), AiError> {
         let _response = self
-            .call_mcp(
+            .call_mcp_server(
+                server_name,
                 "initialize",
                 serde_json::json!({
                     "protocolVersion": "2024-11-05",
@@ -145,14 +196,14 @@ impl AiAgent {
             .await?;
 
         // Send initialized notification
-        self.notify_mcp("notifications/initialized", serde_json::json!({}))
+        self.notify_mcp_server(server_name, "notifications/initialized", serde_json::json!({}))
             .await?;
 
         Ok(())
     }
 
-    async fn fetch_tools(&self) -> Result<(), AiError> {
-        let response = self.call_mcp("tools/list", serde_json::json!({})).await?;
+    async fn fetch_tools_from_server(&self, server_name: &str) -> Result<Vec<ToolDefinition>, AiError> {
+        let response = self.call_mcp_server(server_name, "tools/list", serde_json::json!({})).await?;
 
         let tools_value = response
             .get("tools")
@@ -162,7 +213,7 @@ impl AiAgent {
         let mcp_tools: Vec<serde_json::Value> =
             serde_json::from_value(tools_value).unwrap_or_default();
 
-        let mut tool_definitions: Vec<ToolDefinition> = mcp_tools
+        let tool_definitions: Vec<ToolDefinition> = mcp_tools
             .into_iter()
             .filter_map(|t| {
                 let name = t.get("name")?.as_str()?.to_string();
@@ -179,24 +230,19 @@ impl AiAgent {
             })
             .collect();
 
-        // Add native tools (not MCP)
-        tool_definitions.push(tools::display_recipe_tool());
-
-        let mut tools_guard = self.tools.lock().await;
-        *tools_guard = tool_definitions;
-
-        Ok(())
+        Ok(tool_definitions)
     }
 
-    async fn call_mcp(
+    async fn call_mcp_server(
         &self,
+        server_name: &str,
         method: &str,
         params: serde_json::Value,
     ) -> Result<serde_json::Value, AiError> {
-        let mut process_guard = self.mcp_process.lock().await;
-        let mcp = process_guard
-            .as_mut()
-            .ok_or(AiError::ProcessNotRunning)?;
+        let mut processes_guard = self.mcp_processes.lock().await;
+        let mcp = processes_guard
+            .get_mut(server_name)
+            .ok_or_else(|| AiError::Mcp(format!("Server not found: {}", server_name)))?;
 
         mcp.request_id += 1;
         let request = JsonRpcRequest {
@@ -229,11 +275,11 @@ impl AiAgent {
         Ok(response.result.unwrap_or(serde_json::json!(null)))
     }
 
-    async fn notify_mcp(&self, method: &str, params: serde_json::Value) -> Result<(), AiError> {
-        let mut process_guard = self.mcp_process.lock().await;
-        let mcp = process_guard
-            .as_mut()
-            .ok_or(AiError::ProcessNotRunning)?;
+    async fn notify_mcp_server(&self, server_name: &str, method: &str, params: serde_json::Value) -> Result<(), AiError> {
+        let mut processes_guard = self.mcp_processes.lock().await;
+        let mcp = processes_guard
+            .get_mut(server_name)
+            .ok_or_else(|| AiError::Mcp(format!("Server not found: {}", server_name)))?;
 
         let notification = serde_json::json!({
             "jsonrpc": "2.0",
@@ -252,9 +298,14 @@ impl AiAgent {
 
     /// Find a recipe by title using fuzzy matching via MCP list_recipes
     async fn find_recipe_by_title(&self, search_title: &str) -> Option<String> {
+        // Look up which server has list_recipes tool
+        let registry = self.tool_registry.lock().await;
+        let server_name = registry.get("list_recipes")?.clone();
+        drop(registry);
+
         // Call list_recipes through MCP to get all recipes
         let result = self
-            .call_mcp("tools/call", serde_json::json!({
+            .call_mcp_server(&server_name, "tools/call", serde_json::json!({
                 "name": "list_recipes",
                 "arguments": {}
             }))
@@ -343,9 +394,16 @@ impl AiAgent {
             }
         }
 
-        // MCP tools
+        // MCP tools - look up server from registry
+        let registry = self.tool_registry.lock().await;
+        let server_name = registry.get(&tool_call.name)
+            .ok_or_else(|| AiError::Mcp(format!("Unknown tool: {}", tool_call.name)))?;
+        let server_name = server_name.clone();
+        drop(registry);
+
         let result = self
-            .call_mcp(
+            .call_mcp_server(
+                &server_name,
                 "tools/call",
                 serde_json::json!({
                     "name": tool_call.name,
@@ -383,9 +441,9 @@ impl AiAgent {
     ) -> Result<(String, Vec<String>, Vec<String>, Vec<Message>), AiError> {
         // Ensure MCP is running
         {
-            let process_guard = self.mcp_process.lock().await;
-            if process_guard.is_none() {
-                drop(process_guard);
+            let processes_guard = self.mcp_processes.lock().await;
+            if processes_guard.is_empty() {
+                drop(processes_guard);
                 self.start().await?;
             }
         }

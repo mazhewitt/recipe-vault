@@ -23,11 +23,19 @@ FROM debian:trixie-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies (including Python for fetch MCP server)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libsqlite3-0 \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install uv (Python package runner for MCP fetch server)
+RUN pip3 install --no-cache-dir --break-system-packages uv
+
+# Verify uvx is available
+RUN uvx --version
 
 # Copy binaries from builder (including sqlx for migrations)
 COPY --from=builder /app/target/release/recipe-vault /usr/local/bin/recipe-vault
