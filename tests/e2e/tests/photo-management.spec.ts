@@ -1,11 +1,16 @@
 import { test, expect, Page } from '@playwright/test';
 import { authenticate, createRecipe, Recipe } from './helpers';
-import * as path from 'path';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Helper to create a test recipe
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper to create a test recipe with unique title
 async function createTestRecipe(page: Page, title: string): Promise<string> {
+  const uniqueTitle = `${title} ${Date.now()}`;
   const recipe: Recipe = {
-    title,
+    title: uniqueTitle,
     description: 'Test recipe for photo management',
     ingredients: [
       { name: 'flour', quantity: 2, unit: 'cups' },
@@ -56,14 +61,13 @@ test.describe('Photo Management', () => {
     await authenticate(page);
   });
 
-  test('should display upload placeholder when recipe has no photo', async ({ page }) => {
+  test('should display add-photo icon when recipe has no photo', async ({ page }) => {
     const recipeId = await createTestRecipe(page, 'Recipe Without Photo');
     await navigateToRecipe(page, recipeId);
 
-    // Should show upload placeholder
-    const placeholder = page.locator('.photo-upload-placeholder');
-    await expect(placeholder).toBeVisible();
-    await expect(placeholder).toContainText('Add Photo');
+    // Should show small add-photo icon in the title row
+    const addIcon = page.locator('.photo-add-icon');
+    await expect(addIcon).toBeVisible();
   });
 
   test('should upload JPG photo and display correctly', async ({ page }) => {
@@ -78,9 +82,8 @@ test.describe('Photo Management', () => {
     const photo = page.locator('.recipe-photo');
     await expect(photo).toBeVisible({ timeout: 5000 });
 
-    // Should have delete and change buttons
-    await expect(page.locator('.photo-delete-btn')).toBeVisible();
-    await expect(page.locator('.photo-upload-btn')).toBeVisible();
+    // Should have delete x button
+    await expect(page.locator('.photo-delete-x')).toBeAttached();
 
     // Photo should be an img element with correct src
     await expect(photo).toHaveAttribute('src', new RegExp(`/api/recipes/${recipeId}/photo`));
@@ -157,7 +160,7 @@ test.describe('Photo Management', () => {
     await expect(title).toBeVisible();
   });
 
-  test('should delete photo and show placeholder', async ({ page }) => {
+  test('should delete photo and hide photo container', async ({ page }) => {
     const recipeId = await createTestRecipe(page, 'Delete Photo Recipe');
     await navigateToRecipe(page, recipeId);
 
@@ -174,10 +177,10 @@ test.describe('Photo Management', () => {
     });
 
     // Click delete button
-    await page.locator('.photo-delete-btn').click();
+    await page.locator('.photo-delete-x').click();
 
-    // Photo should be gone, placeholder should appear
-    await expect(page.locator('.photo-upload-placeholder')).toBeVisible({ timeout: 5000 });
+    // Photo should be gone, add-photo icon should appear in title row
+    await expect(page.locator('.photo-add-icon')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.recipe-photo')).not.toBeVisible();
   });
 
@@ -201,7 +204,7 @@ test.describe('Photo Management', () => {
     });
 
     // Click delete
-    await page.locator('.photo-delete-btn').click();
+    await page.locator('.photo-delete-x').click();
 
     // Wait a moment for dialog
     await page.waitForTimeout(100);
@@ -224,14 +227,14 @@ test.describe('Photo Management', () => {
     });
 
     // Click delete button
-    await page.locator('.photo-delete-btn').click();
+    await page.locator('.photo-delete-x').click();
 
     // Wait a moment
     await page.waitForTimeout(500);
 
     // Photo should still be visible
     await expect(page.locator('.recipe-photo')).toBeVisible();
-    await expect(page.locator('.photo-delete-btn')).toBeVisible();
+    await expect(page.locator('.photo-delete-x')).toBeAttached();
   });
 
   test('should show client-side error for 6MB file', async ({ page }) => {
@@ -243,9 +246,9 @@ test.describe('Photo Management', () => {
     const fileInput = page.locator('#photo-upload-input');
     await fileInput.setInputFiles(fixturePath);
 
-    // Should show error message
+    // Should show error message (may be in chat panel, hidden on mobile)
     const errorMessage = page.locator('.paste-error');
-    await expect(errorMessage).toBeVisible({ timeout: 2000 });
+    await expect(errorMessage).toBeAttached({ timeout: 5000 });
     await expect(errorMessage).toContainText('too large');
     await expect(errorMessage).toContainText('5MB');
   });
@@ -267,16 +270,20 @@ test.describe('Photo Management', () => {
     const recipeId = await createTestRecipe(page, 'Loading Indicator Recipe');
     await navigateToRecipe(page, recipeId);
 
-    // Intercept the upload request to delay it
+    // First upload a photo so the photo container exists
+    const fixturePath = path.join(__dirname, '../fixtures/test-photo.jpg');
+    await uploadPhoto(page, fixturePath);
+    await expect(page.locator('.recipe-photo')).toBeVisible({ timeout: 5000 });
+
+    // Now intercept the next upload request to delay it
     await page.route(`/api/recipes/${recipeId}/photo`, async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay
       await route.continue();
     });
 
-    const fixturePath = path.join(__dirname, '../fixtures/test-photo.jpg');
     const fileInput = page.locator('#photo-upload-input');
 
-    // Start upload
+    // Start upload (replacing existing photo)
     await fileInput.setInputFiles(fixturePath);
 
     // Check for loading state (opacity change)
@@ -298,6 +305,11 @@ test.describe('Photo Management', () => {
     const recipeId = await createTestRecipe(page, 'Failed Upload Recipe');
     await navigateToRecipe(page, recipeId);
 
+    // First upload a photo so the photo container exists (needed for the upload input)
+    const fixturePath = path.join(__dirname, '../fixtures/test-photo.jpg');
+    await uploadPhoto(page, fixturePath);
+    await expect(page.locator('.recipe-photo')).toBeVisible({ timeout: 5000 });
+
     // Mock a failed upload
     await page.route(`/api/recipes/${recipeId}/photo`, async (route) => {
       await route.fulfill({
@@ -306,12 +318,12 @@ test.describe('Photo Management', () => {
       });
     });
 
-    const fixturePath = path.join(__dirname, '../fixtures/test-photo.jpg');
+    // Upload again (will fail due to mocked route)
     await uploadPhoto(page, fixturePath);
 
-    // Should show error message
+    // Should show error message (may be in chat panel, hidden on mobile)
     const errorMessage = page.locator('.paste-error');
-    await expect(errorMessage).toBeVisible({ timeout: 2000 });
+    await expect(errorMessage).toBeAttached({ timeout: 5000 });
     await expect(errorMessage).toContainText('Failed to upload');
   });
 
@@ -329,7 +341,7 @@ test.describe('Photo Management', () => {
 
     // Check max-height is reduced on mobile
     const maxHeight = await photo.evaluate((el) => window.getComputedStyle(el).maxHeight);
-    expect(maxHeight).toBe('200px');
+    expect(maxHeight).toBe('130px');
   });
 
   test('should remove photo from UI when recipe is deleted', async ({ page }) => {

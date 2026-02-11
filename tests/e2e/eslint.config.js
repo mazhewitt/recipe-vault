@@ -19,7 +19,9 @@ export default [
         setTimeout: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
-        Notification: "readonly"
+        Notification: "readonly",
+        FormData: "readonly",
+        confirm: "readonly"
       }
     },
     rules: {
