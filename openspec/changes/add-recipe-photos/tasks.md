@@ -163,17 +163,17 @@
 
 ## 17. Testing - Manual/Deployment
 
-- [ ] 17.1 Verify photos persist across server restarts
-- [ ] 17.2 Verify recipe deletion removes photo file from filesystem (not just UI)
-- [ ] 17.3 Test backup/restore includes photos directory
+- [x] 17.1 Verify photos persist across server restarts
+- [x] 17.2 Verify recipe deletion removes photo file from filesystem (not just UI)
+- [x] 17.3 Test backup/restore includes photos directory
 
 ## 18. Docker/Deployment
 
 - [x] 18.1 Update `docker-entrypoint.sh` to create `/app/data/photos/` directory
 - [x] 18.2 Set ownership: `chown -R appuser:appuser /app/data/photos`
 - [x] 18.3 Verify `/app/data/` volume mount includes photos subdirectory
-- [ ] 18.4 Test deployment on local Docker container
-- [ ] 18.5 Verify photos survive container restarts
+- [x] 18.4 Test deployment on local Docker container
+- [x] 18.5 Verify photos survive container restarts
 
 ## 19. Documentation
 
@@ -185,6 +185,6 @@
 
 ## 20. Backup Strategy
 
-- [ ] 20.1 Verify existing backup scripts include `/app/data/photos/` directory
-- [ ] 20.2 Test backup/restore process with photos
+- [x] 20.1 Verify existing backup scripts include `/app/data/photos/` directory
+- [x] 20.2 Test backup/restore process with photos
 - [ ] 20.3 Document backup strategy for photos in deployment docs
