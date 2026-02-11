@@ -14,6 +14,7 @@ pub struct Config {
     pub mock_llm: bool,
     pub mock_recipe_id: Option<String>,
     pub families_config: FamiliesConfig,
+    pub photos_dir: String,
 }
 
 /// Configuration for family-based multi-tenancy, loaded from families.yaml
@@ -92,6 +93,9 @@ impl Config {
             .unwrap_or_else(|_| "/app/data/families.yaml".to_string());
         let families_config = FamiliesConfig::load(Path::new(&families_config_path))?;
 
+        let photos_dir = env::var("PHOTOS_DIR")
+            .unwrap_or_else(|_| "./data/photos".to_string());
+
         Ok(Config {
             database_url,
             bind_address,
@@ -101,6 +105,7 @@ impl Config {
             mock_llm,
             mock_recipe_id,
             families_config,
+            photos_dir,
         })
     }
 }

@@ -41,6 +41,14 @@ async fn main() {
     tracing::debug!("Database URL: {}", config.database_url);
     tracing::debug!("Bind address: {}", config.bind_address);
 
+    // Create photos directory if it doesn't exist
+    tracing::info!("Ensuring photos directory exists: {}", config.photos_dir);
+    if let Err(e) = std::fs::create_dir_all(&config.photos_dir) {
+        tracing::error!("Failed to create photos directory at {}: {}", config.photos_dir, e);
+        panic!("Failed to create photos directory: {}", e);
+    }
+    tracing::info!("Photos directory ready");
+
     // Load or generate API key
     let api_key = load_or_generate_api_key();
     let api_key_for_chat = api_key.clone();
@@ -113,6 +121,9 @@ async fn main() {
         .route("/recipes/:id", get(recipes::get_recipe))
         .route("/recipes/:id", put(recipes::update_recipe))
         .route("/recipes/:id", delete(recipes::delete_recipe))
+        .route("/recipes/:id/photo", post(recipes::upload_photo))
+        .route("/recipes/:id/photo", get(recipes::get_photo))
+        .route("/recipes/:id/photo", delete(recipes::delete_photo))
         .with_state(recipe_state);
 
     // Build chat routes with chat state

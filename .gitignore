@@ -10,6 +10,9 @@
 *.db-wal
 *.log
 
+# Runtime data directory (photos, etc.)
+data/
+
 # Secret files - NEVER commit these
 .api_key
 *.key

@@ -22,6 +22,15 @@ pub enum ApiError {
 
     #[error("Internal server error")]
     Internal(String),
+
+    #[error("File too large: {0}")]
+    FileTooLarge(String),
+
+    #[error("Unsupported file type: {0}")]
+    UnsupportedFileType(String),
+
+    #[error("Filesystem error: {0}")]
+    FileSystemError(String),
 }
 
 impl IntoResponse for ApiError {
@@ -30,6 +39,16 @@ impl IntoResponse for ApiError {
             ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg, "NOT_FOUND"),
             ApiError::Validation(msg) => (StatusCode::BAD_REQUEST, msg, "VALIDATION_ERROR"),
             ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg, "CONFLICT"),
+            ApiError::FileTooLarge(msg) => (StatusCode::PAYLOAD_TOO_LARGE, msg, "FILE_TOO_LARGE"),
+            ApiError::UnsupportedFileType(msg) => (StatusCode::BAD_REQUEST, msg, "UNSUPPORTED_FILE_TYPE"),
+            ApiError::FileSystemError(msg) => {
+                tracing::error!("Filesystem error: {}", msg);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to process file: {}", msg),
+                    "FILESYSTEM_ERROR",
+                )
+            }
             ApiError::Database(ref err) => {
                 tracing::error!("Database error: {:?}", err);
                 (

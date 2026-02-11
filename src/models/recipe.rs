@@ -17,6 +17,8 @@ pub struct Recipe {
     pub servings: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub difficulty: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub photo_filename: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
