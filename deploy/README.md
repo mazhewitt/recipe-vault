@@ -85,6 +85,79 @@ sudo docker run --rm -v /volume1/docker/recipe-vault/data:/app/data \
   sqlite3 /app/data/recipes.db 'DELETE FROM _sqlx_migrations WHERE version = XXXXXXX;'"
 ```
 
+## Backup Strategy
+
+### Database + Photos Backup
+
+The `data/` directory contains both the SQLite database and recipe photos:
+```
+/volume1/docker/recipe-vault/data/
+├── recipes.db              # SQLite database
+├── photos/                 # Recipe photos (JPG, PNG, WebP, GIF)
+│   ├── recipe-id-1.jpg
+│   ├── recipe-id-2.png
+│   └── ...
+├── backups/                # Automatic database backups (created by entrypoint)
+│   ├── recipes_backup_TIMESTAMP.db
+│   └── ...
+└── .api_key               # API authentication key
+```
+
+### Backup Recommendations
+
+**Option 1: Docker Volume Backup (Recommended)**
+```bash
+# Stop the container
+cd /volume1/docker/recipe-vault
+sudo docker-compose down
+
+# Create compressed backup
+sudo tar -czf recipe-vault-backup-$(date +%Y%m%d).tar.gz data/
+
+# Restart container
+sudo docker-compose up -d
+```
+
+**Option 2: Synology Hyperbackup**
+- Configure Hyperbackup to include `/docker/recipe-vault/data/`
+- Schedule regular backups (daily/weekly)
+- Includes both database and photos automatically
+
+**Option 3: Manual Backup Script**
+```bash
+#!/bin/bash
+# Save as /volume1/docker/recipe-vault/backup.sh
+
+BACKUP_DIR="/volume1/docker/recipe-vault/backups"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+tar -czf "$BACKUP_DIR/full-backup-$TIMESTAMP.tar.gz" \
+  -C /volume1/docker/recipe-vault data/
+
+# Keep only last 7 backups
+ls -t "$BACKUP_DIR"/full-backup-*.tar.gz | tail -n +8 | xargs rm -f
+```
+
+### Restore from Backup
+
+```bash
+# Stop container
+cd /volume1/docker/recipe-vault
+sudo docker-compose down
+
+# Restore data directory
+sudo tar -xzf recipe-vault-backup-YYYYMMDD.tar.gz
+
+# Verify photos directory exists
+ls -la data/photos/
+
+# Restart container
+sudo docker-compose up -d
+```
+
+**Important**: The entrypoint creates automatic database backups before migrations in `data/backups/`. These backups do NOT include photos - use full `data/` backups to preserve photos.
+
 ### Post-Deployment Checklist
 
 After deploying changes that include static assets (JS, CSS):

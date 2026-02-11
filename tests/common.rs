@@ -96,6 +96,10 @@ pub fn create_test_app_with_config(
     };
 
     // Create RecipeState with Config for handlers
+    // Use a temporary directory for photo storage in tests
+    let photos_dir = std::env::temp_dir().join("recipe-vault-test-photos");
+    std::fs::create_dir_all(&photos_dir).ok();
+
     let config = Config {
         database_url: ":memory:".to_string(),
         bind_address: "127.0.0.1:3000".to_string(),
@@ -105,6 +109,7 @@ pub fn create_test_app_with_config(
         mock_recipe_id: None,
         families_config: (*families_config).clone(),
         dev_user_email: None,
+        photos_dir: photos_dir.to_str().unwrap().to_string(),
     };
 
     let recipe_state = recipes::RecipeState {
@@ -126,6 +131,18 @@ pub fn create_test_app_with_config(
         .route(
             "/api/recipes/:id",
             axum::routing::delete(recipes::delete_recipe),
+        )
+        .route(
+            "/api/recipes/:id/photo",
+            axum::routing::post(recipes::upload_photo),
+        )
+        .route(
+            "/api/recipes/:id/photo",
+            axum::routing::get(recipes::get_photo),
+        )
+        .route(
+            "/api/recipes/:id/photo",
+            axum::routing::delete(recipes::delete_photo),
         )
         .with_state(recipe_state)
         .route_layer(middleware::from_fn_with_state(
@@ -187,4 +204,91 @@ pub async fn send_request_with_headers(
     };
 
     (status, json_response)
+}
+
+/// Helper to send multipart form data request (for photo uploads)
+#[allow(dead_code)]
+pub async fn send_multipart_request(
+    app: &Router,
+    method: &str,
+    uri: &str,
+    field_name: &str,
+    file_data: Vec<u8>,
+    filename: &str,
+    content_type: &str,
+) -> (StatusCode, Option<Value>) {
+    // Build a simple multipart body manually
+    let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+    let mut body = Vec::new();
+
+    // Start boundary
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    // Content-Disposition header
+    body.extend_from_slice(
+        format!(
+            "Content-Disposition: form-data; name=\"{}\"; filename=\"{}\"\r\n",
+            field_name, filename
+        )
+        .as_bytes(),
+    );
+    // Content-Type header
+    body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", content_type).as_bytes());
+    // File data
+    body.extend_from_slice(&file_data);
+    // End boundary
+    body.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
+
+    let request = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={}", boundary),
+        )
+        .body(Body::from(body))
+        .unwrap();
+
+    let response = app.clone().oneshot(request).await.unwrap();
+    let status = response.status();
+
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+
+    let json_response = if !body_bytes.is_empty() {
+        serde_json::from_slice(&body_bytes).ok()
+    } else {
+        None
+    };
+
+    (status, json_response)
+}
+
+/// Helper to send binary request (for retrieving photos)
+#[allow(dead_code)]
+pub async fn send_binary_request(
+    app: &Router,
+    method: &str,
+    uri: &str,
+) -> (StatusCode, Vec<u8>, Option<String>) {
+    let request = Request::builder()
+        .method(method)
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(request).await.unwrap();
+    let status = response.status();
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+
+    (status, body_bytes, content_type)
 }

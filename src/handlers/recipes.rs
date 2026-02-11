@@ -405,3 +405,119 @@ fn content_type_from_extension(filename: &str) -> &'static str {
         _ => "application/octet-stream",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_content_type_from_extension_jpg() {
+        assert_eq!(content_type_from_extension("photo.jpg"), "image/jpeg");
+        assert_eq!(content_type_from_extension("photo.JPG"), "image/jpeg");
+        assert_eq!(content_type_from_extension("PHOTO.jpg"), "image/jpeg");
+    }
+
+    #[test]
+    fn test_content_type_from_extension_jpeg() {
+        assert_eq!(content_type_from_extension("photo.jpeg"), "image/jpeg");
+        assert_eq!(content_type_from_extension("photo.JPEG"), "image/jpeg");
+    }
+
+    #[test]
+    fn test_content_type_from_extension_png() {
+        assert_eq!(content_type_from_extension("photo.png"), "image/png");
+        assert_eq!(content_type_from_extension("photo.PNG"), "image/png");
+    }
+
+    #[test]
+    fn test_content_type_from_extension_webp() {
+        assert_eq!(content_type_from_extension("photo.webp"), "image/webp");
+        assert_eq!(content_type_from_extension("photo.WEBP"), "image/webp");
+    }
+
+    #[test]
+    fn test_content_type_from_extension_gif() {
+        assert_eq!(content_type_from_extension("photo.gif"), "image/gif");
+        assert_eq!(content_type_from_extension("photo.GIF"), "image/gif");
+    }
+
+    #[test]
+    fn test_content_type_from_extension_unknown() {
+        assert_eq!(content_type_from_extension("photo.txt"), "application/octet-stream");
+        assert_eq!(content_type_from_extension("photo.pdf"), "application/octet-stream");
+        assert_eq!(content_type_from_extension("photo"), "application/octet-stream");
+    }
+
+    #[test]
+    fn test_validate_file_extension_valid() {
+        assert!(validate_file_extension("jpg").is_ok());
+        assert!(validate_file_extension("JPG").is_ok());
+        assert!(validate_file_extension("jpeg").is_ok());
+        assert!(validate_file_extension("JPEG").is_ok());
+        assert!(validate_file_extension("png").is_ok());
+        assert!(validate_file_extension("PNG").is_ok());
+        assert!(validate_file_extension("webp").is_ok());
+        assert!(validate_file_extension("WEBP").is_ok());
+        assert!(validate_file_extension("gif").is_ok());
+        assert!(validate_file_extension("GIF").is_ok());
+    }
+
+    #[test]
+    fn test_validate_file_extension_invalid() {
+        assert!(validate_file_extension("txt").is_err());
+        assert!(validate_file_extension("pdf").is_err());
+        assert!(validate_file_extension("doc").is_err());
+        assert!(validate_file_extension("exe").is_err());
+    }
+
+    #[test]
+    fn test_determine_file_extension_from_content_type() {
+        let ct = Some("image/jpeg".to_string());
+        let result = determine_file_extension(&ct, &None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "jpg");
+
+        let ct = Some("image/png".to_string());
+        let result = determine_file_extension(&ct, &None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "png");
+
+        let ct = Some("image/webp".to_string());
+        let result = determine_file_extension(&ct, &None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "webp");
+
+        let ct = Some("image/gif".to_string());
+        let result = determine_file_extension(&ct, &None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "gif");
+    }
+
+    #[test]
+    fn test_determine_file_extension_from_filename() {
+        let filename = Some("photo.jpg".to_string());
+        let result = determine_file_extension(&None, &filename);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "jpg");
+
+        let filename = Some("photo.PNG".to_string());
+        let result = determine_file_extension(&None, &filename);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "png");
+    }
+
+    #[test]
+    fn test_determine_file_extension_no_input() {
+        let result = determine_file_extension(&None, &None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_filename_generation() {
+        // Test that recipe ID + extension format is correct
+        let recipe_id = "abc-123";
+        let extension = "jpg";
+        let filename = format!("{}.{}", recipe_id, extension);
+        assert_eq!(filename, "abc-123.jpg");
+    }
+}

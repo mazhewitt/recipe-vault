@@ -838,8 +838,42 @@ function renderRecipe(recipe) {
 
     const totalTimeMinutes = getTotalTimeMinutes(recipe);
 
+    // Photo display with upload/delete controls
+    const hasPhoto = recipe.photo_filename && recipe.photo_filename !== '';
+    const photoHtml = hasPhoto
+        ? `<div class="recipe-photo-container">
+            <div class="recipe-photo-wrapper">
+                <img src="/api/recipes/${recipe.id}/photo?t=${Date.now()}"
+                     alt="${recipe.title} photo"
+                     class="recipe-photo"
+                     id="recipe-photo-img"
+                     onclick="document.getElementById('photo-upload-input').click()"
+                     title="Click to change photo"
+                     onerror="this.closest('.recipe-photo-container').style.display='none';">
+                <button class="photo-delete-x" onclick="deleteRecipePhoto('${recipe.id}')" title="Remove photo">&times;</button>
+            </div>
+            <input type="file" id="photo-upload-input" accept="image/*" style="display: none;" onchange="uploadRecipePhoto('${recipe.id}', this)">
+           </div>`
+        : '';
+
+    // Small add-photo icon for title row (only when no photo)
+    const addPhotoIcon = !hasPhoto
+        ? `<button class="photo-add-icon" onclick="document.getElementById('photo-upload-input').click()" title="Add photo">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                <path d="M3 14l5-5 4 4 6-6 5 5" stroke="currentColor" stroke-width="2" fill="none"/>
+                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+            </svg>
+           </button>
+           <input type="file" id="photo-upload-input" accept="image/*" style="display: none;" onchange="uploadRecipePhoto('${recipe.id}', this)">`
+        : '';
+
     const ingredientsHtml = `
-        <div class="recipe-title">${recipe.title || 'Untitled Recipe'}</div>
+        <div class="recipe-title-row">
+            <div class="recipe-title">${recipe.title || 'Untitled Recipe'}</div>
+            ${addPhotoIcon}
+        </div>
+        ${photoHtml}
 
         <div class="section-header">ingredients:</div>
         <div class="ingredients-list">
@@ -1061,4 +1095,111 @@ async function sendMessage() {
     }
 
     setLoading(false);
+}
+
+// Recipe photo management functions
+// eslint-disable-next-line no-unused-vars -- Called from HTML onclick attribute
+async function uploadRecipePhoto(recipeId, inputElement) {
+    const file = inputElement.files[0];
+    if (!file) return;
+
+    // Validate file size (5MB limit)
+    const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_PHOTO_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        showError(`Photo too large (${sizeMB}MB). Maximum size is 5MB.`);
+        inputElement.value = ''; // Clear input
+        return;
+    }
+
+    // Show loading state
+    const photoContainer = document.querySelector('.recipe-photo-container');
+    if (photoContainer) {
+        photoContainer.style.opacity = '0.6';
+        photoContainer.style.pointerEvents = 'none';
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        const response = await fetch(`/api/recipes/${recipeId}/photo`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            if (response.status === 413) {
+                showError('Photo too large. Maximum size is 5MB.');
+            } else if (response.status === 400) {
+                showError('Invalid photo format. Use JPG, PNG, WebP, or GIF.');
+            } else {
+                showError('Failed to upload photo. Please try again.');
+            }
+            console.error('Upload error:', response.status, errorText);
+            return;
+        }
+
+        // Reload the recipe to show the new photo
+        await fetchAndDisplayRecipe(recipeId);
+
+        // Show success (optional)
+        console.log('Photo uploaded successfully');
+    } catch (error) {
+        console.error('Photo upload error:', error);
+        showError('Failed to upload photo. Please try again.');
+    } finally {
+        // Clear the input so the same file can be uploaded again
+        inputElement.value = '';
+
+        // Restore UI state
+        if (photoContainer) {
+            photoContainer.style.opacity = '1';
+            photoContainer.style.pointerEvents = 'auto';
+        }
+    }
+}
+
+// eslint-disable-next-line no-unused-vars -- Called from HTML onclick attribute
+async function deleteRecipePhoto(recipeId) {
+    // Show confirmation dialog
+    const confirmed = confirm('Are you sure you want to delete this photo?');
+    if (!confirmed) return;
+
+    // Show loading state
+    const photoContainer = document.querySelector('.recipe-photo-container');
+    if (photoContainer) {
+        photoContainer.style.opacity = '0.6';
+        photoContainer.style.pointerEvents = 'none';
+    }
+
+    try {
+        const response = await fetch(`/api/recipes/${recipeId}/photo`, {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            showError('Failed to delete photo. Please try again.');
+            console.error('Delete error:', response.status, errorText);
+            return;
+        }
+
+        // Reload the recipe to remove the photo
+        await fetchAndDisplayRecipe(recipeId);
+
+        console.log('Photo deleted successfully');
+    } catch (error) {
+        console.error('Photo delete error:', error);
+        showError('Failed to delete photo. Please try again.');
+    } finally {
+        // Restore UI state
+        if (photoContainer) {
+            photoContainer.style.opacity = '1';
+            photoContainer.style.pointerEvents = 'auto';
+        }
+    }
 }

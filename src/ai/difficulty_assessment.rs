@@ -189,6 +189,7 @@ mod tests {
             cook_time_minutes: Some(20),
             servings: Some(4),
             difficulty: None,
+            photo_filename: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
             created_by: Some("test@example.com".to_string()),

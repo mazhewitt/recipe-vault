@@ -121,7 +121,76 @@ DELETE /api/recipes/{id}
 
 # Response: 204 No Content
 # Response: 404 Not Found
-# Note: Cascades to delete all ingredients and steps
+# Note: Cascades to delete all ingredients, steps, and associated photo file
+```
+
+#### Upload Recipe Photo
+```bash
+POST /api/recipes/{id}/photo
+Content-Type: multipart/form-data
+
+# Form field: photo (file upload)
+
+# Supported formats: JPG, JPEG, PNG, WebP, GIF
+# Maximum file size: 5MB (5,242,880 bytes)
+
+# Example with curl:
+curl -X POST http://localhost:3000/api/recipes/{id}/photo \
+  -H "X-API-Key: your-api-key" \
+  -F "photo=@/path/to/image.jpg"
+
+# Response: 200 OK
+{
+  "photo_filename": "recipe-id.jpg"
+}
+
+# Response: 400 Bad Request (invalid format or missing file)
+# Response: 404 Not Found (recipe doesn't exist)
+# Response: 413 Payload Too Large (file exceeds 5MB)
+
+# Notes:
+# - Uploading a new photo replaces the existing one
+# - If the new photo has a different format, the old file is deleted
+# - Photo filename format: {recipe-id}.{extension}
+```
+
+#### Get Recipe Photo
+```bash
+GET /api/recipes/{id}/photo
+
+# Example:
+curl http://localhost:3000/api/recipes/{id}/photo \
+  -H "X-API-Key: your-api-key" \
+  -o downloaded-photo.jpg
+
+# Response: 200 OK (binary image data)
+# Content-Type header set based on file format:
+#   - image/jpeg for JPG/JPEG
+#   - image/png for PNG
+#   - image/webp for WebP
+#   - image/gif for GIF
+
+# Response: 404 Not Found (recipe has no photo or doesn't exist)
+
+# Note: Recipe detail endpoint (GET /api/recipes/{id}) includes
+# "photo_filename" field to indicate if a photo exists
+```
+
+#### Delete Recipe Photo
+```bash
+DELETE /api/recipes/{id}/photo
+
+# Example:
+curl -X DELETE http://localhost:3000/api/recipes/{id}/photo \
+  -H "X-API-Key: your-api-key"
+
+# Response: 200 OK
+# Response: 404 Not Found (recipe has no photo or doesn't exist)
+
+# Notes:
+# - Deletes the photo file from filesystem
+# - Sets recipe's photo_filename to NULL in database
+# - Recipe continues to exist without photo
 ```
 
 #### Chat with AI Assistant

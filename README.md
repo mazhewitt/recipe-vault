@@ -6,11 +6,12 @@ A recipe management system built with Rust, featuring a REST API and a web-based
 
 - **REST API**: Full CRUD operations for recipes via HTTP
 - **Web Chat Interface**: Browser-based AI assistant for natural language recipe management
+- **Recipe Photos**: Attach photos to recipes with upload, display, and delete functionality (supports JPG, PNG, WebP, GIF up to 5MB)
 - **Image Recipe Extraction**: Paste images of handwritten or printed recipes to extract structured data using Claude's vision capabilities
 - **URL Recipe Extraction**: Paste recipe URLs to automatically fetch and extract recipe data using the MCP fetch server
 - **AI Difficulty Assessment**: Automatic recipe difficulty ratings (1-5 scale) based on ingredients, techniques, and complexity
 - **SQLite Database**: Lightweight, file-based storage
-- **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, servings, and difficulty ratings
+- **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, servings, difficulty ratings, and photos
 - **Multi-Model Support**: Works with Anthropic Claude and OpenAI models
 - **API Key Authentication**: Secure API access with auto-generated keys
 - **Remote Access**: Run API server on one machine, access from anywhere
@@ -340,6 +341,29 @@ recipe-vault/
 1. Check `DATABASE_URL` in `.env`
 2. Verify write permissions on database directory
 3. Migrations run automatically on startup
+
+### Photo Upload Errors
+
+**413 Payload Too Large** or **"Photo too large"**
+- Photos must be ≤ 5MB (5,242,880 bytes)
+- Compress or resize the image before uploading
+- Client-side validation prevents uploads over 5MB
+
+**400 Bad Request** or **"Invalid photo format"**
+- Supported formats: JPG, JPEG, PNG, WebP, GIF
+- Check file extension matches actual format
+- Try converting to a supported format
+
+**Photo not displaying after upload**
+- Check browser console for errors
+- Verify `/app/data/photos/` directory exists and is writable
+- For Docker deployments: ensure photos directory has correct permissions (`chown appuser:appuser`)
+- Try clearing browser cache (photos use cache-busting query params)
+
+**Photos lost after container restart (Docker)**
+- Verify `/app/data` volume is mounted correctly
+- Check `docker-compose.yml` includes photos directory in volume
+- Ensure backups include `/app/data/photos/` directory
 
 ## License
 
