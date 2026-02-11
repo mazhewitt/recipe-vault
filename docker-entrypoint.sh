@@ -3,10 +3,16 @@ set -e
 
 DB_FILE="/app/data/recipes.db"
 BACKUP_DIR="/app/data/backups"
+PHOTOS_DIR="/app/data/photos"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
+
+# Create photos directory if it doesn't exist
+echo "📸 Ensuring photos directory exists..."
+mkdir -p "$PHOTOS_DIR"
+echo "✅ Photos directory ready"
 
 # Backup existing database before running migrations
 if [ -f "$DB_FILE" ]; then

@@ -55,6 +55,7 @@ RUN mkdir -p /app/data
 ENV DATABASE_URL=sqlite:///app/data/recipes.db?mode=rwc
 ENV BIND_ADDRESS=0.0.0.0:3000
 ENV MCP_BINARY_PATH=/usr/local/bin/recipe-vault-mcp
+ENV PHOTOS_DIR=/app/data/photos
 
 EXPOSE 3000
 

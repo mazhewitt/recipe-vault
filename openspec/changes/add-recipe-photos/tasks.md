@@ -169,9 +169,9 @@
 
 ## 18. Docker/Deployment
 
-- [ ] 18.1 Update `docker-entrypoint.sh` to create `/app/data/photos/` directory
-- [ ] 18.2 Set ownership: `chown -R appuser:appuser /app/data/photos`
-- [ ] 18.3 Verify `/app/data/` volume mount includes photos subdirectory
+- [x] 18.1 Update `docker-entrypoint.sh` to create `/app/data/photos/` directory
+- [x] 18.2 Set ownership: `chown -R appuser:appuser /app/data/photos`
+- [x] 18.3 Verify `/app/data/` volume mount includes photos subdirectory
 - [ ] 18.4 Test deployment on local Docker container
 - [ ] 18.5 Verify photos survive container restarts
 
