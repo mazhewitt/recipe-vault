@@ -97,11 +97,11 @@ test.describe('UI Improvements', () => {
     // Overlay should be visible
     const overlay = page.locator('#photo-preview-overlay');
     await expect(overlay).toBeVisible();
-    await expect(overlay).toHaveCSS('display', 'flex');
+    await expect(overlay).toHaveClass(/visible/);
 
     // Clicking overlay should close it
     await overlay.click({ position: { x: 10, y: 10 } });
-    await expect(overlay).not.toBeVisible();
+    await expect(overlay).not.toHaveClass(/visible/);
   });
 
   test('should close photo preview on Escape key', async ({ page }) => {
@@ -126,10 +126,10 @@ test.describe('UI Improvements', () => {
     const photo = page.locator('.recipe-photo');
     await expect(photo).toBeVisible({ timeout: 10000 });
     await photo.click();
-    await expect(page.locator('#photo-preview-overlay')).toBeVisible();
+    await expect(page.locator('#photo-preview-overlay')).toHaveClass(/visible/);
 
     await page.keyboard.press('Escape');
-    await expect(page.locator('#photo-preview-overlay')).not.toBeVisible();
+    await expect(page.locator('#photo-preview-overlay')).not.toHaveClass(/visible/);
   });
 
   test('should navigate to index when clicking "Recipe Book" header', async ({ page }) => {

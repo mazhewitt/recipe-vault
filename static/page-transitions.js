@@ -313,10 +313,18 @@ export function initSwipeGestures(container) {
     let oldRightHTML = null;
     let pageWidth = 0;
     let contentRendered = false;
+    let shouldIgnoreSwipe = false;
 
     container.addEventListener('touchstart', (e) => {
         if (!isMobile()) return;
         if (animating) return;
+
+        // Ignore swipes that start on the recipe photo to allow taps for preview
+        if (e.target.classList.contains('recipe-photo')) {
+            shouldIgnoreSwipe = true;
+            return;
+        }
+        shouldIgnoreSwipe = false;
 
         const touch = e.touches[0];
         touchStartX = touch.clientX;
@@ -333,7 +341,7 @@ export function initSwipeGestures(container) {
     }, { passive: true });
 
     container.addEventListener('touchmove', (e) => {
-        if (!tracking || !isMobile()) return;
+        if (!tracking || !isMobile() || shouldIgnoreSwipe) return;
 
         const touch = e.touches[0];
         const dx = touch.clientX - touchStartX;

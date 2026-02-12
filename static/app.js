@@ -200,10 +200,103 @@ function setupNavigationButtons() {
     const prevBtn = document.getElementById('page-prev');
     const nextBtn = document.getElementById('page-next');
     const header = document.getElementById('recipe-book-header');
+    const pagesContainer = document.querySelector('.pages-container');
 
     if (prevBtn) prevBtn.addEventListener('click', Navigation.loadPrevRecipe);
     if (nextBtn) nextBtn.addEventListener('click', Navigation.loadNextRecipe);
     if (header) header.addEventListener('click', Navigation.showIndex);
+
+    // Delegated click listener for recipe photos
+    if (pagesContainer) {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isTouch = false;
+
+        pagesContainer.addEventListener('touchstart', (e) => {
+            if (e.target.classList.contains('recipe-photo')) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                isTouch = true;
+            }
+        }, { passive: true });
+
+        pagesContainer.addEventListener('touchend', (e) => {
+            if (isTouch && e.target.classList.contains('recipe-photo')) {
+                const dx = e.changedTouches[0].clientX - touchStartX;
+                const dy = e.changedTouches[0].clientY - touchStartY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // If movement is small (a tap), show preview
+                if (distance < 10) {
+                    const url = e.target.getAttribute('data-preview-url') || e.target.src;
+                    const alt = e.target.alt;
+                    RecipeDisplay.showPhotoPreview(url, alt);
+                }
+            }
+            isTouch = false;
+        }, { passive: true });
+
+        // Also handle mouse clicks for desktop
+        pagesContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('recipe-photo') && e.pointerType === 'mouse') {
+                const url = e.target.getAttribute('data-preview-url') || e.target.src;
+                const alt = e.target.alt;
+                RecipeDisplay.showPhotoPreview(url, alt);
+            }
+        });
+    }
+}
+
+function setupRecipePhotoUpload() {
+    // Create a hidden file input for recipe photo uploads
+    const photoInput = document.createElement('input');
+    photoInput.type = 'file';
+    photoInput.accept = 'image/*';
+    photoInput.style.display = 'none';
+    photoInput.id = 'recipe-photo-upload';
+    document.body.appendChild(photoInput);
+
+    let targetRecipeId = null;
+
+    // Delegated click handler for add-photo buttons (they are re-rendered on each recipe)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.add-photo-btn');
+        if (!btn) return;
+        targetRecipeId = btn.dataset.recipeId;
+        photoInput.value = '';
+        photoInput.click();
+    });
+
+    photoInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file || !targetRecipeId) return;
+
+        if (file.size > MAX_IMAGE_SIZE) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            showError(`Image too large (${sizeMB}MB). Max size is 5MB.`);
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        try {
+            const resp = await fetch(`/api/recipes/${targetRecipeId}/photo`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: formData,
+            });
+            if (!resp.ok) {
+                showError('Failed to upload photo.');
+                return;
+            }
+            // Re-render the recipe to show the new photo
+            await RecipeDisplay.fetchAndDisplayRecipe(targetRecipeId);
+        } catch (err) {
+            console.error('Photo upload error:', err);
+            showError('Failed to upload photo.');
+        }
+    });
 }
 
 function setupMobileEdgeNavigation() {
@@ -245,6 +338,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupTextareaAutoResize();
     setupNavigationButtons();
     setupMobileEdgeNavigation();
+    setupRecipePhotoUpload();
     setupOrientationChangeHandler();
 
     // Initialize swipe gestures for mobile page-turn navigation

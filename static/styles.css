@@ -703,6 +703,32 @@ body::before {
     flex: 1;
 }
 
+/* Add photo button */
+.add-photo-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1.5px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    cursor: pointer;
+    color: var(--color-ink-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.add-photo-btn:hover {
+    opacity: 1;
+    border-color: var(--color-ink-medium);
+    color: var(--color-ink-medium);
+}
+
+.add-photo-btn:active {
+    transform: scale(0.93);
+}
+
 /* Recipe photo */
 .recipe-photo-container {
     margin: 12px 0 20px 0;
@@ -1432,6 +1458,11 @@ body::before {
     .index-recipe-item {
         padding: 14px 16px;
     }
+
+    /* Keep add-photo icon clear of the mobile edge nav overlay */
+    .recipe-title-row {
+        padding-right: 40px;
+    }
 }
 
 /* Mobile Edge Navigation */
@@ -1508,7 +1539,14 @@ body::before {
     align-items: center;
     z-index: 2000;
     cursor: zoom-out;
-    animation: fadeIn 0.2s ease-out;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-out;
+}
+
+.photo-preview-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .photo-preview-overlay img {

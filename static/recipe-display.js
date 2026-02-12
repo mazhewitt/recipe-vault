@@ -183,16 +183,33 @@ export function showPhotoPreview(url, alt) {
     if (overlay && img) {
         img.src = url;
         img.alt = alt;
-        overlay.style.display = 'flex';
+        overlay.classList.add('visible');
     }
 }
 window.showPhotoPreview = showPhotoPreview;
 
-// Add global escape key listener for overlay dismissal
+// Add global listeners for overlay dismissal
+function setupOverlayDismissal() {
+    const overlay = document.getElementById('photo-preview-overlay');
+    if (overlay && !overlay.dataset.listenerAttached) {
+        overlay.addEventListener('click', () => {
+            overlay.classList.remove('visible');
+        });
+        overlay.dataset.listenerAttached = 'true';
+    }
+}
+
+// Initial setup
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupOverlayDismissal);
+} else {
+    setupOverlayDismissal();
+}
+
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const overlay = document.getElementById('photo-preview-overlay');
-        if (overlay) overlay.style.display = 'none';
+        if (overlay) overlay.classList.remove('visible');
     }
 });
 
@@ -253,6 +270,14 @@ export function renderRecipe(recipe) {
 
     // Photo display
     const hasPhoto = recipe.photo_filename && recipe.photo_filename !== '';
+    const addPhotoIcon = `<button class="add-photo-btn" data-recipe-id="${recipe.id}" title="Add photo" aria-label="Add photo to recipe">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="12" cy="13" r="3"/>
+                <path d="M5 3v2"/>
+                <path d="M19 3v2"/>
+            </svg>
+        </button>`;
     const photoHtml = hasPhoto
         // SANITIZED: recipe.title used in alt attribute
         ? `<div class="recipe-photo-container">
@@ -261,7 +286,7 @@ export function renderRecipe(recipe) {
                      alt="${escapeHtml(recipe.title)} photo"
                      class="recipe-photo"
                      id="recipe-photo-img"
-                     onclick="showPhotoPreview(this.src, this.alt)"
+                     data-preview-url="/api/recipes/${recipe.id}/photo"
                      onerror="this.closest('.recipe-photo-container').style.display='none';">
             </div>
            </div>`
@@ -271,6 +296,7 @@ export function renderRecipe(recipe) {
     const ingredientsHtml = `
         <div class="recipe-title-row">
             <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
+            ${addPhotoIcon}
         </div>
         ${photoHtml}
 
