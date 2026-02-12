@@ -5,7 +5,7 @@ use crate::{
     error::{ApiError, ApiResult},
     models::{
         recipe::{CreateRecipeInput, UpdateRecipeInput},
-        RecipeIngredient, Recipe, RecipeWithDetails, Step,
+        RecipeIngredient, Recipe, RecipeWithDetails, ShareLink, Step,
     },
 };
 
@@ -50,10 +50,10 @@ pub async fn create_recipe(
     .bind(&recipe_id)
     .bind(&input.title)
     .bind(&input.description)
-    .bind(&input.prep_time_minutes)
-    .bind(&input.cook_time_minutes)
-    .bind(&input.servings)
-    .bind(&input.difficulty)
+    .bind(input.prep_time_minutes)
+    .bind(input.cook_time_minutes)
+    .bind(input.servings)
+    .bind(input.difficulty)
     .bind(&user_email)
     .bind(&user_email)
     .execute(&mut *tx)
@@ -70,7 +70,7 @@ pub async fn create_recipe(
         .bind(&recipe_id)
         .bind(position as i32)
         .bind(&ingredient.name)
-        .bind(&ingredient.quantity)
+        .bind(ingredient.quantity)
         .bind(&ingredient.unit)
         .bind(&ingredient.notes)
         .execute(&mut *tx)
@@ -88,8 +88,8 @@ pub async fn create_recipe(
         .bind(&recipe_id)
         .bind(position as i32)
         .bind(&step.instruction)
-        .bind(&step.duration_minutes)
-        .bind(&step.temperature_value)
+        .bind(step.duration_minutes)
+        .bind(step.temperature_value)
         .bind(&step.temperature_unit)
         .execute(&mut *tx)
         .await?;
@@ -325,7 +325,7 @@ pub async fn update_recipe(
             .bind(recipe_id)
             .bind(position as i32)
             .bind(&ingredient.name)
-            .bind(&ingredient.quantity)
+            .bind(ingredient.quantity)
             .bind(&ingredient.unit)
             .bind(&ingredient.notes)
             .execute(&mut *tx)
@@ -357,8 +357,8 @@ pub async fn update_recipe(
             .bind(recipe_id)
             .bind(position as i32)
             .bind(&step.instruction)
-            .bind(&step.duration_minutes)
-            .bind(&step.temperature_value)
+            .bind(step.duration_minutes)
+            .bind(step.temperature_value)
             .bind(&step.temperature_unit)
             .execute(&mut *tx)
             .await?;
@@ -402,4 +402,70 @@ pub async fn delete_recipe(
     }
 
     Ok(())
+}
+
+/// Insert a new share link
+pub async fn create_share_link(
+    pool: &SqlitePool,
+    token: &str,
+    recipe_id: &str,
+    created_by: &str,
+    expires_at: &str,
+) -> ApiResult<ShareLink> {
+    sqlx::query(
+        "INSERT INTO share_links (token, recipe_id, created_by, expires_at) VALUES (?, ?, ?, ?)"
+    )
+    .bind(token)
+    .bind(recipe_id)
+    .bind(created_by)
+    .bind(expires_at)
+    .execute(pool)
+    .await?;
+
+    let link: ShareLink = sqlx::query_as(
+        "SELECT * FROM share_links WHERE token = ?"
+    )
+    .bind(token)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(link)
+}
+
+/// Look up a share link by token. Returns None if not found or expired.
+pub async fn get_share_link(
+    pool: &SqlitePool,
+    token: &str,
+) -> ApiResult<Option<ShareLink>> {
+    let link: Option<ShareLink> = sqlx::query_as(
+        "SELECT * FROM share_links WHERE token = ?"
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(link)
+}
+
+/// Get a recipe with full details via a share token (no family filtering).
+/// Returns None if the token doesn't exist. Caller should check expiry.
+pub async fn get_recipe_by_share_token(
+    pool: &SqlitePool,
+    token: &str,
+) -> ApiResult<Option<RecipeWithDetails>> {
+    let link: Option<ShareLink> = sqlx::query_as(
+        "SELECT * FROM share_links WHERE token = ?"
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await?;
+
+    let link = match link {
+        Some(l) => l,
+        None => return Ok(None),
+    };
+
+    // Fetch recipe without family filtering (share links bypass tenancy)
+    let recipe = get_recipe(pool, &link.recipe_id, None).await?;
+    Ok(Some(recipe))
 }

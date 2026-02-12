@@ -371,14 +371,13 @@ impl LlmProvider {
             }
             Message::Assistant { content, tool_calls } => {
                 let mut content_blocks: Vec<serde_json::Value> = Vec::new();
-                if let Some(text) = content {
-                    if !text.is_empty() {
+                if let Some(text) = content
+                    && !text.is_empty() {
                         content_blocks.push(serde_json::json!({
                             "type": "text",
                             "text": text
                         }));
                     }
-                }
                 if let Some(calls) = tool_calls {
                     for call in calls {
                         content_blocks.push(serde_json::json!({
@@ -522,14 +521,13 @@ impl LlmProvider {
             Message::User { content } => {
                 // OpenAI also supports content blocks similar to Anthropic
                 // If only text, we can simplify to just a string for compatibility
-                if content.len() == 1 {
-                    if let Some(ContentBlock::Text { text }) = content.first() {
+                if content.len() == 1
+                    && let Some(ContentBlock::Text { text }) = content.first() {
                         return serde_json::json!({
                             "role": "user",
                             "content": text
                         });
                     }
-                }
 
                 // For multi-modal content, use array format
                 let content_json: Vec<serde_json::Value> = content

@@ -140,7 +140,7 @@ fn handle_request(client: &ApiClient, request: JsonRpcRequest) -> Option<JsonRpc
 fn write_response(stdout: &mut io::Stdout, response: &JsonRpcResponse) -> io::Result<()> {
     let json = serde_json::to_string(response).map_err(|e| {
         error!("Failed to serialize response: {}", e);
-        io::Error::new(io::ErrorKind::Other, e)
+        io::Error::other(e)
     })?;
 
     writeln!(stdout, "{}", json)?;

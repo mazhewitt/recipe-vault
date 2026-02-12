@@ -253,8 +253,8 @@ pub fn handle_get_recipe(client: &ApiClient, params: JsonValue) -> Result<JsonVa
         .ok_or_else(|| JsonRpcError::invalid_params("Missing or invalid recipe_id parameter"))?;
 
     let recipe = client.get_recipe(recipe_id)?;
-    Ok(serde_json::to_value(recipe)
-        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+    serde_json::to_value(recipe)
+        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))
 }
 
 /// Handle update_recipe tool call
@@ -279,11 +279,10 @@ pub fn handle_update_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
     };
 
     // Validate difficulty if provided
-    if let Some(d) = params.get("difficulty").and_then(|v| v.as_i64()) {
-        if d < 1 || d > 5 {
+    if let Some(d) = params.get("difficulty").and_then(|v| v.as_i64())
+        && !(1..=5).contains(&d) {
             return Err(JsonRpcError::invalid_params("Difficulty must be between 1 and 5"));
         }
-    }
 
     let update_input = UpdateRecipeInput {
         title: params.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()),
@@ -297,8 +296,8 @@ pub fn handle_update_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
     };
 
     let recipe = client.update_recipe(recipe_id, update_input)?;
-    Ok(serde_json::to_value(recipe)
-        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+    serde_json::to_value(recipe)
+        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))
 }
 
 /// Handle delete_recipe tool call
@@ -361,18 +360,16 @@ pub fn handle_create_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
     let difficulty = params.get("difficulty").and_then(|v| v.as_i64()).map(|v| v as i32);
 
     // Validate servings if provided
-    if let Some(s) = servings {
-        if s <= 0 {
+    if let Some(s) = servings
+        && s <= 0 {
             return Err(JsonRpcError::invalid_params("Servings must be greater than 0"));
         }
-    }
 
     // Validate difficulty if provided
-    if let Some(d) = difficulty {
-        if d < 1 || d > 5 {
+    if let Some(d) = difficulty
+        && !(1..=5).contains(&d) {
             return Err(JsonRpcError::invalid_params("Difficulty must be between 1 and 5"));
         }
-    }
 
     // Parse ingredients
     let ingredients = if let Some(ingredients_array) = params.get("ingredients").and_then(|v| v.as_array()) {
@@ -400,8 +397,8 @@ pub fn handle_create_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
     };
 
     let recipe = client.create_recipe(create_recipe)?;
-    Ok(serde_json::to_value(recipe)
-        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))?)
+    serde_json::to_value(recipe)
+        .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))
 }
 
 /// Parse ingredients from JSON array

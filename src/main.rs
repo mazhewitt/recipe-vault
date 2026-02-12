@@ -17,7 +17,7 @@ use recipe_vault::{
     auth::{api_key_auth, cloudflare_auth, load_or_generate_api_key, ApiKeyState, CloudflareAuthState},
     config::Config,
     db,
-    handlers::{chat, recipes, ui::{self, UiState}},
+    handlers::{chat, recipes, share::{self, ShareState}, ui::{self, UiState}},
 };
 
 #[tokio::main]
@@ -114,6 +114,12 @@ async fn main() {
         config: Arc::new(config.clone()),
     };
 
+    // Create share state for share handlers
+    let share_state = ShareState {
+        pool: pool.clone(),
+        config: Arc::new(config.clone()),
+    };
+
     // Build recipe routes with recipe state
     let recipe_routes = Router::new()
         .route("/recipes", post(recipes::create_recipe))
@@ -126,6 +132,11 @@ async fn main() {
         .route("/recipes/:id/photo", delete(recipes::delete_photo))
         .with_state(recipe_state);
 
+    // Build share link creation route (authenticated, under /api)
+    let share_api_routes = Router::new()
+        .route("/recipes/:id/share", post(share::create_share_link))
+        .with_state(share_state.clone());
+
     // Build chat routes with chat state
     let chat_routes = Router::new()
         .route("/chat", post(chat::chat))
@@ -137,6 +148,7 @@ async fn main() {
     // so UserIdentity is already available in extensions here.
     let api_routes = Router::new()
         .merge(recipe_routes)
+        .merge(share_api_routes)
         .merge(chat_routes)
         .route_layer(middleware::from_fn_with_state(
             api_key_state.clone(),
@@ -149,6 +161,12 @@ async fn main() {
         .route("/chat", get(ui::chat_page))
         .with_state(ui_state);
 
+    // Public share routes (no authentication required)
+    let public_share_routes = Router::new()
+        .route("/share/:token", get(share::share_page))
+        .route("/share/:token/photo", get(share::share_photo))
+        .with_state(share_state);
+
     let app = Router::new()
         .nest_service("/static", ServeDir::new("./static"))
         .merge(ui_routes)
@@ -157,6 +175,7 @@ async fn main() {
             cloudflare_auth_state,
             cloudflare_auth,
         ))
+        .merge(public_share_routes) // Merged after auth layer — bypasses authentication
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
@@ -176,8 +195,8 @@ async fn main() {
     tracing::info!("Listening on http://{}", addr);
     tracing::info!("API key authentication enabled");
     tracing::info!("Family multi-tenancy enabled");
-    if config.dev_user_email.is_some() {
-        tracing::info!("Development user email enabled: {}", config.dev_user_email.as_ref().unwrap());
+    if let Some(email) = &config.dev_user_email {
+        tracing::info!("Development user email enabled: {}", email);
     }
 
     // Start server

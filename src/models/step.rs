@@ -28,7 +28,7 @@ impl TemperatureUnit {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "Celsius" => Some(TemperatureUnit::Celsius),
             "Fahrenheit" => Some(TemperatureUnit::Fahrenheit),

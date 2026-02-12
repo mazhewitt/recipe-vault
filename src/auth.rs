@@ -81,13 +81,11 @@ pub fn load_or_generate_api_key() -> String {
     let key = generate_api_key();
 
     // Try to save the key
-    if let Some(parent) = key_path.parent() {
-        if !parent.exists() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                warn!("Failed to create directory for API key: {}", e);
-            }
+    if let Some(parent) = key_path.parent()
+        && !parent.exists()
+        && let Err(e) = fs::create_dir_all(parent) {
+            warn!("Failed to create directory for API key: {}", e);
         }
-    }
 
     match fs::write(key_path, &key) {
         Ok(_) => {
@@ -142,7 +140,7 @@ pub async fn cloudflare_auth(
         .headers()
         .get("Cf-Access-Authenticated-User-Email")
         .and_then(|v| v.to_str().ok())
-        .map(|s| normalize_email(s))
+        .map(normalize_email)
         .or_else(|| state.dev_user_email.as_ref().map(|e| normalize_email(e)));
 
     let family_members = email
@@ -179,7 +177,7 @@ pub async fn api_key_auth(
                 .headers()
                 .get("X-User-Email")
                 .and_then(|v| v.to_str().ok())
-                .map(|s| normalize_email(s));
+                .map(normalize_email);
 
             if let Some(email) = x_user_email {
                 // Scoped mode: look up family for this email
@@ -219,8 +217,8 @@ pub async fn api_key_auth(
     }
 
     // Check if Cloudflare identity is present in extensions
-    if let Some(identity) = request.extensions().get::<UserIdentity>() {
-        if identity.email.is_some() {
+    if let Some(identity) = request.extensions().get::<UserIdentity>()
+        && identity.email.is_some() {
             if identity.family_members.is_none() {
                 // User authenticated via Cloudflare but not in any family → 403
                 return (
@@ -233,7 +231,6 @@ pub async fn api_key_auth(
             }
             return next.run(request).await;
         }
-    }
 
     // No valid auth provided
     (

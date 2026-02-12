@@ -278,6 +278,15 @@ export function renderRecipe(recipe) {
                 <path d="M19 3v2"/>
             </svg>
         </button>`;
+    const shareIcon = `<button class="share-btn" data-recipe-id="${recipe.id}" title="Share recipe" aria-label="Share recipe">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none">
+                <circle cx="18" cy="5" r="3"/>
+                <circle cx="6" cy="12" r="3"/>
+                <circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+        </button>`;
     const photoHtml = hasPhoto
         // SANITIZED: recipe.title used in alt attribute
         ? `<div class="recipe-photo-container">
@@ -296,6 +305,7 @@ export function renderRecipe(recipe) {
     const ingredientsHtml = `
         <div class="recipe-title-row">
             <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
+            ${shareIcon}
             ${addPhotoIcon}
         </div>
         ${photoHtml}

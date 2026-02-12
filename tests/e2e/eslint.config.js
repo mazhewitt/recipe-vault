@@ -21,7 +21,9 @@ export default [
         clearInterval: "readonly",
         Notification: "readonly",
         FormData: "readonly",
-        confirm: "readonly"
+        confirm: "readonly",
+        navigator: "readonly",
+        requestAnimationFrame: "readonly"
       }
     },
     rules: {

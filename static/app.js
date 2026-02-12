@@ -299,6 +299,56 @@ function setupRecipePhotoUpload() {
     });
 }
 
+function setupShareButton() {
+    // Delegated click handler for share buttons (they are re-rendered on each recipe)
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.share-btn');
+        if (!btn) return;
+        const recipeId = btn.dataset.recipeId;
+        if (!recipeId) return;
+
+        btn.disabled = true;
+        try {
+            const resp = await fetch(`/api/recipes/${recipeId}/share`, {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+            if (!resp.ok) {
+                showError('Failed to create share link.');
+                return;
+            }
+            const data = await resp.json();
+            const fullUrl = `${window.location.origin}${data.url}`;
+
+            // Copy to clipboard (may fail without secure context)
+            let copied = false;
+            try {
+                await navigator.clipboard.writeText(fullUrl);
+                copied = true;
+            } catch {
+                // Clipboard API not available (non-HTTPS) — fall back to prompt
+                window.prompt('Copy this share link:', fullUrl);
+            }
+
+            // Show confirmation toast
+            const toast = document.createElement('div');
+            toast.className = 'share-toast';
+            toast.textContent = copied ? 'Link copied!' : 'Link created!';
+            btn.parentElement.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        } catch (err) {
+            console.error('Share error:', err);
+            showError('Failed to share recipe.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
 function setupMobileEdgeNavigation() {
     const prevEdge = document.getElementById('mobile-edge-prev');
     const nextEdge = document.getElementById('mobile-edge-next');
@@ -339,6 +389,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNavigationButtons();
     setupMobileEdgeNavigation();
     setupRecipePhotoUpload();
+    setupShareButton();
     setupOrientationChangeHandler();
 
     // Initialize swipe gestures for mobile page-turn navigation

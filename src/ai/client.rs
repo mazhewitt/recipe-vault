@@ -30,22 +30,14 @@ pub struct McpServerConfig {
     pub env: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AiAgentConfig {
     pub mcp_servers: Vec<McpServerConfig>,
     pub system_prompt: Option<String>,
 }
 
-impl Default for AiAgentConfig {
-    fn default() -> Self {
-        Self {
-            mcp_servers: Vec::new(),
-            system_prompt: None,
-        }
-    }
-}
-
 struct McpProcess {
+    #[allow(dead_code)]
     name: String,
     child: Child,
     request_id: u64,
@@ -374,7 +366,7 @@ impl AiAgent {
                 // If title is provided, search for the recipe by title
                 (_, Some(search_title)) => {
                     tracing::info!("Searching for recipe by title: {}", search_title);
-                    match self.find_recipe_by_title(&search_title).await {
+                    match self.find_recipe_by_title(search_title).await {
                         Some(id) => {
                             tracing::info!("Found recipe by title search: {}", id);
                             Some(id)
@@ -429,10 +421,7 @@ impl AiAgent {
             .and_then(|arr| arr.first())
             .and_then(|item| item.get("text"))
             .and_then(|t| t.as_str())
-            .unwrap_or_else(|| {
-                // Fallback to stringifying the result
-                &""
-            });
+            .unwrap_or("");
 
         // Check if this is a start_timer tool call and extract timer data
         let timer_data = if tool_call.name == "start_timer" {
@@ -486,8 +475,8 @@ impl AiAgent {
 
         // Inject reminder for longer conversations (5+ messages)
         // This helps the model remember critical tool-use instructions
-        if messages.len() >= 5 {
-            if let Some(Message::User { content }) = messages.last_mut() {
+        if messages.len() >= 5
+            && let Some(Message::User { content }) = messages.last_mut() {
                 // Find the last Text block and append the reminder to it
                 if let Some(ContentBlock::Text { text }) = content.iter_mut().rev().find(|b| matches!(b, ContentBlock::Text { .. })) {
                     text.push_str(
@@ -500,7 +489,6 @@ impl AiAgent {
                     );
                 }
             }
-        }
 
         let mut tool_uses: Vec<String> = Vec::new();
         let mut recipe_ids: Vec<String> = Vec::new();

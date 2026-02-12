@@ -47,7 +47,7 @@ impl ChatState {
                 .unwrap_or_else(|_| "./target/release/recipe-vault-mcp".to_string());
             let api_base_url = format!(
                 "http://127.0.0.1:{}",
-                self.config.bind_address.split(':').last().unwrap_or("3000")
+                self.config.bind_address.split(':').next_back().unwrap_or("3000")
             );
 
             // Recipes server config

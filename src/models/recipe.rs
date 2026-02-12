@@ -125,11 +125,10 @@ impl CreateRecipeInput {
         if self.title.len() > 200 {
             return Err("Title exceeds maximum length of 200 characters".to_string());
         }
-        if let Some(desc) = &self.description {
-            if desc.len() > 2000 {
+        if let Some(desc) = &self.description
+            && desc.len() > 2000 {
                 return Err("Description exceeds maximum length of 2000 characters".to_string());
             }
-        }
         Ok(())
     }
 }

@@ -693,6 +693,7 @@ body::before {
     justify-content: space-between;
     gap: 8px;
     margin-bottom: var(--space-md);
+    position: relative;
 }
 
 .recipe-title {
@@ -727,6 +728,56 @@ body::before {
 
 .add-photo-btn:active {
     transform: scale(0.93);
+}
+
+/* Share button */
+.share-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1.5px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    cursor: pointer;
+    color: var(--color-ink-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity 0.2s, border-color 0.2s;
+}
+
+.share-btn:hover {
+    opacity: 1;
+    border-color: var(--color-ink-medium);
+    color: var(--color-ink-medium);
+}
+
+.share-btn:active {
+    transform: scale(0.93);
+}
+
+.share-btn:disabled {
+    opacity: 0.4;
+    cursor: wait;
+}
+
+.share-toast {
+    position: absolute;
+    top: -30px;
+    right: 0;
+    background: var(--color-leather);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8em;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.share-toast.show {
+    opacity: 1;
 }
 
 /* Recipe photo */

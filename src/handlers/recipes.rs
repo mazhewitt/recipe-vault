@@ -122,8 +122,8 @@ pub async fn delete_recipe(
     let family_members = identity.and_then(|i| i.family_members.as_ref());
 
     // Before deleting, check if recipe has a photo and delete it
-    if let Ok(recipe) = queries::get_recipe(&state.pool, &id, family_members.map(|v| v.as_slice())).await {
-        if let Some(photo_filename) = &recipe.recipe.photo_filename {
+    if let Ok(recipe) = queries::get_recipe(&state.pool, &id, family_members.map(|v| v.as_slice())).await
+        && let Some(photo_filename) = &recipe.recipe.photo_filename {
             let photo_path = format!("{}/{}", state.config.photos_dir, photo_filename);
             if let Err(e) = tokio::fs::remove_file(&photo_path).await {
                 tracing::warn!("Failed to delete photo file {}: {}", photo_path, e);
@@ -132,7 +132,6 @@ pub async fn delete_recipe(
                 tracing::info!("Deleted photo file: {}", photo_path);
             }
         }
-    }
 
     queries::delete_recipe(&state.pool, &id, family_members.map(|v| v.as_slice())).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -322,11 +321,10 @@ fn determine_file_extension(content_type: &Option<String>, filename: &Option<Str
     }
 
     // Fallback to filename extension
-    if let Some(fname) = filename {
-        if let Some(ext) = std::path::Path::new(fname).extension().and_then(|s| s.to_str()) {
+    if let Some(fname) = filename
+        && let Some(ext) = std::path::Path::new(fname).extension().and_then(|s| s.to_str()) {
             return Ok(ext.to_lowercase());
         }
-    }
 
     Err(crate::error::ApiError::UnsupportedFileType(
         "Could not determine file type from content-type or filename".to_string()
