@@ -73,7 +73,7 @@
 
         <!-- Recipe Book Section -->
         <div class="book-container">
-            <div class="section-label">Recipe Book</div>
+            <div class="section-label clickable" id="recipe-book-header">Recipe Book</div>
             <div class="recipe-book">
                 <div class="book-cover"></div>
                 <button id="page-prev" class="page-nav prev" aria-label="Previous recipe" disabled>&lt;</button>
@@ -142,6 +142,11 @@
             <span class="tab-icon">💬</span>
             <span class="tab-text">Chat</span>
         </button>
+    </div>
+
+    <!-- Photo Preview Overlay -->
+    <div id="photo-preview-overlay" class="photo-preview-overlay" style="display: none;" onclick="this.style.display='none'">
+        <img id="photo-preview-img" src="" alt="Photo preview">
     </div>
 
     <script type="module" src="/static/app.js"></script>

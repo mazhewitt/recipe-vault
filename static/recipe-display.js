@@ -176,6 +176,26 @@ export function renderIndex(recipes) {
     });
 }
 
+// Photo preview functions
+export function showPhotoPreview(url, alt) {
+    const overlay = document.getElementById('photo-preview-overlay');
+    const img = document.getElementById('photo-preview-img');
+    if (overlay && img) {
+        img.src = url;
+        img.alt = alt;
+        overlay.style.display = 'flex';
+    }
+}
+window.showPhotoPreview = showPhotoPreview;
+
+// Add global escape key listener for overlay dismissal
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const overlay = document.getElementById('photo-preview-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+});
+
 export function renderRecipe(recipe) {
     const leftContent = document.getElementById('page-left-content');
     const rightContent = document.getElementById('page-right-content');
@@ -231,7 +251,7 @@ export function renderRecipe(recipe) {
 
     const totalTimeMinutes = getTotalTimeMinutes(recipe);
 
-    // Photo display with upload/delete controls
+    // Photo display
     const hasPhoto = recipe.photo_filename && recipe.photo_filename !== '';
     const photoHtml = hasPhoto
         // SANITIZED: recipe.title used in alt attribute
@@ -241,32 +261,16 @@ export function renderRecipe(recipe) {
                      alt="${escapeHtml(recipe.title)} photo"
                      class="recipe-photo"
                      id="recipe-photo-img"
-                     onclick="document.getElementById('photo-upload-input').click()"
-                     title="Click to change photo"
+                     onclick="showPhotoPreview(this.src, this.alt)"
                      onerror="this.closest('.recipe-photo-container').style.display='none';">
-                <button class="photo-delete-x" onclick="deleteRecipePhoto('${recipe.id}')" title="Remove photo">&times;</button>
             </div>
-            <input type="file" id="photo-upload-input" accept="image/*" style="display: none;" onchange="uploadRecipePhoto('${recipe.id}', this)">
            </div>`
-        : '';
-
-    // Small add-photo icon for title row (only when no photo)
-    const addPhotoIcon = !hasPhoto
-        ? `<button class="photo-add-icon" onclick="document.getElementById('photo-upload-input').click()" title="Add photo">
-            <svg viewBox="0 0 24 24" width="18" height="18">
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
-                <path d="M3 14l5-5 4 4 6-6 5 5" stroke="currentColor" stroke-width="2" fill="none"/>
-                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
-            </svg>
-           </button>
-           <input type="file" id="photo-upload-input" accept="image/*" style="display: none;" onchange="uploadRecipePhoto('${recipe.id}', this)">`
         : '';
 
     // SANITIZED: recipe.title is user input
     const ingredientsHtml = `
         <div class="recipe-title-row">
             <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
-            ${addPhotoIcon}
         </div>
         ${photoHtml}
 

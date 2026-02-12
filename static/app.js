@@ -134,90 +134,6 @@ async function handleImageFile(imageFile) {
     }
 }
 
-// Photo management functions (called from HTML onclick)
-window.uploadRecipePhoto = async function(recipeId, inputElement) {
-    const file = inputElement.files[0];
-    if (!file) return;
-
-    const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_PHOTO_SIZE) {
-        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        showError(`Photo too large (${sizeMB}MB). Maximum size is 5MB.`);
-        inputElement.value = '';
-        return;
-    }
-
-    const photoContainer = document.querySelector('.recipe-photo-container') || document.querySelector('.recipe-title-row');
-    if (photoContainer) {
-        photoContainer.style.opacity = '0.6';
-        photoContainer.style.pointerEvents = 'none';
-    }
-
-    try {
-        const formData = new FormData();
-        formData.append('photo', file);
-
-        const response = await fetch(`/api/recipes/${recipeId}/photo`, {
-            method: 'POST',
-            credentials: 'same-origin',
-            body: formData
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            showError('Failed to upload photo. Please try again.');
-            console.error('Upload error:', response.status, errorText);
-            return;
-        }
-
-        await RecipeDisplay.fetchAndDisplayRecipe(recipeId);
-        console.log('Photo uploaded successfully');
-    } catch (error) {
-        console.error('Photo upload error:', error);
-        showError('Failed to upload photo. Please try again.');
-    } finally {
-        inputElement.value = '';
-        if (photoContainer) {
-            photoContainer.style.opacity = '1';
-            photoContainer.style.pointerEvents = 'auto';
-        }
-    }
-};
-
-window.deleteRecipePhoto = async function(recipeId) {
-    const confirmed = confirm('Are you sure you want to delete this photo?');
-    if (!confirmed) return;
-
-    const photoContainer = document.querySelector('.recipe-photo-container');
-    if (photoContainer) {
-        photoContainer.style.opacity = '0.6';
-        photoContainer.style.pointerEvents = 'none';
-    }
-
-    try {
-        const response = await fetch(`/api/recipes/${recipeId}/photo`, {
-            method: 'DELETE',
-            credentials: 'same-origin'
-        });
-
-        if (!response.ok) {
-            showError('Failed to delete photo. Please try again.');
-            return;
-        }
-
-        await RecipeDisplay.fetchAndDisplayRecipe(recipeId);
-        console.log('Photo deleted successfully');
-    } catch (error) {
-        console.error('Photo delete error:', error);
-        showError('Failed to delete photo. Please try again.');
-    } finally {
-        if (photoContainer) {
-            photoContainer.style.opacity = '1';
-            photoContainer.style.pointerEvents = 'auto';
-        }
-    }
-};
-
 // Global functions for HTML onclick handlers and Playwright tests
 window.sendMessage = Chat.sendMessage;
 window.switchTab = Navigation.switchTab;
@@ -283,9 +199,11 @@ function setupTextareaAutoResize() {
 function setupNavigationButtons() {
     const prevBtn = document.getElementById('page-prev');
     const nextBtn = document.getElementById('page-next');
+    const header = document.getElementById('recipe-book-header');
 
     if (prevBtn) prevBtn.addEventListener('click', Navigation.loadPrevRecipe);
     if (nextBtn) nextBtn.addEventListener('click', Navigation.loadNextRecipe);
+    if (header) header.addEventListener('click', Navigation.showIndex);
 }
 
 function setupMobileEdgeNavigation() {
