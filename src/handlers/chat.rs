@@ -134,7 +134,7 @@ pub async fn chat(
     }
 
     // Add user message to history and capture the conversation snapshot
-    let conversation = state
+    let (mut conversation, is_new_session) = state
         .sessions()
         .append_user_message(
             &conversation_id,
@@ -143,6 +143,15 @@ pub async fn chat(
             },
         )
         .await;
+
+    if is_new_session {
+        let notice = Message::User {
+            content: vec![ContentBlock::Text {
+                text: "[System] This session has no prior history. Briefly explain to the user that the conversation was reset and you'll continue from here.".to_string(),
+            }],
+        };
+        conversation.insert(0, notice);
+    }
     let conv_id = conversation_id.clone();
 
     // Create SSE stream
