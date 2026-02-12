@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from './utils.js';
+import { getCachedRecipe, prefetchAdjacent } from './page-transitions.js';
 
 // Import global state accessors (these will be set by app.js)
 export let state = null;
@@ -360,36 +361,45 @@ export async function fetchAndDisplayRecipe(recipeId) {
     showRecipeLoading();
     state.viewMode = 'recipe';
     try {
-        const response = await fetch(`/api/recipes/${recipeId}`, {
-            credentials: 'same-origin'
-        });
-        if (!response.ok) {
-            if (response.status === 404) {
-                // Recipe missing - refresh list and fallback to first if available
-                const list = await state.fetchRecipeList(true);
-                if (list.length > 0) {
-                    const firstId = list[0].id;
-                    state.currentRecipeId = firstId;
-                    state.currentRecipeTitle = list[0].title || null;
-                    await fetchAndDisplayRecipe(firstId);
+        // Check prefetch cache first
+        const cached = getCachedRecipe(recipeId);
+        let recipe;
+        if (cached) {
+            recipe = cached;
+        } else {
+            const response = await fetch(`/api/recipes/${recipeId}`, {
+                credentials: 'same-origin'
+            });
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // Recipe missing - refresh list and fallback to first if available
+                    const list = await state.fetchRecipeList(true);
+                    if (list.length > 0) {
+                        const firstId = list[0].id;
+                        state.currentRecipeId = firstId;
+                        state.currentRecipeTitle = list[0].title || null;
+                        await fetchAndDisplayRecipe(firstId);
+                    } else {
+                        state.currentRecipeId = null;
+                        state.currentRecipeTitle = null;
+                        showRecipeError('Recipe not found');
+                        state.updateNavigationState();
+                    }
                 } else {
-                    state.currentRecipeId = null;
-                    state.currentRecipeTitle = null;
-                    showRecipeError('Recipe not found');
-                    state.updateNavigationState();
+                    showRecipeError('Failed to load recipe');
                 }
-            } else {
-                showRecipeError('Failed to load recipe');
+                return;
             }
-            return;
+            recipe = await response.json();
         }
-        const recipe = await response.json();
         renderRecipe(recipe);
         state.currentRecipeId = recipe.id || recipe.recipe?.id || state.currentRecipeId;
         state.currentRecipeTitle = recipe.title || recipe.recipe?.title || state.currentRecipeTitle;
         // Refresh recipe list to include newly created recipes
         await state.fetchRecipeList(true);
         state.updateNavigationState();
+        // Prefetch adjacent recipes for instant navigation
+        prefetchAdjacent(state.currentRecipeId);
     } catch (error) {
         console.error('Error fetching recipe:', error);
         showRecipeError('Failed to load recipe');

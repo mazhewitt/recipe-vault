@@ -8,6 +8,7 @@ import * as RecipeDisplay from './recipe-display.js';
 import * as Chat from './chat.js';
 import * as Timer from './timer.js';
 import * as Navigation from './navigation.js';
+import * as PageTransitions from './page-transitions.js';
 
 // Global state
 let conversationId = null;
@@ -23,6 +24,7 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 // Shared utility: fetchRecipeList
 async function fetchRecipeList(forceRefresh = false) {
     if (recipeListCache && !forceRefresh) return recipeListCache;
+    if (forceRefresh) PageTransitions.clearPrefetchCache();
     try {
         const resp = await fetch('/api/recipes', { credentials: 'same-origin' });
         if (!resp.ok) return [];
@@ -67,6 +69,7 @@ RecipeDisplay.initializeState(sharedState);
 Chat.initializeState(sharedState);
 Timer.initializeState ? Timer.initializeState(sharedState) : null;
 Navigation.initializeState(sharedState);
+PageTransitions.initializeState(sharedState);
 
 // Image handling functions
 function fileToBase64(file) {
@@ -323,6 +326,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNavigationButtons();
     setupMobileEdgeNavigation();
     setupOrientationChangeHandler();
+
+    // Initialize swipe gestures for mobile page-turn navigation
+    const pagesContainer = document.querySelector('.pages-container');
+    if (pagesContainer) PageTransitions.initSwipeGestures(pagesContainer);
 
     // Load initial state
     const list = await fetchRecipeList();
