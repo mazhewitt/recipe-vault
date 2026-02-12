@@ -106,7 +106,7 @@ async fn main() {
     }
 
     // Create chat state with AI agent
-    let chat_state = chat::ChatState::new(config.clone(), api_key_for_chat);
+    let chat_state = recipe_vault::chat::ChatState::new(config.clone(), api_key_for_chat);
 
     // Create recipe state with database and AI configuration
     let recipe_state = recipes::RecipeState {
