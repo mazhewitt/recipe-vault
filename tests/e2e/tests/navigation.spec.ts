@@ -116,13 +116,13 @@ test.describe('Recipe Navigation', () => {
     // Navigate to last recipe (we know we have 3 recipes)
     const recipeCount = recipes.length;
     for (let i = 1; i < recipeCount; i++) {
-      await page.locator(nav.next).click();
-      // Wait for navigation to complete and state to update
+      // Await the full navigation cycle (animation + fetch + render)
       await page.evaluate(async () => {
+        // @ts-ignore - loadNextRecipe is defined in app.js
+        await loadNextRecipe();
         // @ts-ignore - updateNavigationState is defined in app.js
         await updateNavigationState();
       });
-      await page.waitForTimeout(300);
     }
 
     // Next button should be disabled on last recipe

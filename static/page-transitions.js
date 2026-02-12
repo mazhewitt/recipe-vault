@@ -3,6 +3,8 @@
  * Handles page-turn animations, swipe gestures, and recipe prefetching
  */
 
+/* global CSS, requestIdleCallback */
+
 export let state = null;
 
 export function initializeState(appState) {
@@ -100,15 +102,15 @@ function isMobile() {
  * @param {Function} renderFn - called to render new content into the real pages
  * @returns {Promise<void>} resolves when animation completes
  */
-export function animatePageTurn(direction, renderFn) {
-    if (animating) return Promise.resolve();
+export async function animatePageTurn(direction, renderFn) {
+    if (animating) return;
     animating = true;
 
     const pagesContainer = document.querySelector('.pages-container');
     if (!pagesContainer) {
-        renderFn();
+        await Promise.resolve(renderFn());
         animating = false;
-        return Promise.resolve();
+        return;
     }
 
     // Lock container height to prevent layout shift
@@ -133,8 +135,9 @@ function crossfadeTransition(pagesContainer, renderFn) {
         if (pageLeft) pageLeft.style.opacity = '0';
         if (pageRight) pageRight.style.opacity = '0';
 
-        setTimeout(() => {
-            renderFn();
+        setTimeout(async () => {
+            // Wait for renderFn (may be async, e.g. fetchAndDisplayRecipe)
+            await Promise.resolve(renderFn());
 
             // Fade in
             if (pageLeft) pageLeft.style.opacity = '1';
@@ -161,10 +164,11 @@ function pageTurnTransition(pagesContainer, direction, renderFn) {
             : 'page-left';
         const sourcePage = document.getElementById(sourcePageId);
         if (!sourcePage) {
-            renderFn();
-            pagesContainer.style.height = '';
-            animating = false;
-            resolve();
+            Promise.resolve(renderFn()).then(() => {
+                pagesContainer.style.height = '';
+                animating = false;
+                resolve();
+            });
             return;
         }
 
@@ -190,32 +194,34 @@ function pageTurnTransition(pagesContainer, direction, renderFn) {
 
         pagesContainer.appendChild(overlay);
 
-        // Render new content behind the overlay
-        renderFn();
+        // Start render (may be async) and animation in parallel
+        const renderPromise = Promise.resolve(renderFn());
 
         // Trigger reflow then start animation
         overlay.offsetHeight; // force reflow
         overlay.classList.add('animating');
 
-        const onEnd = () => {
-            overlay.removeEventListener('animationend', onEnd);
-            overlay.remove();
+        const animationDone = new Promise(res => {
+            const onEnd = () => {
+                overlay.removeEventListener('animationend', onEnd);
+                overlay.remove();
+                res();
+            };
+            overlay.addEventListener('animationend', onEnd);
+
+            // Safety timeout in case animationend doesn't fire
+            setTimeout(() => {
+                if (overlay.parentNode) overlay.remove();
+                res();
+            }, 600);
+        });
+
+        // Wait for BOTH animation and render to complete before unlocking
+        Promise.all([renderPromise, animationDone]).then(() => {
             pagesContainer.style.height = '';
             animating = false;
             resolve();
-        };
-
-        overlay.addEventListener('animationend', onEnd);
-
-        // Safety timeout in case animationend doesn't fire
-        setTimeout(() => {
-            if (animating) {
-                overlay.remove();
-                pagesContainer.style.height = '';
-                animating = false;
-                resolve();
-            }
-        }, 600);
+        });
     });
 }
 

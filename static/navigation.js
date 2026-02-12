@@ -69,29 +69,21 @@ export async function loadNextRecipe() {
 
     // If in index view, load first recipe
     if (state.viewMode === 'index') {
-        await animatePageTurn('forward', () => {
-            state.fetchAndDisplayRecipe(list[0].id);
-        });
+        await animatePageTurn('forward', () => state.fetchAndDisplayRecipe(list[0].id));
         return;
     }
 
     if (!state.currentRecipeId) {
-        await animatePageTurn('forward', () => {
-            state.fetchAndDisplayRecipe(list[0].id);
-        });
+        await animatePageTurn('forward', () => state.fetchAndDisplayRecipe(list[0].id));
         return;
     }
     const idx = findIndexById(list, state.currentRecipeId);
     if (idx === -1) {
-        await animatePageTurn('forward', () => {
-            state.fetchAndDisplayRecipe(list[0].id);
-        });
+        await animatePageTurn('forward', () => state.fetchAndDisplayRecipe(list[0].id));
         return;
     }
     if (idx < list.length - 1) {
-        await animatePageTurn('forward', () => {
-            state.fetchAndDisplayRecipe(list[idx + 1].id);
-        });
+        await animatePageTurn('forward', () => state.fetchAndDisplayRecipe(list[idx + 1].id));
     }
 }
 
@@ -107,29 +99,21 @@ export async function loadPrevRecipe() {
 
     // If no recipe currently shown, clicking back should load the first recipe
     if (!state.currentRecipeId) {
-        await animatePageTurn('backward', () => {
-            state.fetchAndDisplayRecipe(list[0].id);
-        });
+        await animatePageTurn('backward', () => state.fetchAndDisplayRecipe(list[0].id));
         return;
     }
 
     const idx = findIndexById(list, state.currentRecipeId);
     if (idx === -1) {
         // Current recipe not found, return to index
-        await animatePageTurn('backward', () => {
-            state.showIndex();
-        });
+        await animatePageTurn('backward', () => state.showIndex());
         return;
     }
     if (idx > 0) {
-        await animatePageTurn('backward', () => {
-            state.fetchAndDisplayRecipe(list[idx - 1].id);
-        });
+        await animatePageTurn('backward', () => state.fetchAndDisplayRecipe(list[idx - 1].id));
     } else {
         // At first recipe, return to index
-        await animatePageTurn('backward', () => {
-            state.showIndex();
-        });
+        await animatePageTurn('backward', () => state.showIndex());
     }
 }
 

@@ -225,6 +225,8 @@ window.cancelTimer = Timer.cancelTimer;
 window.removeImage = removeImage;
 window.fetchAndDisplayRecipe = RecipeDisplay.fetchAndDisplayRecipe;
 window.fetchRecipeList = fetchRecipeList;
+window.loadNextRecipe = Navigation.loadNextRecipe;
+window.loadPrevRecipe = Navigation.loadPrevRecipe;
 window.updateNavigationState = Navigation.updateNavigationState;
 
 // Setup functions
