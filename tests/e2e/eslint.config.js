@@ -4,7 +4,7 @@ export default [
     ignores: ["node_modules/**", "playwright-report/**", "test-results/**"],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: "script",
+      sourceType: "module",
       globals: {
         console: "readonly",
         window: "readonly",

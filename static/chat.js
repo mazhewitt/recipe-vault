@@ -1,0 +1,254 @@
+/**
+ * Chat Module
+ * Handles chat UI, SSE streaming, and message rendering
+ */
+
+import { escapeHtml } from './utils.js';
+
+// Import global state accessors (will be set by app.js)
+export let state = null;
+
+export function initializeState(appState) {
+    state = appState;
+}
+
+export function scrollToBottom() {
+    const messages = document.getElementById('messages');
+    messages.scrollTop = messages.scrollHeight;
+}
+
+/**
+ * Renders markdown text to HTML.
+ * Uses marked.js library if available, otherwise falls back to basic patterns.
+ *
+ * NOTE: This function returns HTML that will be inserted via innerHTML.
+ * It is used for AI-generated content which is considered trusted (controlled by us).
+ * User input should NOT be passed through this function - use escapeHtml() instead.
+ */
+export function renderMarkdown(text) {
+    try {
+        if (typeof marked !== 'undefined' && marked.parse) {
+            return marked.parse(text);
+        }
+    } catch (e) {
+        console.error('Markdown parsing error:', e);
+    }
+    // Fallback: basic markdown rendering
+    return text
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+        .replace(/\n/g, '<br>');
+}
+
+export function addMessage(content, role, isStreaming = false) {
+    const messages = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `message ${role}` + (isStreaming ? ' streaming' : '');
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    // Format with speaker label
+    const speaker = role === 'user' ? 'User' : (role === 'assistant' ? 'AI' : '');
+    const prefix = speaker ? `<strong>${speaker}:</strong> ` : '';
+
+    if (role === 'assistant') {
+        // CONTROLLED: AI-generated content, rendered as markdown (trusted source)
+        contentDiv.innerHTML = prefix + renderMarkdown(content);
+    } else if (role === 'tool-use') {
+        // SANITIZED: Tool names could theoretically contain user input
+        contentDiv.innerHTML = `<em>${escapeHtml(content)}</em>`;
+    } else if (role === 'error') {
+        // SANITIZED: Error messages may contain user input or data
+        contentDiv.innerHTML = `<strong>Error:</strong> ${escapeHtml(content)}`;
+    } else {
+        // SANITIZED: User messages are user input and must be escaped
+        contentDiv.innerHTML = prefix + escapeHtml(content);
+    }
+
+    div.appendChild(contentDiv);
+
+    if (isStreaming) {
+        div.id = 'streaming-message';
+    }
+    messages.appendChild(div);
+    scrollToBottom();
+    return div;
+}
+
+export function updateStreamingMessage(content) {
+    let msg = document.getElementById('streaming-message');
+    if (msg) {
+        const contentDiv = msg.querySelector('.message-content');
+        // CONTROLLED: AI-generated streaming content (trusted source)
+        contentDiv.innerHTML = '<strong>AI:</strong> ' + renderMarkdown(content);
+    } else {
+        msg = addMessage(content, 'assistant', true);
+    }
+    scrollToBottom();
+}
+
+export function finalizeStreamingMessage() {
+    const msg = document.getElementById('streaming-message');
+    if (msg) {
+        msg.classList.remove('streaming');
+        msg.removeAttribute('id');
+    }
+}
+
+export function setLoading(loading, text = 'Thinking...') {
+    const loadingEl = document.getElementById('loading');
+    const loadingText = document.getElementById('loading-text');
+    const input = document.getElementById('message-input');
+
+    loadingEl.classList.toggle('active', loading);
+    loadingText.textContent = text;
+    input.disabled = loading;
+}
+
+/**
+ * Sends a chat message to the API and handles SSE streaming response.
+ *
+ * NOTE: This function currently uses manual SSE parsing. Task 5 will refactor
+ * this to use the native EventSource API for proper multi-line event handling.
+ */
+export async function sendMessage() {
+    const input = document.getElementById('message-input');
+    const message = input.value.trim();
+
+    // Require either message text or an attached image
+    if (!message && !state.attachedImage) return;
+
+    input.value = '';
+    // Reset textarea height after clearing
+    input.style.height = 'auto';
+    addMessage(message, 'user');
+    setLoading(true);
+
+    let streamedText = '';
+
+    try {
+        const payload = {
+            message: message || "",  // Ensure message is never undefined
+            conversation_id: state.conversationId
+        };
+
+        if (state.viewMode === 'recipe' && state.currentRecipeId) {
+            payload.current_recipe = {
+                recipe_id: String(state.currentRecipeId)
+            };
+            if (state.currentRecipeTitle) {
+                payload.current_recipe.title = state.currentRecipeTitle;
+            }
+        }
+
+        // Include image if attached
+        if (state.attachedImage) {
+            payload.image = {
+                data: state.attachedImage.data,
+                media_type: state.attachedImage.media_type
+            };
+            console.log('Sending message with image:', {
+                textLength: message.length,
+                imageSize: state.attachedImage.size,
+                mediaType: state.attachedImage.media_type
+            });
+        }
+
+        console.log('Sending chat request...', payload.message ? 'with text' : 'image only');
+
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        });
+
+        console.log('Response received:', response.status, response.statusText);
+
+        if (response.status === 401) {
+            window.location.href = '/chat';
+            return;
+        }
+
+        if (!response.ok) {
+            // Handle non-200 responses
+            const errorText = await response.text();
+            console.error('Server error:', response.status, errorText);
+
+            if (response.status === 413) {
+                addMessage('Error: Image too large for server. Try a smaller image or compress it first.', 'error');
+            } else {
+                addMessage(`Error: ${response.statusText || 'Server error'}`, 'error');
+            }
+            setLoading(false);
+            return;
+        }
+
+        // MANUAL SSE PARSING (will be replaced in task 5 with EventSource)
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('event:')) {
+                    continue;
+                }
+
+                if (line.startsWith('data:')) {
+                    const data = line.substring(5).trim();
+                    if (!data) continue;
+
+                    try {
+                        const parsed = JSON.parse(data);
+
+                        if (parsed.text !== undefined) {
+                            if (parsed.text) {
+                                streamedText += parsed.text;
+                                updateStreamingMessage(streamedText);
+                            }
+                        } else if (parsed.recipe_id !== undefined) {
+                            state.fetchAndDisplayRecipe(parsed.recipe_id);
+                        } else if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
+                            // timer_start event
+                            state.startTimer(parsed.duration_minutes, parsed.label);
+                        } else if (parsed.tool) {
+                            setLoading(true, `Using ${parsed.tool}...`);
+                            addMessage(`Using tool: ${parsed.tool}`, 'tool-use');
+                        } else if (parsed.conversation_id) {
+                            state.conversationId = parsed.conversation_id;
+                            finalizeStreamingMessage();
+                        } else if (parsed.message && parsed.recoverable !== undefined) {
+                            addMessage(parsed.message, 'error');
+                        }
+                    } catch (e) {
+                        console.log('Parse error:', e, data);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        addMessage('Connection error. Please try again.', 'error');
+    }
+
+    // Clear attached image after successful send
+    if (state.attachedImage) {
+        state.removeImage();
+    }
+
+    setLoading(false);
+}
