@@ -112,10 +112,79 @@ export function setLoading(loading, text = 'Thinking...') {
 }
 
 /**
- * Sends a chat message to the API and handles SSE streaming response.
+ * Parses Server-Sent Events (SSE) from a stream.
+ * Properly handles multi-line events according to SSE specification.
  *
- * NOTE: This function currently uses manual SSE parsing. Task 5 will refactor
- * this to use the native EventSource API for proper multi-line event handling.
+ * @param {ReadableStream} stream - The response body stream
+ * @param {Function} onEvent - Callback for each parsed event: (eventType, data) => void
+ * @param {Function} onError - Callback for errors: (error) => void
+ */
+async function parseSSEStream(stream, onEvent, onError) {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+
+    let buffer = '';
+    let currentEvent = '';
+    let currentData = [];
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+
+            // Keep the last incomplete line in the buffer
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                // Blank line signals end of event
+                if (line === '' || line === '\r') {
+                    if (currentData.length > 0) {
+                        // Join multi-line data with newlines
+                        const dataStr = currentData.join('\n');
+                        onEvent(currentEvent || 'message', dataStr);
+                        currentEvent = '';
+                        currentData = [];
+                    }
+                    continue;
+                }
+
+                // Parse event type
+                if (line.startsWith('event:')) {
+                    currentEvent = line.substring(6).trim();
+                    continue;
+                }
+
+                // Parse data line
+                if (line.startsWith('data:')) {
+                    const data = line.substring(5);
+                    // Remove leading space if present (per SSE spec)
+                    currentData.push(data.startsWith(' ') ? data.substring(1) : data);
+                    continue;
+                }
+
+                // Ignore comments (lines starting with ':')
+                if (line.startsWith(':')) {
+                    continue;
+                }
+            }
+        }
+
+        // Handle any remaining buffered event
+        if (currentData.length > 0) {
+            const dataStr = currentData.join('\n');
+            onEvent(currentEvent || 'message', dataStr);
+        }
+    } catch (error) {
+        onError(error);
+    }
+}
+
+/**
+ * Sends a chat message to the API and handles SSE streaming response.
+ * Uses proper SSE parsing to handle multi-line events.
  */
 export async function sendMessage() {
     const input = document.getElementById('message-input');
@@ -192,54 +261,93 @@ export async function sendMessage() {
             return;
         }
 
-        // MANUAL SSE PARSING (will be replaced in task 5 with EventSource)
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+        // Parse SSE stream with proper event handling
+        await parseSSEStream(
+            response.body,
+            (eventType, data) => {
+                if (!data) return;
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+                try {
+                    const parsed = JSON.parse(data);
 
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-                if (line.startsWith('event:')) {
-                    continue;
-                }
-
-                if (line.startsWith('data:')) {
-                    const data = line.substring(5).trim();
-                    if (!data) continue;
-
-                    try {
-                        const parsed = JSON.parse(data);
-
-                        if (parsed.text !== undefined) {
+                    // Handle different event types
+                    switch (eventType) {
+                        case 'chunk':
+                            // Text streaming
                             if (parsed.text) {
                                 streamedText += parsed.text;
                                 updateStreamingMessage(streamedText);
                             }
-                        } else if (parsed.recipe_id !== undefined) {
-                            state.fetchAndDisplayRecipe(parsed.recipe_id);
-                        } else if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
-                            // timer_start event
-                            state.startTimer(parsed.duration_minutes, parsed.label);
-                        } else if (parsed.tool) {
-                            setLoading(true, `Using ${parsed.tool}...`);
-                            addMessage(`Using tool: ${parsed.tool}`, 'tool-use');
-                        } else if (parsed.conversation_id) {
-                            state.conversationId = parsed.conversation_id;
+                            break;
+
+                        case 'tool_use':
+                            // Tool call notification
+                            if (parsed.tool) {
+                                setLoading(true, `Using ${parsed.tool}...`);
+                                addMessage(`Using tool: ${parsed.tool}`, 'tool-use');
+                            }
+                            break;
+
+                        case 'recipe_artifact':
+                            // Recipe panel display
+                            if (parsed.recipe_id !== undefined) {
+                                state.fetchAndDisplayRecipe(parsed.recipe_id);
+                            }
+                            break;
+
+                        case 'timer_start':
+                            // Timer start
+                            if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
+                                state.startTimer(parsed.duration_minutes, parsed.label);
+                            }
+                            break;
+
+                        case 'done':
+                            // Response completion
+                            if (parsed.conversation_id) {
+                                state.conversationId = parsed.conversation_id;
+                            }
                             finalizeStreamingMessage();
-                        } else if (parsed.message && parsed.recoverable !== undefined) {
-                            addMessage(parsed.message, 'error');
-                        }
-                    } catch (e) {
-                        console.log('Parse error:', e, data);
+                            break;
+
+                        case 'error':
+                            // Error handling
+                            if (parsed.message) {
+                                addMessage(parsed.message, 'error');
+                            }
+                            break;
+
+                        default:
+                            // Fallback: handle events without explicit type (backward compatibility)
+                            if (parsed.text !== undefined) {
+                                if (parsed.text) {
+                                    streamedText += parsed.text;
+                                    updateStreamingMessage(streamedText);
+                                }
+                            } else if (parsed.recipe_id !== undefined) {
+                                state.fetchAndDisplayRecipe(parsed.recipe_id);
+                            } else if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
+                                state.startTimer(parsed.duration_minutes, parsed.label);
+                            } else if (parsed.tool) {
+                                setLoading(true, `Using ${parsed.tool}...`);
+                                addMessage(`Using tool: ${parsed.tool}`, 'tool-use');
+                            } else if (parsed.conversation_id) {
+                                state.conversationId = parsed.conversation_id;
+                                finalizeStreamingMessage();
+                            } else if (parsed.message && parsed.recoverable !== undefined) {
+                                addMessage(parsed.message, 'error');
+                            }
+                            break;
                     }
+                } catch (e) {
+                    console.log('Parse error:', e, data);
                 }
+            },
+            (error) => {
+                console.error('SSE stream error:', error);
+                addMessage('Connection error. Please try again.', 'error');
             }
-        }
+        );
     } catch (error) {
         console.error('Error:', error);
         addMessage('Connection error. Please try again.', 'error');

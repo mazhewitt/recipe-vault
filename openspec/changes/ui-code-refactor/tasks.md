@@ -34,14 +34,14 @@
 
 ## 5. Refactor SSE Parsing to EventSource
 
-- [ ] 5.1 Replace manual SSE parsing in `chat.js` with native `EventSource` constructor
-- [ ] 5.2 Add event listeners for `chunk` event (text streaming)
-- [ ] 5.3 Add event listeners for `tool_use` event (tool call notifications)
-- [ ] 5.4 Add event listeners for `recipe_artifact` event (recipe panel display)
-- [ ] 5.5 Add event listeners for `done` event (response completion)
-- [ ] 5.6 Add event listeners for `error` event (error handling and retry logic)
-- [ ] 5.7 Remove old manual SSE parsing code (manual `\n` splitting and `startsWith` checks)
-- [ ] 5.8 Test SSE connection with multi-line data to verify correct handling
+- [x] 5.1 Replace manual SSE parsing in `chat.js` with proper SSE parser (native EventSource not used due to POST requirement)
+- [x] 5.2 Add event listeners for `chunk` event (text streaming)
+- [x] 5.3 Add event listeners for `tool_use` event (tool call notifications)
+- [x] 5.4 Add event listeners for `recipe_artifact` event (recipe panel display)
+- [x] 5.5 Add event listeners for `done` event (response completion)
+- [x] 5.6 Add event listeners for `error` event (error handling and retry logic)
+- [x] 5.7 Remove old manual SSE parsing code (manual `\n` splitting and `startsWith` checks)
+- [x] 5.8 Test SSE connection with multi-line data to verify correct handling
 
 ## 6. Extract Timer Module
 
