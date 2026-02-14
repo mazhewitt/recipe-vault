@@ -4,7 +4,7 @@
  */
 
 import { escapeHtml } from './utils.js';
-import { getCachedRecipe, prefetchAdjacent } from './page-transitions.js';
+import { getCachedRecipe, prefetchAdjacent, animatePageTurn } from './page-transitions.js';
 
 // Import global state accessors (these will be set by app.js)
 export let state = null;
@@ -171,7 +171,7 @@ export function renderIndex(recipes) {
     document.querySelectorAll('.index-recipe-item').forEach(item => {
         item.addEventListener('click', () => {
             const recipeId = item.getAttribute('data-recipe-id');
-            fetchAndDisplayRecipe(recipeId);
+            animatePageTurn('forward', () => fetchAndDisplayRecipe(recipeId));
         });
     });
 }

@@ -1,9 +1,4 @@
-# swipe-navigation Specification
-
-## Purpose
-Handles horizontal swipe gestures on mobile for recipe navigation. Detects swipe direction and triggers navigation; the visual animation is handled by the View Transitions API (or crossfade fallback).
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Swipe gesture triggers recipe navigation on mobile
 
@@ -56,3 +51,11 @@ Swipe gesture handling SHALL only be active on mobile viewports (max-width: 600p
 
 - **WHEN** the viewport width is 600px or less
 - **THEN** swipe gesture handlers for navigation are active on the recipe page
+
+## REMOVED Requirements
+
+### Requirement: Interactive swipe tracking follows finger
+
+**Reason**: The interactive overlay-tracking swipe (mapping finger position to rotateY angle in real-time) is the source of scroll-conflict bugs and the Android layout collapse. Replaced by a simpler detect-direction-and-trigger pattern where the View Transitions API handles all visual animation.
+
+**Migration**: Swipe gestures still work — swipe left/right past 30% threshold triggers navigation. The visual feedback now happens via View Transitions slide animation on release instead of an interactive overlay following the finger during the swipe.

@@ -1103,8 +1103,7 @@ body::before {
     background: linear-gradient(270deg, rgba(0,0,0,0.15), transparent);
 }
 
-.page-turn-overlay.animating::after,
-.page-turn-overlay.swipe-tracking::after {
+.page-turn-overlay.animating::after {
     opacity: 1;
 }
 
@@ -1129,13 +1128,15 @@ body::before {
     animation: pageTurnBackward 400ms ease-in-out forwards;
 }
 
-/* Interactive swipe tracking - no animation, transform set via JS */
-.page-turn-overlay.swipe-tracking {
-    animation: none;
-}
 
 @media (prefers-reduced-motion: reduce) {
     .page-turn-overlay.animating {
+        animation: none !important;
+    }
+
+    /* Disable View Transition slide animations — browser falls back to crossfade */
+    ::view-transition-old(page-content),
+    ::view-transition-new(page-content) {
         animation: none !important;
     }
 }
@@ -1472,11 +1473,6 @@ body::before {
         display: none;
     }
 
-    .page-turn-overlay {
-        padding: 16px;
-        border-radius: 0;
-    }
-
     .book-cover {
         top: 0;
         left: 0;
@@ -1500,6 +1496,11 @@ body::before {
 
     .page-content {
         padding-top: 10px;
+    }
+
+    /* View Transitions API: tag the content element for mobile slide transitions */
+    #page-left-content {
+        view-transition-name: page-content;
     }
 
     .page-nav {
@@ -1567,6 +1568,51 @@ body::before {
     .mobile-edge-nav {
         display: flex;
     }
+}
+
+/* ==================== MOBILE VIEW TRANSITIONS ==================== */
+
+/* Clip sliding content to bounds (prevents overflow above tab bar) and disable the
+   group's default position animation (prevents diagonal movement when scrolled) */
+::view-transition-group(page-content) {
+    overflow: hidden;
+    animation-duration: 0s;
+}
+
+/* Forward navigation: old slides out left, new slides in from right */
+html[data-nav-direction="forward"]::view-transition-old(page-content) {
+    animation: slide-out-left 250ms ease-out both;
+}
+html[data-nav-direction="forward"]::view-transition-new(page-content) {
+    animation: slide-in-right 250ms ease-out both;
+}
+
+/* Backward navigation: old slides out right, new slides in from left */
+html[data-nav-direction="backward"]::view-transition-old(page-content) {
+    animation: slide-out-right 250ms ease-out both;
+}
+html[data-nav-direction="backward"]::view-transition-new(page-content) {
+    animation: slide-in-left 250ms ease-out both;
+}
+
+@keyframes slide-out-left {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(-100%); opacity: 0; }
+}
+
+@keyframes slide-in-right {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slide-out-right {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes slide-in-left {
+    from { transform: translateX(-100%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
 }
 
 /* Recipe authorship */

@@ -1,9 +1,4 @@
-# recipe-page-transitions Specification
-
-## Purpose
-Handles visual transitions when navigating between recipes. Desktop uses a 3D page-turn overlay effect; mobile uses the View Transitions API for directional slide animations.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Page turn animation on recipe navigation
 
@@ -42,15 +37,25 @@ The system SHALL animate recipe-to-recipe navigation with a 3D page-turn effect 
 - **WHEN** the user navigates on mobile and the browser does not support `document.startViewTransition`
 - **THEN** the system falls back to a crossfade transition (opacity fade ~150ms)
 
-### Requirement: Page turn edge shadow
+### Requirement: Reduced motion fallback
 
-The page-turn overlay SHALL display a gradient shadow along its turning edge to simulate depth and page thickness during the animation.
+When the user has `prefers-reduced-motion: reduce` enabled, or the browser does not support CSS 3D transforms, the system SHALL replace the page-turn animation with an instant crossfade (opacity transition ~150ms). On mobile, reduced motion SHALL also disable the View Transitions slide animation and use a crossfade instead.
 
-#### Scenario: Shadow follows turning edge
+#### Scenario: Reduced motion preference on desktop
 
-- **WHEN** the page-turn animation is in progress
-- **THEN** a gradient shadow is visible along the leading edge of the turning overlay
-- **AND** the shadow intensity varies with the rotation angle (strongest near 90deg)
+- **WHEN** `prefers-reduced-motion: reduce` is active and the user navigates on desktop
+- **THEN** the outgoing content fades out and the incoming content fades in over ~150ms
+- **AND** no rotateY transform is applied
+
+#### Scenario: Reduced motion preference on mobile
+
+- **WHEN** `prefers-reduced-motion: reduce` is active and the user navigates on mobile
+- **THEN** the crossfade transition is used instead of the View Transitions slide animation
+
+#### Scenario: No 3D transform support on desktop
+
+- **WHEN** the browser does not support `transform: rotateY(1deg)` and the user navigates on desktop
+- **THEN** the crossfade fallback is used instead of the page-turn animation
 
 ### Requirement: Container dimensions are stable during transitions
 
@@ -74,35 +79,7 @@ The system SHALL lock the `.pages-container` height to its current computed valu
 - **THEN** the old content remains visually stable on screen until the slide animation begins
 - **AND** no intermediate empty/skeleton state is visible to the user
 
-### Requirement: Reduced motion fallback
-
-When the user has `prefers-reduced-motion: reduce` enabled, or the browser does not support CSS 3D transforms, the system SHALL replace the page-turn animation with an instant crossfade (opacity transition ~150ms). On mobile, reduced motion SHALL also disable the View Transitions slide animation and use a crossfade instead.
-
-#### Scenario: Reduced motion preference on desktop
-
-- **WHEN** `prefers-reduced-motion: reduce` is active and the user navigates on desktop
-- **THEN** the outgoing content fades out and the incoming content fades in over ~150ms
-- **AND** no rotateY transform is applied
-
-#### Scenario: Reduced motion preference on mobile
-
-- **WHEN** `prefers-reduced-motion: reduce` is active and the user navigates on mobile
-- **THEN** the crossfade transition is used instead of the View Transitions slide animation
-
-#### Scenario: No 3D transform support on desktop
-
-- **WHEN** the browser does not support `transform: rotateY(1deg)` and the user navigates on desktop
-- **THEN** the crossfade fallback is used instead of the page-turn animation
-
-### Requirement: Navigation is blocked during animation
-
-The system SHALL ignore navigation inputs (button clicks, edge taps, swipe gestures) while a page-turn animation is in progress, preventing double-navigation or animation corruption.
-
-#### Scenario: Rapid clicking during animation
-
-- **WHEN** a page-turn animation is playing and the user clicks a navigation arrow again
-- **THEN** the click is ignored and no second animation begins
-- **AND** the current animation completes normally
+## ADDED Requirements
 
 ### Requirement: View transition name assigned on mobile
 
