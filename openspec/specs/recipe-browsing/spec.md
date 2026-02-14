@@ -19,12 +19,13 @@ The frontend SHALL fetch the current list of recipes from the API each time navi
 
 ### Requirement: User can navigate to next recipe
 
-The user SHALL be able to navigate to the next recipe in alphabetical order by clicking the forward arrow.
+The user SHALL be able to navigate to the next recipe in alphabetical order by clicking the forward arrow. Navigation SHALL trigger a page-turn animation and attempt to use prefetched data for instant rendering.
 
 #### Scenario: Navigate to next recipe
 
 - **WHEN** a recipe is displayed and the user clicks the ">" arrow
-- **THEN** the next recipe in alphabetical order is loaded and displayed
+- **THEN** the system checks the prefetch cache for the next recipe's data
+- **AND** a forward page-turn animation plays while the next recipe content is rendered behind the overlay
 
 #### Scenario: Forward arrow disabled at end of list
 
@@ -33,27 +34,27 @@ The user SHALL be able to navigate to the next recipe in alphabetical order by c
 
 ### Requirement: User can navigate to previous recipe
 
-The user SHALL be able to navigate to the previous recipe in alphabetical order by clicking the back arrow. When on the first recipe, the back arrow SHALL return to the index.
+The user SHALL be able to navigate to the previous recipe in alphabetical order by clicking the back arrow. When on the first recipe, the back arrow SHALL return to the index. Navigation SHALL trigger a page-turn animation.
 
 #### Scenario: Navigate to previous recipe
 
 - **WHEN** a recipe is displayed and the user clicks the "<" arrow
-- **THEN** the previous recipe in alphabetical order is loaded and displayed
+- **THEN** a backward page-turn animation plays while the previous recipe content is rendered behind the overlay
 
 #### Scenario: Back arrow from first recipe returns to index
 
 - **WHEN** the first recipe in alphabetical order is displayed
-- **THEN** clicking the "<" arrow returns to the index view
+- **THEN** clicking the "<" arrow triggers a backward page-turn animation and returns to the index view
 - **AND** the index is re-fetched fresh
 
 ### Requirement: Navigation from placeholder state loads first recipe
 
-When the index is displayed, clicking the forward arrow SHALL load the first recipe. Clicking the back arrow SHALL be disabled. This replaces the previous behavior where both arrows loaded the first recipe from the placeholder state.
+When the index is displayed, clicking the forward arrow SHALL load the first recipe with a page-turn animation. Clicking the back arrow SHALL be disabled.
 
 #### Scenario: Forward arrow from index
 
 - **WHEN** the index is displayed and the user clicks the ">" arrow
-- **THEN** the first recipe in alphabetical order is loaded and displayed
+- **THEN** a forward page-turn animation plays and the first recipe in alphabetical order is displayed
 - **AND** the view mode changes to recipe view
 
 #### Scenario: Back arrow from index

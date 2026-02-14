@@ -115,3 +115,20 @@ The index SHALL be styled to match the handwritten cookbook aesthetic of the rec
 
 - **WHEN** the user hovers over a recipe name in the index
 - **THEN** the name shows a visual hover effect (e.g., color change or underline) indicating it is clickable
+
+### Requirement: Recipe Book header navigates to index
+
+The "Recipe Book" header SHALL navigate to the recipe index when clicked.
+
+#### Scenario: Header click from recipe view
+- **WHEN** a recipe is displayed
+- **AND** the user clicks the "Recipe Book" header
+- **THEN** the recipe index view is rendered
+- **AND** the current recipe context is cleared
+- **AND** the index data is fetched fresh
+
+#### Scenario: Header click from index view
+- **WHEN** the index view is already displayed
+- **AND** the user clicks the "Recipe Book" header
+- **THEN** the index view remains displayed
+

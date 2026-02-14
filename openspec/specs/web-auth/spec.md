@@ -1,7 +1,9 @@
 # Web Authentication Spec
 
-## Requirements
+## Purpose
 
+The Web Authentication capability enables family-based authentication for the web interface, allowing family members to log in with a shared password while supporting public share links for recipe access.
+## Requirements
 ### Requirement: Family Password Configuration
 
 The system SHALL read a family password from the `FAMILY_PASSWORD` environment variable.
@@ -79,3 +81,15 @@ The system SHALL display a login form when accessing protected pages without a v
 - **WHEN** a user accesses `/chat` with a valid session cookie
 - **THEN** the chat interface is displayed directly
 - **AND** no login form is shown
+
+#### Scenario: Access share page without session
+- **WHEN** a user accesses `/share/:token` without any authentication
+- **THEN** the share page is displayed directly
+- **AND** no login form is shown
+- **AND** no authentication is required
+
+#### Scenario: Access share photo without session
+- **WHEN** a user accesses `/share/:token/photo` without any authentication
+- **THEN** the photo is served directly
+- **AND** no authentication is required
+

@@ -3,9 +3,7 @@
 ## Purpose
 
 The Recipe Photo Storage capability allows users to attach a single hero image to each recipe, with photos stored on the filesystem and served via HTTP API. This enhances the visual appeal of the recipe book and helps users identify recipes at a glance.
-
 ## Requirements
-
 ### Requirement: Photo Upload
 
 The system SHALL allow users to upload a photo for a recipe via multipart form data.
@@ -186,6 +184,28 @@ The system SHALL enforce authentication and family-based authorization for all p
 - **WHEN** any photo operation is performed
 - **THEN** the system verifies the recipe belongs to the user's family (or god mode)
 - **AND** returns 404 for recipes outside the family
+
+### Requirement: Public photo access via share token
+
+The system SHALL serve recipe photos for valid share links without requiring authentication, using the share token to authorize access.
+
+#### Scenario: Valid share token photo retrieval
+- **WHEN** a request is made to `GET /share/:token/photo`
+- **AND** the token is valid and not expired
+- **AND** the recipe has a photo
+- **THEN** the photo file is returned as binary data
+- **AND** the Content-Type header matches the file format
+
+#### Scenario: Share token photo for recipe without photo
+- **WHEN** a request is made to `GET /share/:token/photo`
+- **AND** the token is valid and not expired
+- **AND** the recipe has no photo (photo_filename is NULL)
+- **THEN** a 404 Not Found response is returned
+
+#### Scenario: Expired share token photo retrieval
+- **WHEN** a request is made to `GET /share/:token/photo`
+- **AND** the token exists but is expired
+- **THEN** a 404 Not Found response is returned
 
 ## Data Types
 

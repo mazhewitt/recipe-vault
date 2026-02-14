@@ -2,9 +2,7 @@
 
 ## Purpose
 Provide a small, focused specification for serving frontend static assets (HTML, CSS, JavaScript, images) from the server at the `/static` URL path. This ensures that UI files are available, correctly typed, and cacheable. (TBD: expand with additional asset types or performance rules as needed.)
-
 ## Requirements
-
 ### Requirement: Static assets are served from the static directory
 
 The server SHALL serve files from the `static/` directory at the `/static/` URL path.
@@ -55,3 +53,14 @@ The chat page HTML SHALL load styles and scripts from external files rather than
 
 - **WHEN** the chat page HTML is rendered
 - **THEN** it includes a `<script src="/static/app.js"></script>` tag before the closing body tag
+
+### Requirement: Share page includes inline styles
+
+The share page SHALL include its own minimal inline CSS rather than referencing the full application stylesheet.
+
+#### Scenario: Share page styling is self-contained
+- **WHEN** the share page HTML is rendered at `/share/:token`
+- **THEN** styling is included via an inline `<style>` block in the `<head>`
+- **AND** no external stylesheet is referenced
+- **AND** the page renders correctly without loading any additional CSS files
+
