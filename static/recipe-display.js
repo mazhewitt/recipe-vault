@@ -81,6 +81,7 @@ export function getTotalTimeMinutes(recipe) {
 export function renderIndex(recipes) {
     const leftContent = document.getElementById('page-left-content');
     const rightContent = document.getElementById('page-right-content');
+    const alphabetLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
     if (recipes.length === 0) {
         // SAFE: Static HTML, no user data
@@ -104,15 +105,48 @@ export function renderIndex(recipes) {
     });
 
     const sortedLetters = Object.keys(groups).sort();
+    const activeAlphabet = new Set(sortedLetters.filter(letter => /^[A-Z]$/.test(letter)));
 
-    function renderGroup(letters) {
+    function sectionIdFor(letter, page) {
+        return `index-section-${page}-${letter.toLowerCase()}`;
+    }
+
+    function renderAlphabet(lettersToPage) {
+        const controls = alphabetLetters.map(letter => {
+            const targetPage = lettersToPage[letter];
+            const isActive = Boolean(targetPage);
+            const targetId = isActive ? sectionIdFor(letter, targetPage) : '';
+
+            return `
+                <button
+                    type="button"
+                    class="index-alpha-letter${isActive ? ' active' : ' disabled'}"
+                    data-letter="${letter}"
+                    data-target-page="${targetPage || ''}"
+                    data-target-id="${targetId}"
+                    ${isActive ? '' : 'disabled'}
+                    aria-label="Jump to ${letter}"
+                    ${isActive ? '' : 'aria-disabled="true"'}
+                >${letter}</button>
+            `;
+        }).join('');
+
+        return `
+            <div class="index-alphabet-nav" aria-label="Alphabet index navigation">
+                ${controls}
+            </div>
+        `;
+    }
+
+    function renderGroup(letters, page) {
         return letters.map(letter => {
             const recipeItems = groups[letter].map(recipe =>
                 // SANITIZED: recipe.title is user input
                 `<div class="index-recipe-item" data-recipe-id="${recipe.id}">${escapeHtml(recipe.title)}</div>`
             ).join('');
+            const groupId = sectionIdFor(letter, page);
             return `
-                <div class="index-letter-group">
+                <div class="index-letter-group" id="${groupId}">
                     <div class="index-letter-header">${letter}</div>
                     ${recipeItems}
                 </div>
@@ -121,10 +155,16 @@ export function renderIndex(recipes) {
     }
 
     if (isMobile()) {
+        const lettersToPage = {};
+        sortedLetters.forEach(letter => {
+            if (activeAlphabet.has(letter)) lettersToPage[letter] = 'left';
+        });
+
         // SAFE: Index title is static, renderGroup handles sanitization
         leftContent.innerHTML = `
+            ${renderAlphabet(lettersToPage)}
             <div class="index-title">~ Index ~</div>
-            ${renderGroup(sortedLetters)}
+            ${renderGroup(sortedLetters, 'left')}
         `;
         rightContent.innerHTML = '';
     } else {
@@ -158,20 +198,50 @@ export function renderIndex(recipes) {
         const leftLetters = sortedLetters.slice(0, splitIndex);
         const rightLetters = sortedLetters.slice(splitIndex);
 
+        const lettersToPage = {};
+        leftLetters.forEach(letter => {
+            if (activeAlphabet.has(letter)) lettersToPage[letter] = 'left';
+        });
+        rightLetters.forEach(letter => {
+            if (activeAlphabet.has(letter)) lettersToPage[letter] = 'right';
+        });
+
         // SAFE: Static title, renderGroup handles sanitization
         leftContent.innerHTML = `
+            ${renderAlphabet(lettersToPage)}
             <div class="index-title">~ Index ~</div>
-            ${renderGroup(leftLetters)}
+            ${renderGroup(leftLetters, 'left')}
         `;
 
-        rightContent.innerHTML = renderGroup(rightLetters);
+        rightContent.innerHTML = renderGroup(rightLetters, 'right');
     }
+
+    leftContent.scrollTop = 0;
+    rightContent.scrollTop = 0;
 
     // Add click handlers for recipe names
     document.querySelectorAll('.index-recipe-item').forEach(item => {
         item.addEventListener('click', () => {
             const recipeId = item.getAttribute('data-recipe-id');
             animatePageTurn('forward', () => fetchAndDisplayRecipe(recipeId));
+        });
+    });
+
+    document.querySelectorAll('.index-alpha-letter.active').forEach(item => {
+        item.addEventListener('click', () => {
+            const targetPage = item.getAttribute('data-target-page');
+            const targetId = item.getAttribute('data-target-id');
+            const container = targetPage === 'right' ? rightContent : leftContent;
+            const target = targetId ? document.getElementById(targetId) : null;
+
+            if (!container || !target) return;
+
+            const top = Math.max(0, target.offsetTop - 2);
+            try {
+                container.scrollTo({ top, behavior: 'smooth' });
+            } catch {
+                container.scrollTop = top;
+            }
         });
     });
 }
