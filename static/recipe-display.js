@@ -231,16 +231,23 @@ export function renderIndex(recipes) {
         item.addEventListener('click', () => {
             const targetPage = item.getAttribute('data-target-page');
             const targetId = item.getAttribute('data-target-id');
-            const container = targetPage === 'right' ? rightContent : leftContent;
             const target = targetId ? document.getElementById(targetId) : null;
 
-            if (!container || !target) return;
+            if (!target) return;
+
+            // The scrollable container is .page (parent of .page-content),
+            // not .page-content itself which has no overflow set.
+            const scrollContainer = targetPage === 'right'
+                ? document.getElementById('page-right')
+                : document.getElementById('page-left');
+
+            if (!scrollContainer) return;
 
             const top = Math.max(0, target.offsetTop - 2);
             try {
-                container.scrollTo({ top, behavior: 'smooth' });
+                scrollContainer.scrollTo({ top, behavior: 'smooth' });
             } catch {
-                container.scrollTop = top;
+                scrollContainer.scrollTop = top;
             }
         });
     });
