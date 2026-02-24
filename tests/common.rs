@@ -105,6 +105,7 @@ pub fn create_test_app_with_config(
         bind_address: "127.0.0.1:3000".to_string(),
         anthropic_api_key: "test-key".to_string(),
         ai_model: "test-model".to_string(),
+        difficulty_model: "test-model".to_string(),
         mock_llm: true,
         mock_recipe_id: None,
         families_config: (*families_config).clone(),
@@ -115,6 +116,7 @@ pub fn create_test_app_with_config(
     let recipe_state = recipes::RecipeState {
         pool: pool.clone(),
         config: Arc::new(config),
+        http_client: reqwest::Client::new(),
     };
 
     Router::new()

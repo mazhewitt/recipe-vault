@@ -13,15 +13,17 @@ pub struct ChatState {
     sessions: SessionStore,
     config: Arc<Config>,
     api_key: Arc<String>,
+    http_client: reqwest::Client,
 }
 
 impl ChatState {
-    pub fn new(config: Config, api_key: String) -> Self {
+    pub fn new(config: Config, api_key: String, http_client: reqwest::Client) -> Self {
         Self {
             agent: Arc::new(RwLock::new(None)),
             sessions: SessionStore::new(),
             config: Arc::new(config),
             api_key: Arc::new(api_key),
+            http_client,
         }
     }
 
@@ -39,6 +41,7 @@ impl ChatState {
                     LlmProviderType::Anthropic,
                     self.config.anthropic_api_key.clone(),
                     self.config.ai_model.clone(),
+                    Some(self.http_client.clone()),
                 )
             };
 

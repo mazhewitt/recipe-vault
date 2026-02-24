@@ -150,22 +150,22 @@ pub enum LlmResponse {
 }
 
 impl LlmProvider {
-    pub fn new(provider_type: LlmProviderType, api_key: String, model: String) -> Self {
+    pub fn new(provider_type: LlmProviderType, api_key: String, model: String, http_client: Option<reqwest::Client>) -> Self {
         Self {
             provider_type,
             api_key,
             model,
-            client: reqwest::Client::new(),
+            client: http_client.unwrap_or_else(reqwest::Client::new),
             mock_recipe_id: None,
         }
     }
 
     pub fn anthropic(api_key: String, model: String) -> Self {
-        Self::new(LlmProviderType::Anthropic, api_key, model)
+        Self::new(LlmProviderType::Anthropic, api_key, model, None)
     }
 
     pub fn openai(api_key: String, model: String) -> Self {
-        Self::new(LlmProviderType::OpenAi, api_key, model)
+        Self::new(LlmProviderType::OpenAi, api_key, model, None)
     }
 
     pub fn mock(mock_recipe_id: Option<String>) -> Self {
@@ -296,7 +296,11 @@ impl LlmProvider {
         body.insert("max_tokens".to_string(), serde_json::json!(4096));
 
         if let Some(system) = system_prompt {
-            body.insert("system".to_string(), serde_json::json!(system));
+            body.insert("system".to_string(), serde_json::json!([{
+                "type": "text",
+                "text": system,
+                "cache_control": {"type": "ephemeral"}
+            }]));
         }
 
         let anthropic_messages: Vec<serde_json::Value> = messages

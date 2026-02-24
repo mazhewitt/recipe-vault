@@ -24,6 +24,7 @@ use crate::{
 pub struct RecipeState {
     pub pool: SqlitePool,
     pub config: Arc<Config>,
+    pub http_client: reqwest::Client,
 }
 
 /// Create a new recipe
@@ -42,6 +43,7 @@ pub async fn create_recipe(
         let recipe_id = recipe.recipe.id.clone();
         let pool = state.pool.clone();
         let config = state.config.clone();
+        let http_client = state.http_client.clone();
 
         tracing::info!("Recipe {} created without difficulty, spawning auto-assessment task", recipe_id);
 
@@ -51,7 +53,7 @@ pub async fn create_recipe(
             // and avoid database lock contention (especially in tests with SQLite)
             tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-            match auto_assign_difficulty(&pool, &config, &recipe_id).await {
+            match auto_assign_difficulty(&pool, &config, &recipe_id, http_client).await {
                 Ok(difficulty) => {
                     tracing::info!("Auto-assigned difficulty {} to recipe {}", difficulty, recipe_id);
                 }
@@ -347,18 +349,20 @@ async fn auto_assign_difficulty(
     pool: &SqlitePool,
     config: &Config,
     recipe_id: &str,
+    http_client: reqwest::Client,
 ) -> Result<u8, Box<dyn std::error::Error + Send + Sync>> {
     // Fetch the full recipe with ingredients and steps (no family filtering for background task)
     let recipe_details = queries::get_recipe(pool, recipe_id, None).await?;
 
-    // Create LLM provider
+    // Create LLM provider using the haiku model (simple structured task) and shared HTTP client
     let llm = if config.mock_llm {
         LlmProvider::mock(config.mock_recipe_id.clone())
     } else {
         LlmProvider::new(
             LlmProviderType::Anthropic,
             config.anthropic_api_key.clone(),
-            config.ai_model.clone(),
+            config.difficulty_model.clone(),
+            Some(http_client),
         )
     };
 

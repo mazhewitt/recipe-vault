@@ -10,6 +10,7 @@ pub struct Config {
     pub bind_address: String,
     pub anthropic_api_key: String,
     pub ai_model: String,
+    pub difficulty_model: String,
     pub dev_user_email: Option<String>,
     pub mock_llm: bool,
     pub mock_recipe_id: Option<String>,
@@ -79,7 +80,10 @@ impl Config {
             .map_err(|_| "ANTHROPIC_API_KEY must be set".to_string())?;
 
         let ai_model = env::var("AI_MODEL")
-            .unwrap_or_else(|_| "claude-sonnet-4-5".to_string());
+            .unwrap_or_else(|_| "claude-sonnet-4-6".to_string());
+
+        let difficulty_model = env::var("DIFFICULTY_MODEL")
+            .unwrap_or_else(|_| "claude-haiku-4-5".to_string());
 
         let dev_user_email = env::var("DEV_USER_EMAIL").ok();
 
@@ -101,6 +105,7 @@ impl Config {
             bind_address,
             anthropic_api_key,
             ai_model,
+            difficulty_model,
             dev_user_email,
             mock_llm,
             mock_recipe_id,

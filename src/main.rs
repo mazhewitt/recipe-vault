@@ -105,13 +105,17 @@ async fn main() {
         }
     }
 
+    // Shared HTTP client — reuses TLS sessions and connection pool across all LLM calls
+    let http_client = reqwest::Client::new();
+
     // Create chat state with AI agent
-    let chat_state = recipe_vault::chat::ChatState::new(config.clone(), api_key_for_chat);
+    let chat_state = recipe_vault::chat::ChatState::new(config.clone(), api_key_for_chat, http_client.clone());
 
     // Create recipe state with database and AI configuration
     let recipe_state = recipes::RecipeState {
         pool: pool.clone(),
         config: Arc::new(config.clone()),
+        http_client,
     };
 
     // Create share state for share handlers
