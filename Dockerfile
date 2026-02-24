@@ -23,7 +23,7 @@ FROM debian:trixie-slim
 
 WORKDIR /app
 
-# Install runtime dependencies (including Python for fetch MCP server)
+# Install runtime dependencies (including Python for MCP servers)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libsqlite3-0 \
@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (Python package runner for MCP fetch server)
+# Install uv (Python package runner for MCP servers)
 RUN pip3 install --no-cache-dir --break-system-packages uv
 
 # Verify uvx is available

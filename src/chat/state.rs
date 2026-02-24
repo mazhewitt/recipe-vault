@@ -87,6 +87,22 @@ impl ChatState {
                 );
             }
 
+            // Add DuckDuckGo search server if uvx is available (no API key required)
+            if std::process::Command::new("uvx")
+                .arg("--version")
+                .output()
+                .is_ok()
+            {
+                let search_server = McpServerConfig {
+                    name: "search".to_string(),
+                    command: "uvx".to_string(),
+                    args: vec!["duckduckgo-mcp".to_string(), "serve".to_string()],
+                    env: std::collections::HashMap::new(),
+                };
+                mcp_servers.push(search_server);
+                tracing::info!("uvx available - DuckDuckGo search server enabled");
+            }
+
             let agent_config = AiAgentConfig {
                 mcp_servers,
                 system_prompt: Some(CHAT_SYSTEM_PROMPT.to_string()),
