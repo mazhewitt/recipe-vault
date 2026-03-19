@@ -91,9 +91,12 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 
 # Optional
 DATABASE_URL=sqlite://recipes.db
-PORT=3000
-AI_MODEL=claude-sonnet-4-5  # or gpt-4o for OpenAI
+BIND_ADDRESS=127.0.0.1:3000
+AI_MODEL=claude-sonnet-4-6  # chat model (needs multilingual support)
+DIFFICULTY_MODEL=claude-haiku-4-5  # faster model for background difficulty rating
 DEV_USER_EMAIL=test@example.com  # For local development (simulates Cloudflare auth)
+FAMILIES_CONFIG_PATH=/app/data/families.yaml  # family multi-tenancy config
+PHOTOS_DIR=./data/photos  # photo storage directory
 ```
 
 ### 3. Run the Server
@@ -120,28 +123,90 @@ The Web UI uses **Cloudflare Access** for authentication.
 ### Features
 
 - **Single Sign-On** - Authenticate once via Google/Cloudflare and you're in
-- **User Identity** - See who's logged in directly in the UI
 - **Real-time streaming** - Responses stream as they're generated
 - **Tool use indicators** - See when the AI is searching or creating recipes
-- **Conversation context** - Follow-up questions understand previous context
+- **Conversation context** - Full multi-turn memory across a session
 - **Mobile responsive** - Works on phones and tablets
 
-### Example Conversations
+### What you can do
+
+#### Explore ingredients and cuisines
+Ask open-ended culinary questions before committing to a recipe.
 
 ```
-You: What recipes do I have?
-AI: [Calls list_recipes] You have 3 recipes: Chocolate Chip Cookies,
-    Banana Bread, and Pasta Carbonara.
+You: I have some dried limes — what dishes are they used in?
+AI: Dried limes (loomi/limoo amani) shine in Persian and Gulf cooking:
+    Ghormeh Sabzi, Khoresht-e Bademjan, Makhboos...
+    Would you like me to find an authentic recipe for any of these?
+```
 
-You: Show me the banana bread
-AI: [Calls get_recipe] Here's your Banana Bread recipe...
+#### Find authentic recipes from the web
+The assistant searches in the **native language of the cuisine** — not a literal English translation — and fetches directly from local cooking sites.
 
-You: How long does it take to make?
-AI: Based on the recipe, it takes 15 minutes prep and 60 minutes baking,
-    so about 1 hour 15 minutes total.
+```
+You: Find me an authentic recipe for Khoresht-e Bademjan
+AI: [Searches DuckDuckGo in Farsi] [Fetches from Mamanpaz]
+    Khoresht-e Bademjan (Persian Eggplant Stew)
+    Found on Mamanpaz · Farsi → translated by Claude
+    ...
+    Would you like me to edit it or add it to the book?
+```
 
-You: Create a recipe for pancakes with flour, eggs, milk, and butter
-AI: [Calls create_recipe] I've created a new Pancakes recipe for you...
+#### Save with modifications
+You can ask to modify a found recipe before saving it.
+
+```
+You: Yes — regenerate it using the dried limes
+AI: [Creates recipe with limes included in the method]
+    Saved! I've opened it in the side panel.
+```
+
+#### Update recipes
+Adapt existing recipes for different methods or equipment.
+
+```
+You: Can you update it for an Instant Pot?
+AI: [Updates recipe] Done — cook time drops from 2.5 hours to 50 minutes.
+    The key change: pressure cook the lamb with the dried limes for 25 minutes...
+```
+
+#### Compare with other recipes from a URL
+Paste a URL mid-conversation to compare approaches.
+
+```
+You: This recipe suggests baking the aubergines:
+     https://persianmama.com/khoresh-bademjan-...
+AI: [Fetches URL] Good question — baking uses much less oil and works
+    well for the Instant Pot version. You lose the golden caramelised
+    exterior but gain convenience. Want me to update your recipe?
+```
+
+#### Ask about related dishes
+```
+You: How is this different from Khoresh-e Gheymeh?
+AI: Gheymeh uses yellow split peas and has those signature crispy
+    potato sticks on top. Bademjan showcases silky eggplant. They're
+    both beloved but totally distinct...
+```
+
+#### Guided cooking with timers
+The assistant walks you through cooking phase by phase, waits for you to confirm each step, adapts to your equipment, and sets timers when you need to wait.
+
+```
+You: Can you guide me through cooking the aubergine stew?
+AI: How many people are you cooking for?
+
+You: 4 people
+AI: You're all set — here's Phase 1: Building the base...
+
+You: I'm going to start it on the hob, in the inner pot
+AI: Smart move! Add 2 tbsp oil, then your chopped onions...
+
+You: Can you set me a timer for the aubergines?
+AI: [Starts 22-minute timer] Done! Preheat oven to 200°C, brush with oil...
+
+You: If I use salty Nahrin stock, can I skip the extra salt?
+AI: Absolutely — skip the salt for now. You can always adjust at the end.
 ```
 
 ## REST API
@@ -272,16 +337,24 @@ recipe-vault/
 ├── src/
 │   ├── ai/                        # AI agent layer
 │   │   ├── client.rs              # AI agent with MCP tool execution
+│   │   ├── difficulty_assessment.rs # Background difficulty rating
 │   │   ├── llm.rs                 # LLM provider (Anthropic/OpenAI)
+│   │   ├── prompts.rs             # System prompts
 │   │   └── mod.rs
 │   ├── bin/
 │   │   └── recipe_vault_mcp.rs    # Standalone MCP server binary
+│   ├── chat/                      # Chat session management
+│   │   ├── sessions.rs            # Per-user session state
+│   │   ├── state.rs               # Shared chat state
+│   │   ├── error.rs               # Chat error types
+│   │   └── mod.rs
 │   ├── db/                        # Database layer
 │   │   ├── connection.rs          # SQLite connection management
 │   │   └── queries.rs             # Recipe CRUD operations
 │   ├── handlers/                  # HTTP handlers
 │   │   ├── chat.rs                # Chat API with SSE streaming
 │   │   ├── recipes.rs             # Recipe REST endpoints
+│   │   ├── share.rs               # Recipe sharing endpoints
 │   │   └── ui.rs                  # Web UI (chat page)
 │   ├── mcp/                       # MCP protocol implementation
 │   │   ├── http_client.rs         # HTTP client for API calls
@@ -291,12 +364,23 @@ recipe-vault/
 │   ├── models/                    # Data models
 │   │   ├── recipe.rs              # Recipe, CreateRecipeInput, etc.
 │   │   ├── ingredient.rs          # Ingredient models
+│   │   ├── share_link.rs          # Share link model
 │   │   └── step.rs                # Step models
-│   ├── auth.rs                    # API key authentication
+│   ├── auth.rs                    # API key + Cloudflare Access authentication
 │   ├── config.rs                  # Configuration from environment
 │   ├── error.rs                   # Error types
 │   ├── lib.rs                     # Library exports
 │   └── main.rs                    # API server entry point
+├── static/                        # Static frontend assets
+│   ├── chat.html                  # Main UI (htmx + SSE)
+│   ├── app.js                     # App bootstrap
+│   ├── chat.js                    # Chat/SSE logic
+│   ├── navigation.js              # Recipe navigation
+│   ├── page-transitions.js        # Page transition animations
+│   ├── recipe-display.js          # Recipe rendering
+│   ├── timer.js                   # Cooking timers
+│   ├── utils.js                   # Shared utilities
+│   └── styles.css                 # Styles
 ├── migrations/                    # SQLite migrations (auto-run)
 ├── tests/                         # Integration tests
 │   ├── chat_test.rs               # Chat endpoint tests

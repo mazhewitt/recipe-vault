@@ -1,13 +1,38 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Recipe Vault is a self-hosted, AI-first recipe database for preserving family recipes
+  and guiding users through cooking step-by-step.
+
+  Tech stack:
+  - Language: Rust (Axum web framework)
+  - Database: SQLite via sqlx (single-file, simple deployment)
+  - Frontend: htmx (SSE extension) + custom JavaScript modules (chat, navigation, timers, recipe display)
+  - Templating: Static HTML files served by tower-http; minimal server-side string substitution (no template engine)
+  - AI: Claude API (cooking guidance, recipe parsing, difficulty assessment); OpenAI also supported
+  - Hosting: Synology NAS (self-hosted via Docker, deployed via git tags + GitHub Actions)
+
+  Architecture principles:
+  - Simplicity first: static HTML + htmx for UI, custom JS modules for richer interactions
+  - AI as assistant, not replacement; graceful degradation if unavailable
+  - Mobile-friendly for kitchen use (tablet/phone)
+  - Auth: Cloudflare Access for web UI; API key authentication for REST API
+
+  Key features:
+  - Family multi-tenancy: recipes scoped to family groups via families.yaml
+  - Recipe sharing: shareable read-only links for individual recipes
+  - Recipe photos: upload/display/delete (JPG, PNG, WebP, GIF up to 5MB)
+  - AI difficulty rating: automatic 1-5 scale assessment on recipe save
+  - Guided cooking: step-by-step cooking mode with timers
+
+  Coding conventions:
+  - Follow standard Rust idioms and clippy recommendations
+  - Use thiserror for custom error types, prefer Result over panics
+  - RESTful routes for CRUD, htmx-friendly partial responses
+  - Test database uses in-memory SQLite
+
+  Key env vars: DATABASE_URL, ANTHROPIC_API_KEY, BIND_ADDRESS, AI_MODEL, DIFFICULTY_MODEL,
+    DEV_USER_EMAIL, FAMILIES_CONFIG_PATH, PHOTOS_DIR
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

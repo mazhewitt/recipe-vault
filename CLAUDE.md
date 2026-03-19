@@ -1,4 +1,22 @@
 
+## Specifications
+
+Feature requirements live in `openspec/specs/<capability>/spec.md`. Before implementing or modifying any feature, check whether a spec exists for that area and read it — specs are the authoritative source of requirements and acceptance scenarios.
+
+Key specs:
+- `openspec/specs/recipe-domain/` — core recipe model, CRUD rules
+- `openspec/specs/family-multi-tenancy/` — family scoping, recipe isolation, god mode
+- `openspec/specs/api-security/` — API key auth, Cloudflare Access, middleware
+- `openspec/specs/web-auth/` — authentication flow
+- `openspec/specs/web-chat/` — chat interface, SSE streaming
+- `openspec/specs/mcp-interface/` — MCP tools and protocol
+- `openspec/specs/recipe-sharing/` — share links, public share page
+- `openspec/specs/recipe-photo-storage/` — photo upload, serving, deletion
+- `openspec/specs/recipe-difficulty-rating/` — AI difficulty assessment
+- `openspec/specs/cooking-guidance/` — guided cooking mode
+- `openspec/specs/frontend-modules/` — JS module structure
+- `openspec/specs/deployment/` — Docker, Synology, CI/CD
+
 ## Database Migration Rules
 
 **NEVER modify a migration that has already been applied.** sqlx tracks checksums of migration files. If you change a migration after it has run on any environment (dev, staging, production), sqlx will refuse to run migrations entirely, preventing the application from starting.
