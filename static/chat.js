@@ -216,7 +216,7 @@ export async function sendMessage() {
             }
         }
 
-        // Include image if attached
+        // Include image if attached, then clear the indicator immediately
         if (state.attachedImage) {
             payload.image = {
                 data: state.attachedImage.data,
@@ -227,6 +227,7 @@ export async function sendMessage() {
                 imageSize: state.attachedImage.size,
                 mediaType: state.attachedImage.media_type
             });
+            state.removeImage();
         }
 
         console.log('Sending chat request...', payload.message ? 'with text' : 'image only');
@@ -351,11 +352,6 @@ export async function sendMessage() {
     } catch (error) {
         console.error('Error:', error);
         addMessage('Connection error. Please try again.', 'error');
-    }
-
-    // Clear attached image after successful send
-    if (state.attachedImage) {
-        state.removeImage();
     }
 
     setLoading(false);

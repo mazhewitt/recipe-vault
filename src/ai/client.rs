@@ -124,39 +124,53 @@ impl AiAgent {
             return Ok(());
         }
 
-        // Spawn and initialize each server sequentially
+        // Spawn servers; skip optional ones that fail to spawn
         for server_config in &self.config.mcp_servers {
             tracing::info!("Starting MCP server: {}", server_config.name);
-
-            // Spawn the server process
-            let process = self.spawn_mcp_server(server_config).await?;
-            processes_guard.insert(server_config.name.clone(), process);
+            match self.spawn_mcp_server(server_config).await {
+                Ok(process) => {
+                    processes_guard.insert(server_config.name.clone(), process);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to spawn MCP server '{}': {} - skipping", server_config.name, e);
+                }
+            }
         }
         drop(processes_guard);
 
-        // Initialize each server and fetch tools
+        // Initialize each server and fetch tools; skip servers that fail to initialize
         let mut all_tools = Vec::new();
         let mut registry = HashMap::new();
 
-        for server_config in &self.config.mcp_servers {
+        let server_names: Vec<String> = self.mcp_processes.lock().await.keys().cloned().collect();
+
+        for server_name in &server_names {
             // Initialize this server
-            self.initialize_mcp_server(&server_config.name).await?;
-
-            // Fetch tools from this server
-            let tools = self.fetch_tools_from_server(&server_config.name).await?;
-
-            // Register each tool -> server mapping
-            for tool in &tools {
-                if let Some(existing_server) = registry.get(&tool.name) {
-                    tracing::warn!(
-                        "Duplicate tool '{}' found in servers '{}' and '{}' - using latter",
-                        tool.name, existing_server, server_config.name
-                    );
-                }
-                registry.insert(tool.name.clone(), server_config.name.clone());
+            if let Err(e) = self.initialize_mcp_server(server_name).await {
+                tracing::warn!("Failed to initialize MCP server '{}': {} - skipping", server_name, e);
+                self.mcp_processes.lock().await.remove(server_name);
+                continue;
             }
 
-            all_tools.extend(tools);
+            // Fetch tools from this server
+            match self.fetch_tools_from_server(server_name).await {
+                Ok(tools) => {
+                    for tool in &tools {
+                        if let Some(existing_server) = registry.get(&tool.name) {
+                            tracing::warn!(
+                                "Duplicate tool '{}' found in servers '{}' and '{}' - using latter",
+                                tool.name, existing_server, server_name
+                            );
+                        }
+                        registry.insert(tool.name.clone(), server_name.clone());
+                    }
+                    all_tools.extend(tools);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to fetch tools from MCP server '{}': {} - skipping", server_name, e);
+                    self.mcp_processes.lock().await.remove(server_name);
+                }
+            }
         }
 
         // Add native tools
