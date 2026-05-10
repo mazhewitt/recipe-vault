@@ -7,7 +7,7 @@ A recipe management system built with Rust, featuring a REST API and a web-based
 - **REST API**: Full CRUD operations for recipes via HTTP
 - **Web Chat Interface**: Browser-based AI assistant for natural language recipe management
 - **Recipe Photos**: Attach photos to recipes with upload, display, and delete functionality (supports JPG, PNG, WebP, GIF up to 5MB)
-- **Image Recipe Extraction**: Paste images of handwritten or printed recipes to extract structured data using Claude's vision capabilities
+- **Image Recipe Extraction**: Paste images of handwritten or printed recipes to extract structured data using the configured vision-capable AI provider
 - **URL Recipe Extraction**: Paste recipe URLs to automatically fetch and extract recipe data using the MCP fetch server
 - **AI Difficulty Assessment**: Automatic recipe difficulty ratings (1-5 scale) based on ingredients, techniques, and complexity
 - **SQLite Database**: Lightweight, file-based storage
@@ -105,6 +105,8 @@ PHOTOS_DIR=./data/photos  # photo storage directory
 To use Gemini instead of Anthropic, set `AI_PROVIDER=gemini`,
 `DIFFICULTY_PROVIDER=gemini`, `GEMINI_API_KEY`, and Gemini model names such as
 `AI_MODEL=gemini-2.5-pro` and `DIFFICULTY_MODEL=gemini-2.5-flash`.
+Provider API keys are conditional: Anthropic mode needs `ANTHROPIC_API_KEY`,
+Gemini mode needs `GEMINI_API_KEY`, and `MOCK_LLM=true` needs neither.
 
 ### 3. Run the Server
 
@@ -154,7 +156,7 @@ The assistant searches in the **native language of the cuisine** — not a liter
 You: Find me an authentic recipe for Khoresht-e Bademjan
 AI: [Searches DuckDuckGo in Farsi] [Fetches from Mamanpaz]
     Khoresht-e Bademjan (Persian Eggplant Stew)
-    Found on Mamanpaz · Farsi → translated by Claude
+    Found on Mamanpaz · Farsi → translated by AI
     ...
     Would you like me to edit it or add it to the book?
 ```
@@ -298,7 +300,21 @@ For a quick test run on any machine with Docker:
 ```bash
 docker run -d -p 3000:3000 \
   -v recipe-data:/app/data \
+  -e AI_PROVIDER=anthropic \
   -e ANTHROPIC_API_KEY=your-key \
+  mazhewitt/recipe-vault:latest
+```
+
+Gemini example:
+
+```bash
+docker run -d -p 3000:3000 \
+  -v recipe-data:/app/data \
+  -e AI_PROVIDER=gemini \
+  -e DIFFICULTY_PROVIDER=gemini \
+  -e GEMINI_API_KEY=your-key \
+  -e AI_MODEL=gemini-2.5-pro \
+  -e DIFFICULTY_MODEL=gemini-2.5-flash \
   mazhewitt/recipe-vault:latest
 ```
 
@@ -409,7 +425,7 @@ recipe-vault/
 
 ### Web Chat Not Working
 
-1. Verify `ANTHROPIC_API_KEY` is set in `.env`
+1. Verify the selected provider and key match in `.env` (`AI_PROVIDER=anthropic` with `ANTHROPIC_API_KEY`, or `AI_PROVIDER=gemini` with `GEMINI_API_KEY`)
 2. Check browser console for errors
 3. Ensure you're authenticated (check for email in UI header)
 4. Check application logs for MCP server spawn errors

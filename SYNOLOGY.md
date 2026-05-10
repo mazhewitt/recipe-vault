@@ -43,8 +43,20 @@ Edit the `.env` file on your NAS (using Synology Text Editor or via SSH).
 
 **Required Settings:**
 
-- `ANTHROPIC_API_KEY`: Your API key from Anthropic console.
+- `AI_PROVIDER`: `anthropic` or `gemini`.
+- Provider API key: set `ANTHROPIC_API_KEY` for Anthropic, or `GEMINI_API_KEY` for Gemini.
+- `DIFFICULTY_PROVIDER`: Optional; defaults to `AI_PROVIDER`. Set it when you want difficulty assessment to use a different provider.
 - `DOCKERHUB_USERNAME`: Set this to `mazhewitt` (or your own username if you built your own image).
+
+Example Gemini settings:
+
+```env
+AI_PROVIDER=gemini
+DIFFICULTY_PROVIDER=gemini
+GEMINI_API_KEY=your-gemini-api-key
+AI_MODEL=gemini-2.5-pro
+DIFFICULTY_MODEL=gemini-2.5-flash
+```
 
 ### 4. Start the Application
 

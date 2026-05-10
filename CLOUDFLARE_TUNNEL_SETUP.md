@@ -154,6 +154,7 @@ Add the tunnel token to your `deploy/.env` file:
 
 ```bash
 # Existing vars
+AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=your-anthropic-key
 DATABASE_URL=sqlite:///app/data/recipes.db
 

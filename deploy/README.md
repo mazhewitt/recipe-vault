@@ -21,7 +21,8 @@ This directory contains configuration for deploying Recipe Vault to a Synology N
     - Rename `docker-compose.prod.yml` to `docker-compose.yml`.
     - Edit `docker-compose.yml`: Change `username/recipe-vault:latest` to your actual image name.
     - Rename `.env.example` to `.env`.
-    - Edit `.env`: Add your `ANTHROPIC_API_KEY` and `FAMILY_PASSWORD`.
+    - Edit `.env`: set `AI_PROVIDER` to `anthropic` or `gemini`, add the matching provider key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`), and set `FAMILY_PASSWORD`.
+      `DIFFICULTY_PROVIDER` is optional and defaults to `AI_PROVIDER`.
 
 4.  **Start Services**
     

@@ -95,7 +95,7 @@ See [`.github/workflows/test.yml`](.github/workflows/test.yml) for details.
 
 **Playwright tests fail with "server not available":**
 - Ensure no other instance is running on port 3000
-- Check that `DATABASE_URL` and `ANTHROPIC_API_KEY` environment variables are set (can use dummy values with MOCK_LLM=true)
+- Check that `DATABASE_URL` and the selected provider key are set (`ANTHROPIC_API_KEY` for Anthropic or `GEMINI_API_KEY` for Gemini). With `MOCK_LLM=true`, dummy provider keys are sufficient.
 
 **ESLint errors:**
 - Run `npm run lint:fix` to auto-fix formatting issues
