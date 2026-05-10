@@ -12,7 +12,7 @@ A recipe management system built with Rust, featuring a REST API and a web-based
 - **AI Difficulty Assessment**: Automatic recipe difficulty ratings (1-5 scale) based on ingredients, techniques, and complexity
 - **SQLite Database**: Lightweight, file-based storage
 - **Recipe Management**: Store recipes with ingredients, cooking steps, prep/cook times, servings, difficulty ratings, and photos
-- **Multi-Model Support**: Works with Anthropic Claude and OpenAI models
+- **Configurable AI Provider**: Uses Anthropic Claude or Gemini for chat, recipe extraction, and difficulty assessment
 - **API Key Authentication**: Secure API access with auto-generated keys
 - **Remote Access**: Run API server on one machine, access from anywhere
 
@@ -51,8 +51,8 @@ Recipe Vault provides two ways to interact with your recipes:
 │  │         ▼                  ▼                    ▼               │       │
 │  │  ┌─────────────────────────────────────────────────────────────┐   │   │
 │  │  │                    AI Agent Layer                            │   │   │
-│  │  │  • Anthropic Claude API    • MCP Tool Execution             │   │   │
-│  │  │  • OpenAI API              • Conversation Management        │   │   │
+│  │  │  • Anthropic/Gemini API    • MCP Tool Execution             │   │   │
+│  │  │  • Conversation Management                                  │   │   │
 │  │  └─────────────────────────────────────────────────────────────┘   │   │
 │  │                              │                                      │   │
 │  │                              ▼                                      │   │
@@ -87,7 +87,10 @@ Create a `.env` file:
 
 ```bash
 # Required for web chat
+AI_PROVIDER=anthropic  # anthropic or gemini
+DIFFICULTY_PROVIDER=anthropic  # defaults to AI_PROVIDER if omitted
 ANTHROPIC_API_KEY=your-anthropic-api-key
+# GEMINI_API_KEY=your-gemini-api-key
 
 # Optional
 DATABASE_URL=sqlite://recipes.db
@@ -98,6 +101,10 @@ DEV_USER_EMAIL=test@example.com  # For local development (simulates Cloudflare a
 FAMILIES_CONFIG_PATH=/app/data/families.yaml  # family multi-tenancy config
 PHOTOS_DIR=./data/photos  # photo storage directory
 ```
+
+To use Gemini instead of Anthropic, set `AI_PROVIDER=gemini`,
+`DIFFICULTY_PROVIDER=gemini`, `GEMINI_API_KEY`, and Gemini model names such as
+`AI_MODEL=gemini-2.5-pro` and `DIFFICULTY_MODEL=gemini-2.5-flash`.
 
 ### 3. Run the Server
 
@@ -338,7 +345,7 @@ recipe-vault/
 │   ├── ai/                        # AI agent layer
 │   │   ├── client.rs              # AI agent with MCP tool execution
 │   │   ├── difficulty_assessment.rs # Background difficulty rating
-│   │   ├── llm.rs                 # LLM provider (Anthropic/OpenAI)
+│   │   ├── llm.rs                 # LLM provider (Anthropic/Gemini + mock)
 │   │   ├── prompts.rs             # System prompts
 │   │   └── mod.rs
 │   ├── bin/

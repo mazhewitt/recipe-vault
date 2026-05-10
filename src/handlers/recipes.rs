@@ -10,7 +10,7 @@ use std::sync::Arc;
 use crate::{
     ai::{assess_recipe_difficulty, LlmProvider, LlmProviderType},
     auth::UserIdentity,
-    config::Config,
+    config::{Config, LlmProviderKind},
     db::queries,
     error::ApiResult,
     models::{
@@ -358,9 +358,25 @@ async fn auto_assign_difficulty(
     let llm = if config.mock_llm {
         LlmProvider::mock(config.mock_recipe_id.clone())
     } else {
+        let (provider_type, api_key) = match config.difficulty_provider {
+            LlmProviderKind::Anthropic => (
+                LlmProviderType::Anthropic,
+                config.anthropic_api_key.clone(),
+            ),
+            LlmProviderKind::Gemini => (
+                LlmProviderType::Gemini,
+                config.gemini_api_key.clone(),
+            ),
+        };
+        let api_key = api_key.ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Configured difficulty LLM provider API key missing",
+            )
+        })?;
         LlmProvider::new(
-            LlmProviderType::Anthropic,
-            config.anthropic_api_key.clone(),
+            provider_type,
+            api_key,
             config.difficulty_model.clone(),
             Some(http_client),
         )

@@ -1,12 +1,58 @@
 use crate::ai::llm::{ContentBlock, LlmError, LlmProvider, LlmResponse, Message, ToolCall, ToolDefinition, ToolResult, tools};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
+
+/// A single recipe entry within a meal plan artifact
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MealPlanEntry {
+    pub recipe_id: String,
+    pub title: String,
+    pub role: String,
+}
+
+/// Data emitted when the AI calls display_meal_plan
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MealArtifactData {
+    pub title: String,
+    pub guest_count: Option<i32>,
+    pub recipes: Vec<MealPlanEntry>,
+}
+
+/// Filters raw recipe arguments against a known recipe map.
+/// Returns (resolved entries, dropped_count, centrepiece_invalid).
+/// - Resolves recipe title from `all_recipes` map for known IDs.
+/// - Drops unknown non-centrepiece entries (increments dropped_count).
+/// - Returns centrepiece_invalid=true and stops processing on first unknown centrepiece.
+fn filter_meal_plan_recipes(
+    recipes_arg: &[serde_json::Value],
+    all_recipes: &HashMap<String, String>,
+) -> (Vec<MealPlanEntry>, usize, bool) {
+    let mut resolved = Vec::new();
+    let mut dropped_count: usize = 0;
+
+    for recipe in recipes_arg {
+        let recipe_id = recipe.get("recipe_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let role = recipe.get("role").and_then(|v| v.as_str()).unwrap_or("side").to_string();
+
+        if let Some(title) = all_recipes.get(&recipe_id) {
+            resolved.push(MealPlanEntry { recipe_id, title: title.clone(), role });
+        } else if role == "centrepiece" {
+            tracing::warn!("display_meal_plan: centrepiece recipe_id not found: {}", recipe_id);
+            return (resolved, dropped_count, true);
+        } else {
+            tracing::warn!("display_meal_plan: dropping unknown recipe_id: {}", recipe_id);
+            dropped_count += 1;
+        }
+    }
+
+    (resolved, dropped_count, false)
+}
 
 #[derive(Debug, Error)]
 pub enum AiError {
@@ -176,6 +222,8 @@ impl AiAgent {
         // Add native tools
         all_tools.push(tools::display_recipe_tool());
         registry.insert("display_recipe".to_string(), "native".to_string());
+        all_tools.push(tools::display_meal_plan_tool());
+        registry.insert("display_meal_plan".to_string(), "native".to_string());
 
         // Store registry and tools
         *self.tool_registry.lock().await = registry;
@@ -353,10 +401,93 @@ impl AiAgent {
         None
     }
 
-    /// Execute a tool call. Returns (result_text, optional_recipe_id, optional_timer_data).
+    /// Fetch all recipes and return as a HashMap<recipe_id, title>
+    async fn fetch_all_recipes_as_map(&self) -> HashMap<String, String> {
+        let registry = self.tool_registry.lock().await;
+        let server_name = match registry.get("list_recipes") {
+            Some(s) => s.clone(),
+            None => return HashMap::new(),
+        };
+        drop(registry);
+
+        let result = match self.call_mcp_server(&server_name, "tools/call", serde_json::json!({
+            "name": "list_recipes",
+            "arguments": {}
+        })).await {
+            Ok(r) => r,
+            Err(_) => return HashMap::new(),
+        };
+
+        let content = result
+            .get("content")
+            .and_then(|c| c.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|item| item.get("text"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("");
+
+        let recipes_response: serde_json::Value = match serde_json::from_str(content) {
+            Ok(v) => v,
+            Err(_) => return HashMap::new(),
+        };
+
+        let mut map = HashMap::new();
+        if let Some(recipes) = recipes_response.get("recipes").and_then(|v| v.as_array()) {
+            for recipe in recipes {
+                let id = recipe.get("recipe_id").and_then(|v| v.as_str());
+                let title = recipe.get("title").and_then(|v| v.as_str());
+                if let (Some(id), Some(title)) = (id, title) {
+                    map.insert(id.to_string(), title.to_string());
+                }
+            }
+        }
+        map
+    }
+
+    /// Handle a display_meal_plan tool call: validate IDs, resolve titles, build MealArtifactData.
+    /// Drops unknown non-centrepiece IDs; returns an error string for invalid centrepiece.
+    async fn handle_display_meal_plan(&self, tool_call: &ToolCall) -> Result<(String, Option<MealArtifactData>), AiError> {
+        let title = tool_call.arguments.get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Meal Plan")
+            .to_string();
+
+        let guest_count = tool_call.arguments.get("guest_count")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32);
+
+        let recipes_arg = tool_call.arguments.get("recipes")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let all_recipes = self.fetch_all_recipes_as_map().await;
+
+        let (resolved, dropped_count, centrepiece_invalid) =
+            filter_meal_plan_recipes(&recipes_arg, &all_recipes);
+
+        if centrepiece_invalid {
+            return Ok((
+                "Error: Could not find the centrepiece recipe. Please use list_recipes to get valid recipe IDs.".to_string(),
+                None,
+            ));
+        }
+
+        let data = MealArtifactData { title, guest_count, recipes: resolved };
+
+        let mut result_msg = "Meal plan displayed in the side panel.".to_string();
+        if dropped_count > 0 {
+            result_msg.push_str(&format!(" Note: {} recipe(s) with unknown IDs were omitted.", dropped_count));
+        }
+
+        Ok((result_msg, Some(data)))
+    }
+
+    /// Execute a tool call. Returns (result_text, optional_recipe_id, optional_timer_data, optional_meal_artifact).
     /// If the tool is display_recipe, returns the recipe_id for the chat handler to emit SSE.
     /// If the tool is start_timer, returns (duration_minutes, label) for the chat handler to emit SSE.
-    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>, Option<(f64, String)>), AiError> {
+    /// If the tool is display_meal_plan, returns MealArtifactData for the chat handler to emit SSE.
+    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>, Option<(f64, String)>, Option<MealArtifactData>), AiError> {
         // Handle native tools (not MCP)
         if tool_call.name == "display_recipe" {
             tracing::info!("Tool call detected: display_recipe with args: {:?}", tool_call.arguments);
@@ -403,11 +534,18 @@ impl AiAgent {
                     "Recipe displayed in side panel. STOP. Do not read the recipe out loud. Do not call get_recipe. Just provide a brief summary.".to_string(),
                     Some(id),
                     None,
+                    None,
                 ));
             } else {
                 tracing::warn!("Failed to resolve recipe_id from args: {:?}", tool_call.arguments);
-                return Ok(("Error: Could not find the recipe. Please use list_recipes first to get the correct recipe_id.".to_string(), None, None));
+                return Ok(("Error: Could not find the recipe. Please use list_recipes first to get the correct recipe_id.".to_string(), None, None, None));
             }
+        }
+
+        if tool_call.name == "display_meal_plan" {
+            tracing::info!("Tool call detected: display_meal_plan with args: {:?}", tool_call.arguments);
+            let (msg, maybe_meal_plan) = self.handle_display_meal_plan(tool_call).await?;
+            return Ok((msg, None, None, maybe_meal_plan));
         }
 
         // MCP tools - look up server from registry
@@ -459,21 +597,22 @@ impl AiAgent {
         };
 
         if content.is_empty() {
-            Ok((serde_json::to_string_pretty(&result)?, None, timer_data))
+            Ok((serde_json::to_string_pretty(&result)?, None, timer_data, None))
         } else {
-            Ok((content.to_string(), None, timer_data))
+            Ok((content.to_string(), None, timer_data, None))
         }
     }
 
     /// Chat with the AI agent.
-    /// Returns (response_text, tools_used, recipe_ids_to_display, timer_data, full_messages).
+    /// Returns (response_text, tools_used, recipe_ids_to_display, timer_data, meal_plans, full_messages).
     /// Timer_data is Vec<(duration_minutes, label)> for start_timer tool calls.
+    /// meal_plans is Vec<MealArtifactData> for display_meal_plan tool calls.
     /// The full_messages vector contains all messages from the agent loop
     /// (including tool calls and results) for persisting in the session.
     pub async fn chat(
         &self,
         conversation: &[Message],
-    ) -> Result<(String, Vec<String>, Vec<String>, Vec<(f64, String)>, Vec<Message>), AiError> {
+    ) -> Result<(String, Vec<String>, Vec<String>, Vec<(f64, String)>, Vec<MealArtifactData>, Vec<Message>), AiError> {
         // Ensure MCP is running
         {
             let processes_guard = self.mcp_processes.lock().await;
@@ -507,7 +646,9 @@ impl AiAgent {
         let mut tool_uses: Vec<String> = Vec::new();
         let mut recipe_ids: Vec<String> = Vec::new();
         let mut timer_data: Vec<(f64, String)> = Vec::new();
+        let mut meal_plan_data: Vec<MealArtifactData> = Vec::new();
         let mut final_text = String::new();
+        let mut executed_tool_signatures: HashSet<String> = HashSet::new();
 
         // Agent loop: keep going until we get a text-only response
         const MAX_ITERATIONS: usize = 10;
@@ -534,22 +675,44 @@ impl AiAgent {
             // Execute all tool calls
             let mut tool_results: Vec<ToolResult> = Vec::new();
             for call in &pending_tool_calls {
-                tool_uses.push(call.name.clone());
-                let result = self.execute_tool(call).await;
-                let (content, is_error) = match result {
-                    Ok((text, maybe_recipe_id, maybe_timer_data)) => {
-                        if let Some(rid) = maybe_recipe_id {
-                            recipe_ids.push(rid);
+                let signature = format!("{}:{}", call.name, call.arguments);
+                let duplicate_call = !executed_tool_signatures.insert(signature);
+
+                let (content, is_error) = if duplicate_call {
+                    tracing::warn!(
+                        "Skipping duplicate tool call in same chat turn: {} with args {:?}",
+                        call.name,
+                        call.arguments
+                    );
+                    (
+                        format!(
+                            "Skipped duplicate {} call with the same arguments. Use the existing result, choose a different URL, or search for another source.",
+                            call.name
+                        ),
+                        true,
+                    )
+                } else {
+                    tool_uses.push(call.name.clone());
+                    let result = self.execute_tool(call).await;
+                    match result {
+                        Ok((text, maybe_recipe_id, maybe_timer_data, maybe_meal_plan)) => {
+                            if let Some(rid) = maybe_recipe_id {
+                                recipe_ids.push(rid);
+                            }
+                            if let Some(timer) = maybe_timer_data {
+                                timer_data.push(timer);
+                            }
+                            if let Some(mp) = maybe_meal_plan {
+                                meal_plan_data.push(mp);
+                            }
+                            (text, false)
                         }
-                        if let Some(timer) = maybe_timer_data {
-                            timer_data.push(timer);
-                        }
-                        (text, false)
+                        Err(e) => (format!("Error: {}", e), true),
                     }
-                    Err(e) => (format!("Error: {}", e), true),
                 };
                 tool_results.push(ToolResult {
                     tool_use_id: call.id.clone(),
+                    name: Some(call.name.clone()),
                     content,
                     is_error,
                 });
@@ -575,6 +738,125 @@ impl AiAgent {
 
         // Return messages starting after the original conversation
         let new_messages = messages[conversation.len()..].to_vec();
-        Ok((final_text, tool_uses, recipe_ids, timer_data, new_messages))
+        Ok((final_text, tool_uses, recipe_ids, timer_data, meal_plan_data, new_messages))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_recipe(id: &str, role: &str) -> serde_json::Value {
+        serde_json::json!({ "recipe_id": id, "role": role })
+    }
+
+    fn make_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    }
+
+    // Task 5.1 — filter_meal_plan_recipes drops unknown non-centrepiece IDs
+    #[test]
+    fn test_filter_drops_unknown_side_recipe() {
+        let map = make_map(&[("id-1", "Beef Wellington")]);
+        let recipes = vec![
+            make_recipe("id-1", "centrepiece"),
+            make_recipe("unknown-id", "side"),
+        ];
+
+        let (resolved, dropped, centrepiece_invalid) = filter_meal_plan_recipes(&recipes, &map);
+
+        assert!(!centrepiece_invalid, "centrepiece should be valid");
+        assert_eq!(resolved.len(), 1, "Only the known recipe should be resolved");
+        assert_eq!(resolved[0].recipe_id, "id-1");
+        assert_eq!(resolved[0].role, "centrepiece");
+        assert_eq!(dropped, 1, "Unknown side recipe should be dropped");
+    }
+
+    // Task 5.1 — filter_meal_plan_recipes returns error for invalid centrepiece
+    #[test]
+    fn test_filter_errors_on_invalid_centrepiece() {
+        let map = make_map(&[("id-1", "Roast Potatoes")]);
+        let recipes = vec![
+            make_recipe("unknown-centrepiece-id", "centrepiece"),
+            make_recipe("id-1", "side"),
+        ];
+
+        let (resolved, _dropped, centrepiece_invalid) = filter_meal_plan_recipes(&recipes, &map);
+
+        assert!(centrepiece_invalid, "Unknown centrepiece should be flagged");
+        assert!(resolved.is_empty(), "No recipes should be resolved when centrepiece is invalid");
+    }
+
+    // Resolves titles correctly from the map
+    #[test]
+    fn test_filter_resolves_titles() {
+        let map = make_map(&[
+            ("id-1", "Beef Wellington"),
+            ("id-2", "Roast Potatoes"),
+        ]);
+        let recipes = vec![
+            make_recipe("id-1", "centrepiece"),
+            make_recipe("id-2", "side"),
+        ];
+
+        let (resolved, dropped, centrepiece_invalid) = filter_meal_plan_recipes(&recipes, &map);
+
+        assert!(!centrepiece_invalid);
+        assert_eq!(dropped, 0);
+        assert_eq!(resolved[0].title, "Beef Wellington");
+        assert_eq!(resolved[1].title, "Roast Potatoes");
+    }
+
+    // Empty recipe list is valid
+    #[test]
+    fn test_filter_empty_recipes() {
+        let map = make_map(&[]);
+        let (resolved, dropped, centrepiece_invalid) = filter_meal_plan_recipes(&[], &map);
+        assert!(!centrepiece_invalid);
+        assert_eq!(resolved.len(), 0);
+        assert_eq!(dropped, 0);
+    }
+
+    // Task 5.2 — MealArtifactData serializes to expected JSON shape
+    #[test]
+    fn test_meal_artifact_data_serializes_correctly() {
+        let data = MealArtifactData {
+            title: "Sunday Roast".to_string(),
+            guest_count: Some(6),
+            recipes: vec![
+                MealPlanEntry {
+                    recipe_id: "abc-123".to_string(),
+                    title: "Beef Wellington".to_string(),
+                    role: "centrepiece".to_string(),
+                },
+                MealPlanEntry {
+                    recipe_id: "def-456".to_string(),
+                    title: "Roast Potatoes".to_string(),
+                    role: "side".to_string(),
+                },
+            ],
+        };
+
+        let json = serde_json::to_string(&data).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["title"], "Sunday Roast");
+        assert_eq!(parsed["guest_count"], 6);
+        assert_eq!(parsed["recipes"][0]["recipe_id"], "abc-123");
+        assert_eq!(parsed["recipes"][0]["role"], "centrepiece");
+        assert_eq!(parsed["recipes"][1]["title"], "Roast Potatoes");
+    }
+
+    // Task 5.2 — null guest_count serializes to null (not absent)
+    #[test]
+    fn test_meal_artifact_data_null_guest_count() {
+        let data = MealArtifactData {
+            title: "BBQ".to_string(),
+            guest_count: None,
+            recipes: vec![],
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["guest_count"], serde_json::Value::Null);
     }
 }

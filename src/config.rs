@@ -8,14 +8,36 @@ use std::path::Path;
 pub struct Config {
     pub database_url: String,
     pub bind_address: String,
-    pub anthropic_api_key: String,
+    pub anthropic_api_key: Option<String>,
+    pub gemini_api_key: Option<String>,
+    pub ai_provider: LlmProviderKind,
     pub ai_model: String,
+    pub difficulty_provider: LlmProviderKind,
     pub difficulty_model: String,
     pub dev_user_email: Option<String>,
     pub mock_llm: bool,
     pub mock_recipe_id: Option<String>,
     pub families_config: FamiliesConfig,
     pub photos_dir: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LlmProviderKind {
+    Anthropic,
+    Gemini,
+}
+
+impl LlmProviderKind {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value.trim().to_lowercase().as_str() {
+            "anthropic" => Ok(Self::Anthropic),
+            "gemini" => Ok(Self::Gemini),
+            other => Err(format!(
+                "Unsupported LLM provider '{}'. Expected 'anthropic' or 'gemini'",
+                other
+            )),
+        }
+    }
 }
 
 /// Configuration for family-based multi-tenancy, loaded from families.yaml
@@ -76,20 +98,39 @@ impl Config {
         let bind_address = env::var("BIND_ADDRESS")
             .unwrap_or_else(|_| "127.0.0.1:3000".to_string());
 
-        let anthropic_api_key = env::var("ANTHROPIC_API_KEY")
-            .map_err(|_| "ANTHROPIC_API_KEY must be set".to_string())?;
-
-        let ai_model = env::var("AI_MODEL")
-            .unwrap_or_else(|_| "claude-sonnet-4-6".to_string());
-
-        let difficulty_model = env::var("DIFFICULTY_MODEL")
-            .unwrap_or_else(|_| "claude-haiku-4-5".to_string());
-
-        let dev_user_email = env::var("DEV_USER_EMAIL").ok();
-
         let mock_llm = env::var("MOCK_LLM")
             .unwrap_or_else(|_| "false".to_string())
             .to_lowercase() == "true";
+
+        let ai_provider = LlmProviderKind::parse(
+            &env::var("AI_PROVIDER").unwrap_or_else(|_| "anthropic".to_string()),
+        )?;
+
+        let difficulty_provider = match env::var("DIFFICULTY_PROVIDER") {
+            Ok(value) => LlmProviderKind::parse(&value)?,
+            Err(_) => ai_provider,
+        };
+
+        let ai_model = env::var("AI_MODEL")
+            .unwrap_or_else(|_| default_model_for(ai_provider, ModelPurpose::Chat).to_string());
+
+        let difficulty_model = env::var("DIFFICULTY_MODEL")
+            .unwrap_or_else(|_| {
+                default_model_for(difficulty_provider, ModelPurpose::Difficulty).to_string()
+            });
+
+        let anthropic_api_key = env::var("ANTHROPIC_API_KEY").ok();
+        let gemini_api_key = env::var("GEMINI_API_KEY").ok();
+
+        validate_provider_keys(
+            mock_llm,
+            ai_provider,
+            difficulty_provider,
+            anthropic_api_key.as_deref(),
+            gemini_api_key.as_deref(),
+        )?;
+
+        let dev_user_email = env::var("DEV_USER_EMAIL").ok();
 
         let mock_recipe_id = env::var("MOCK_RECIPE_ID").ok();
 
@@ -104,7 +145,10 @@ impl Config {
             database_url,
             bind_address,
             anthropic_api_key,
+            gemini_api_key,
+            ai_provider,
             ai_model,
+            difficulty_provider,
             difficulty_model,
             dev_user_email,
             mock_llm,
@@ -113,6 +157,46 @@ impl Config {
             photos_dir,
         })
     }
+}
+
+enum ModelPurpose {
+    Chat,
+    Difficulty,
+}
+
+fn default_model_for(provider: LlmProviderKind, purpose: ModelPurpose) -> &'static str {
+    match (provider, purpose) {
+        (LlmProviderKind::Anthropic, ModelPurpose::Chat) => "claude-sonnet-4-6",
+        (LlmProviderKind::Anthropic, ModelPurpose::Difficulty) => "claude-haiku-4-5",
+        (LlmProviderKind::Gemini, ModelPurpose::Chat) => "gemini-2.5-pro",
+        (LlmProviderKind::Gemini, ModelPurpose::Difficulty) => "gemini-2.5-flash",
+    }
+}
+
+fn validate_provider_keys(
+    mock_llm: bool,
+    ai_provider: LlmProviderKind,
+    difficulty_provider: LlmProviderKind,
+    anthropic_api_key: Option<&str>,
+    gemini_api_key: Option<&str>,
+) -> Result<(), String> {
+    if mock_llm {
+        return Ok(());
+    }
+
+    let needs_anthropic =
+        ai_provider == LlmProviderKind::Anthropic || difficulty_provider == LlmProviderKind::Anthropic;
+    let needs_gemini =
+        ai_provider == LlmProviderKind::Gemini || difficulty_provider == LlmProviderKind::Gemini;
+
+    if needs_anthropic && anthropic_api_key.filter(|key| !key.is_empty()).is_none() {
+        return Err("ANTHROPIC_API_KEY must be set when Anthropic is selected".to_string());
+    }
+    if needs_gemini && gemini_api_key.filter(|key| !key.is_empty()).is_none() {
+        return Err("GEMINI_API_KEY must be set when Gemini is selected".to_string());
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -210,5 +294,61 @@ families:
         let result = FamiliesConfig::load(Path::new("/nonexistent/families.yaml"));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Failed to read"));
+    }
+
+    #[test]
+    fn test_parse_provider_defaults_supported_values() {
+        assert_eq!(LlmProviderKind::parse("anthropic").unwrap(), LlmProviderKind::Anthropic);
+        assert_eq!(LlmProviderKind::parse("gemini").unwrap(), LlmProviderKind::Gemini);
+        assert_eq!(LlmProviderKind::parse(" Gemini ").unwrap(), LlmProviderKind::Gemini);
+        assert!(LlmProviderKind::parse("openai").is_err());
+    }
+
+    #[test]
+    fn test_provider_key_validation_anthropic_default() {
+        let result = validate_provider_keys(
+            false,
+            LlmProviderKind::Anthropic,
+            LlmProviderKind::Anthropic,
+            Some("anthropic-key"),
+            None,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_provider_key_validation_gemini_does_not_require_anthropic() {
+        let result = validate_provider_keys(
+            false,
+            LlmProviderKind::Gemini,
+            LlmProviderKind::Gemini,
+            None,
+            Some("gemini-key"),
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_provider_key_validation_requires_selected_keys() {
+        let result = validate_provider_keys(
+            false,
+            LlmProviderKind::Anthropic,
+            LlmProviderKind::Gemini,
+            Some("anthropic-key"),
+            None,
+        );
+        assert!(result.unwrap_err().contains("GEMINI_API_KEY"));
+    }
+
+    #[test]
+    fn test_mock_llm_bypasses_real_provider_keys() {
+        let result = validate_provider_keys(
+            true,
+            LlmProviderKind::Gemini,
+            LlmProviderKind::Anthropic,
+            None,
+            None,
+        );
+        assert!(result.is_ok());
     }
 }

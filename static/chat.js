@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from './utils.js';
+import * as MealPlanDisplay from './meal-plan-display.js';
 
 // Import global state accessors (will be set by app.js)
 export let state = null;
@@ -294,6 +295,11 @@ export async function sendMessage() {
                             if (parsed.recipe_id !== undefined) {
                                 state.fetchAndDisplayRecipe(parsed.recipe_id);
                             }
+                            break;
+
+                        case 'meal_artifact':
+                            // Meal plan panel display
+                            MealPlanDisplay.renderMealPlan(parsed);
                             break;
 
                         case 'timer_start':

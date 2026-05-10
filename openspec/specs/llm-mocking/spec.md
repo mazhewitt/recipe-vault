@@ -3,9 +3,7 @@
 ## Purpose
 
 The LLM Mocking capability provides a mock LLM provider that returns predictable, canned responses. This allows for reliable automated testing of chat and tool-use logic without incurring API costs or dealing with the non-deterministic nature of real LLMs.
-
 ## Requirements
-
 ### Requirement: Mock LLM provider exists
 
 The system SHALL include a `Mock` variant in `LlmProviderType` that returns predictable responses without calling external APIs.
@@ -20,11 +18,13 @@ The system SHALL activate mock LLM mode when `MOCK_LLM=true` environment variabl
 
 #### Scenario: Mock mode enabled
 - **WHEN** server starts with `MOCK_LLM=true`
-- **THEN** `Config.mock_llm` is true and chat requests use the mock provider
+- **THEN** `Config.mock_llm` is true
+- **AND** chat and difficulty requests use the mock provider regardless of `AI_PROVIDER` or `DIFFICULTY_PROVIDER`
 
 #### Scenario: Real mode when variable unset
 - **WHEN** server starts without `MOCK_LLM` environment variable
-- **THEN** `Config.mock_llm` is false and chat requests use the real Anthropic API provider
+- **THEN** `Config.mock_llm` is false
+- **AND** chat and difficulty requests use the configured real LLM provider
 
 ### Requirement: Mock returns appropriate SSE for list queries
 

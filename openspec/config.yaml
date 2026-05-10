@@ -9,7 +9,7 @@ context: |
   - Database: SQLite via sqlx (single-file, simple deployment)
   - Frontend: htmx (SSE extension) + custom JavaScript modules (chat, navigation, timers, recipe display)
   - Templating: Static HTML files served by tower-http; minimal server-side string substitution (no template engine)
-  - AI: Claude API (cooking guidance, recipe parsing, difficulty assessment); OpenAI also supported
+  - AI: Anthropic Claude or Gemini API (cooking guidance, recipe parsing, difficulty assessment)
   - Hosting: Synology NAS (self-hosted via Docker, deployed via git tags + GitHub Actions)
 
   Architecture principles:
@@ -31,8 +31,9 @@ context: |
   - RESTful routes for CRUD, htmx-friendly partial responses
   - Test database uses in-memory SQLite
 
-  Key env vars: DATABASE_URL, ANTHROPIC_API_KEY, BIND_ADDRESS, AI_MODEL, DIFFICULTY_MODEL,
-    DEV_USER_EMAIL, FAMILIES_CONFIG_PATH, PHOTOS_DIR
+  Key env vars: DATABASE_URL, AI_PROVIDER, DIFFICULTY_PROVIDER, ANTHROPIC_API_KEY,
+    GEMINI_API_KEY, BIND_ADDRESS, AI_MODEL, DIFFICULTY_MODEL, DEV_USER_EMAIL,
+    FAMILIES_CONFIG_PATH, PHOTOS_DIR
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

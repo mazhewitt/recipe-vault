@@ -79,7 +79,7 @@ pub fn create_test_app_with_config(
 ) -> Router {
     use recipe_vault::auth::{api_key_auth, cloudflare_auth, ApiKeyState, CloudflareAuthState};
     use recipe_vault::handlers::recipes;
-    use recipe_vault::config::Config;
+    use recipe_vault::config::{Config, LlmProviderKind};
     use axum::middleware;
 
     let families_config = Arc::new(families_config.clone());
@@ -103,8 +103,11 @@ pub fn create_test_app_with_config(
     let config = Config {
         database_url: ":memory:".to_string(),
         bind_address: "127.0.0.1:3000".to_string(),
-        anthropic_api_key: "test-key".to_string(),
+        anthropic_api_key: Some("test-key".to_string()),
+        gemini_api_key: None,
+        ai_provider: LlmProviderKind::Anthropic,
         ai_model: "test-model".to_string(),
+        difficulty_provider: LlmProviderKind::Anthropic,
         difficulty_model: "test-model".to_string(),
         mock_llm: true,
         mock_recipe_id: None,

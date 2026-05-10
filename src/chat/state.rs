@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 
 use crate::ai::{AiAgent, AiAgentConfig, McpServerConfig, LlmProvider, LlmProviderType};
 use crate::ai::prompts::CHAT_SYSTEM_PROMPT;
-use crate::config::Config;
+use crate::config::{Config, LlmProviderKind};
 use crate::chat::{ChatError, SessionStore};
 
 #[derive(Clone)]
@@ -37,9 +37,21 @@ impl ChatState {
             let llm = if self.config.mock_llm {
                 LlmProvider::mock(self.config.mock_recipe_id.clone())
             } else {
+                let (provider_type, api_key) = match self.config.ai_provider {
+                    LlmProviderKind::Anthropic => (
+                        LlmProviderType::Anthropic,
+                        self.config.anthropic_api_key.clone(),
+                    ),
+                    LlmProviderKind::Gemini => (
+                        LlmProviderType::Gemini,
+                        self.config.gemini_api_key.clone(),
+                    ),
+                };
+                let api_key = api_key
+                    .ok_or_else(|| ChatError::Agent("Configured LLM provider API key missing".to_string()))?;
                 LlmProvider::new(
-                    LlmProviderType::Anthropic,
-                    self.config.anthropic_api_key.clone(),
+                    provider_type,
+                    api_key,
                     self.config.ai_model.clone(),
                     Some(self.http_client.clone()),
                 )
@@ -99,7 +111,12 @@ impl ChatState {
                 let search_server = McpServerConfig {
                     name: "search".to_string(),
                     command: "uvx".to_string(),
-                    args: vec!["duckduckgo-mcp".to_string(), "serve".to_string()],
+                    args: vec![
+                        "--from".to_string(),
+                        "duckduckgo-mcp==2.2.0".to_string(),
+                        "duckduckgo-mcp".to_string(),
+                        "serve".to_string(),
+                    ],
                     env: std::collections::HashMap::new(),
                 };
                 mcp_servers.push(search_server);
@@ -118,7 +135,7 @@ impl ChatState {
         Ok(())
     }
 
-    pub async fn chat(&self, conversation: &[crate::ai::Message]) -> Result<(String, Vec<String>, Vec<String>, Vec<(f64, String)>, Vec<crate::ai::Message>), ChatError> {
+    pub async fn chat(&self, conversation: &[crate::ai::Message]) -> Result<(String, Vec<String>, Vec<String>, Vec<(f64, String)>, Vec<crate::ai::MealArtifactData>, Vec<crate::ai::Message>), ChatError> {
         let agent_guard = self.agent.read().await;
         let agent = agent_guard
             .as_ref()

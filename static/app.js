@@ -9,6 +9,7 @@ import * as Chat from './chat.js';
 import * as Timer from './timer.js';
 import * as Navigation from './navigation.js';
 import * as PageTransitions from './page-transitions.js';
+import * as MealPlanDisplay from './meal-plan-display.js';
 
 // Global state
 let conversationId = null;
@@ -70,6 +71,7 @@ Chat.initializeState(sharedState);
 Timer.initializeState ? Timer.initializeState(sharedState) : null;
 Navigation.initializeState(sharedState);
 PageTransitions.initializeState(sharedState);
+MealPlanDisplay.initializeState(sharedState);
 
 // Image handling functions
 function fileToBase64(file) {
@@ -140,6 +142,7 @@ window.switchTab = Navigation.switchTab;
 window.cancelTimer = Timer.cancelTimer;
 window.removeImage = removeImage;
 window.fetchAndDisplayRecipe = RecipeDisplay.fetchAndDisplayRecipe;
+window.renderMealPlan = MealPlanDisplay.renderMealPlan;
 window.fetchRecipeList = fetchRecipeList;
 window.loadNextRecipe = Navigation.loadNextRecipe;
 window.loadPrevRecipe = Navigation.loadPrevRecipe;

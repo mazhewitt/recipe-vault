@@ -56,6 +56,50 @@ export function showRecipeError(message) {
     `;
 }
 
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchRecipeFromApi(recipeId) {
+    const response = await fetch(`/api/recipes/${recipeId}`, {
+        credentials: 'same-origin'
+    });
+
+    if (!response.ok) {
+        const error = new Error(`Failed to load recipe: ${response.status}`);
+        error.status = response.status;
+        throw error;
+    }
+
+    return response.json();
+}
+
+async function refreshDifficultyIfPending(recipe) {
+    if (!recipe || recipe.difficulty != null || !recipe.id) return;
+
+    for (const waitMs of [3000, 7000, 12000]) {
+        await delay(waitMs);
+
+        if (state.currentRecipeId !== recipe.id || state.viewMode !== 'recipe') {
+            return;
+        }
+
+        try {
+            const refreshed = await fetchRecipeFromApi(recipe.id);
+            if (refreshed.difficulty != null) {
+                renderRecipe(refreshed);
+                await state.fetchRecipeList(true);
+                state.updateNavigationState();
+                prefetchAdjacent(refreshed.id);
+                return;
+            }
+        } catch (error) {
+            console.warn('Unable to refresh pending recipe difficulty:', error);
+            return;
+        }
+    }
+}
+
 export function getTotalTimeMinutes(recipe) {
     const prepTime = Number(recipe.prep_time);
     const cookTime = Number(recipe.cook_time);
@@ -481,14 +525,13 @@ export async function fetchAndDisplayRecipe(recipeId) {
         // Check prefetch cache first
         const cached = getCachedRecipe(recipeId);
         let recipe;
-        if (cached) {
+        if (cached && cached.difficulty != null) {
             recipe = cached;
         } else {
-            const response = await fetch(`/api/recipes/${recipeId}`, {
-                credentials: 'same-origin'
-            });
-            if (!response.ok) {
-                if (response.status === 404) {
+            try {
+                recipe = await fetchRecipeFromApi(recipeId);
+            } catch (error) {
+                if (error.status === 404) {
                     // Recipe missing - refresh list and fallback to first if available
                     const list = await state.fetchRecipeList(true);
                     if (list.length > 0) {
@@ -507,7 +550,6 @@ export async function fetchAndDisplayRecipe(recipeId) {
                 }
                 return;
             }
-            recipe = await response.json();
         }
         renderRecipe(recipe);
         state.currentRecipeId = recipe.id || recipe.recipe?.id || state.currentRecipeId;
@@ -517,6 +559,7 @@ export async function fetchAndDisplayRecipe(recipeId) {
         state.updateNavigationState();
         // Prefetch adjacent recipes for instant navigation
         prefetchAdjacent(state.currentRecipeId);
+        refreshDifficultyIfPending(recipe);
     } catch (error) {
         console.error('Error fetching recipe:', error);
         showRecipeError('Failed to load recipe');

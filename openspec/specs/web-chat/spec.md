@@ -6,34 +6,34 @@ The Web Chat feature provides a browser-based interface for conversing with Clau
 ## Requirements
 ### Requirement: Chat Message Handling
 
-The system SHALL accept chat messages via API and return AI responses. Messages MAY include optional image attachments alongside text.
+The system SHALL accept chat messages via API and return AI responses using the configured LLM provider. Messages MAY include optional image attachments alongside text.
 
 #### Scenario: Send message and receive response
 - **WHEN** a user sends a message via POST /api/chat
-- **THEN** the message is sent to Claude API
-- **AND** Claude's response is streamed back
+- **THEN** the message is sent to the configured LLM provider
+- **AND** the provider's response is streamed back
 - **AND** the response includes any tool use results
 
 #### Scenario: Send message with image attachment
 - **WHEN** a user sends a message via POST /api/chat with an image field
-- **THEN** the message text and image are both sent to Claude API
-- **AND** Claude can see and analyze the image content
-- **AND** Claude's response may reference or extract data from the image
+- **THEN** the message text and image are both sent to the configured LLM provider
+- **AND** the provider can see and analyze the image content
+- **AND** the response may reference or extract data from the image
 - **AND** the response is streamed back
 
 #### Scenario: Message with tool use
 - **WHEN** a user asks "What recipes do I have?"
-- **AND** Claude determines it needs to call list_recipes
+- **AND** the configured LLM provider determines it needs to call list_recipes
 - **THEN** the MCP tool is invoked
-- **AND** the tool result is incorporated into Claude's response
+- **AND** the tool result is incorporated into the provider's response
 - **AND** the user sees the recipe list in the response
 
 #### Scenario: LLM returns text alongside tool calls
-- **WHEN** Claude returns both text and tool calls in a single response
+- **WHEN** the configured LLM provider returns both text and tool calls in a single response
 - **THEN** the agent loop SHALL execute the tool calls
-- **AND** send the tool results back to the LLM
-- **AND** continue the loop so the LLM can produce a final response incorporating tool output
-- **AND** the final response text shown to the user is from the LLM's response after seeing tool results
+- **AND** send the tool results back to the provider
+- **AND** continue the loop so the provider can produce a final response incorporating tool output
+- **AND** the final response text shown to the user is from the provider's response after seeing tool results
 
 ### Requirement: MCP Tool Access
 
@@ -223,6 +223,30 @@ The system SHALL require authentication for chat access.
 - **WHEN** a user accesses the chat web UI without a valid session
 - **THEN** they are shown a login form requesting the family password
 - **AND** upon successful login, they are redirected to the chat interface
+
+### Requirement: display_meal_plan Tool
+The system SHALL provide a `display_meal_plan` tool that the AI can call to signal a meal plan should be rendered in the artifact panel. The tool SHALL only be called after the user has explicitly confirmed the proposed meal in chat.
+
+#### Scenario: Tool definition included in chat requests
+- **WHEN** a chat request is made
+- **THEN** the `display_meal_plan` tool SHALL be included in the tools array sent to Claude
+- **AND** the schema SHALL specify: `title` (string, required), `guest_count` (integer, optional), `recipes` (array of `{recipe_id: string, role: string}`, required, min 1 item)
+
+#### Scenario: Valid call triggers meal_artifact event
+- **WHEN** Claude calls `display_meal_plan` with valid recipe_ids
+- **THEN** the backend SHALL validate all recipe_ids exist in the user's family vault
+- **AND** emit a `meal_artifact` SSE event with the full meal plan payload
+- **AND** return a tool result confirming the display was triggered
+
+#### Scenario: Unknown recipe_id in payload
+- **WHEN** Claude calls `display_meal_plan` and one or more recipe_ids do not exist in the vault
+- **THEN** if the unknown ID is the centrepiece, the backend SHALL return an error to Claude and NOT emit a `meal_artifact` event
+- **AND** if the unknown IDs are non-centrepiece recipes, they SHALL be dropped from the payload and the remaining plan emitted
+
+#### Scenario: meal_artifact SSE event structure
+- **WHEN** a `meal_artifact` event is emitted
+- **THEN** it SHALL contain: `title` (string), `guest_count` (integer or null), `recipes` (array of `{recipe_id, title, role}`)
+- **AND** recipe titles SHALL be resolved server-side so the frontend does not need to fetch each recipe individually for panel rendering
 
 ## ADDED Requirements
 

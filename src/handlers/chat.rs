@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use uuid::Uuid;
 
-use crate::ai::{ContentBlock, ImageSource, Message};
+use crate::ai::{ContentBlock, ImageSource, Message, MealPlanEntry};
 use crate::chat::{ChatError, ChatState};
 
 #[derive(Debug, Deserialize)]
@@ -52,6 +52,12 @@ pub enum SseEvent {
     ToolUse { tool: String, status: String },
     #[serde(rename = "recipe_artifact")]
     RecipeArtifact { recipe_id: String },
+    #[serde(rename = "meal_artifact")]
+    MealArtifact {
+        title: String,
+        guest_count: Option<i32>,
+        recipes: Vec<MealPlanEntry>,
+    },
     #[serde(rename = "timer_start")]
     TimerStart {
         duration_minutes: f64,
@@ -163,7 +169,7 @@ pub async fn chat(
 
         // Get agent and process message
         match state.chat(&conversation).await {
-            Ok((response_text, tools_used, recipe_ids, timer_data, new_messages)) => {
+            Ok((response_text, tools_used, recipe_ids, timer_data, meal_plans, new_messages)) => {
                     // Send tool use events
                     for tool in &tools_used {
                         yield Ok(Event::default()
@@ -182,6 +188,14 @@ pub async fn chat(
                             .data(serde_json::json!({
                                 "recipe_id": recipe_id
                             }).to_string()));
+                    }
+
+                    // Send meal artifact events (for display_meal_plan tool calls)
+                    for meal_plan in &meal_plans {
+                        tracing::info!("Emitting meal_artifact event: title={}", meal_plan.title);
+                        yield Ok(Event::default()
+                            .event("meal_artifact")
+                            .data(serde_json::to_string(meal_plan).unwrap_or_default()));
                     }
 
                     // Send timer_start events (for start_timer tool calls)
@@ -247,4 +261,86 @@ pub struct ResetRequest {
 #[derive(Debug, Serialize)]
 pub struct ResetResponse {
     pub success: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Task 5.2 / 5.3 — SseEvent::MealArtifact serializes correctly
+    #[test]
+    fn test_sse_meal_artifact_serializes_to_tagged_json() {
+        let event = SseEvent::MealArtifact {
+            title: "Sunday Roast".to_string(),
+            guest_count: Some(6),
+            recipes: vec![
+                MealPlanEntry {
+                    recipe_id: "abc-123".to_string(),
+                    title: "Beef Wellington".to_string(),
+                    role: "centrepiece".to_string(),
+                },
+            ],
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["event"], "meal_artifact");
+        assert_eq!(parsed["data"]["title"], "Sunday Roast");
+        assert_eq!(parsed["data"]["guest_count"], 6);
+        assert_eq!(parsed["data"]["recipes"][0]["recipe_id"], "abc-123");
+        assert_eq!(parsed["data"]["recipes"][0]["role"], "centrepiece");
+        assert_eq!(parsed["data"]["recipes"][0]["title"], "Beef Wellington");
+    }
+
+    #[test]
+    fn test_sse_meal_artifact_null_guest_count() {
+        let event = SseEvent::MealArtifact {
+            title: "Quick Lunch".to_string(),
+            guest_count: None,
+            recipes: vec![],
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["event"], "meal_artifact");
+        assert_eq!(parsed["data"]["guest_count"], serde_json::Value::Null);
+        assert!(parsed["data"]["recipes"].as_array().unwrap().is_empty());
+    }
+
+    // Task 5.3 — Verify the meal_artifact data emitted via serde_json::to_string
+    // matches what the SSE stream handler emits (since the handler uses MealArtifactData
+    // directly, not SseEvent, we test both round-trips are consistent)
+    #[test]
+    fn test_meal_artifact_serde_roundtrip_consistent_with_sse_payload() {
+        use crate::ai::MealArtifactData;
+
+        let artifact = MealArtifactData {
+            title: "Summer BBQ".to_string(),
+            guest_count: Some(4),
+            recipes: vec![
+                MealPlanEntry {
+                    recipe_id: "r1".to_string(),
+                    title: "Grilled Chicken".to_string(),
+                    role: "centrepiece".to_string(),
+                },
+                MealPlanEntry {
+                    recipe_id: "r2".to_string(),
+                    title: "Coleslaw".to_string(),
+                    role: "side".to_string(),
+                },
+            ],
+        };
+
+        // This is what the SSE handler emits as the data field of the meal_artifact event
+        let sse_data = serde_json::to_string(&artifact).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&sse_data).unwrap();
+
+        assert_eq!(parsed["title"], "Summer BBQ");
+        assert_eq!(parsed["guest_count"], 4);
+        assert_eq!(parsed["recipes"].as_array().unwrap().len(), 2);
+        assert_eq!(parsed["recipes"][0]["role"], "centrepiece");
+        assert_eq!(parsed["recipes"][1]["role"], "side");
+    }
 }
