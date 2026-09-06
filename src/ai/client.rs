@@ -121,6 +121,16 @@ struct JsonRpcError {
     message: String,
 }
 
+/// Timer metadata extracted from a successful `start_timer` tool call, emitted to the
+/// frontend as a `timer_start` SSE event.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimerData {
+    pub duration_minutes: f64,
+    pub label: String,
+    /// 1-based method step the timer belongs to, when the tool was called with one.
+    pub step_number: Option<u32>,
+}
+
 impl AiAgent {
     pub fn new(llm: LlmProvider, config: AiAgentConfig) -> Self {
         Self {
@@ -485,9 +495,9 @@ impl AiAgent {
 
     /// Execute a tool call. Returns (result_text, optional_recipe_id, optional_timer_data, optional_meal_artifact).
     /// If the tool is display_recipe, returns the recipe_id for the chat handler to emit SSE.
-    /// If the tool is start_timer, returns (duration_minutes, label) for the chat handler to emit SSE.
+    /// If the tool is start_timer, returns TimerData for the chat handler to emit SSE.
     /// If the tool is display_meal_plan, returns MealArtifactData for the chat handler to emit SSE.
-    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>, Option<(f64, String)>, Option<MealArtifactData>), AiError> {
+    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>, Option<TimerData>, Option<MealArtifactData>), AiError> {
         // Handle native tools (not MCP)
         if tool_call.name == "display_recipe" {
             tracing::info!("Tool call detected: display_recipe with args: {:?}", tool_call.arguments);
@@ -581,11 +591,15 @@ impl AiAgent {
             if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(content) {
                 let duration = parsed.get("duration_minutes").and_then(|v| v.as_f64());
                 let label = parsed.get("label").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let step_number = parsed
+                    .get("step_number")
+                    .and_then(|v| v.as_u64())
+                    .and_then(|n| u32::try_from(n).ok());
 
                 match (duration, label) {
                     (Some(d), Some(l)) => {
-                        tracing::info!("Timer data extracted: duration={}, label={}", d, l);
-                        Some((d, l))
+                        tracing::info!("Timer data extracted: duration={}, label={}, step={:?}", d, l, step_number);
+                        Some(TimerData { duration_minutes: d, label: l, step_number })
                     }
                     _ => None,
                 }
@@ -605,14 +619,14 @@ impl AiAgent {
 
     /// Chat with the AI agent.
     /// Returns (response_text, tools_used, recipe_ids_to_display, timer_data, meal_plans, full_messages).
-    /// Timer_data is Vec<(duration_minutes, label)> for start_timer tool calls.
+    /// Timer_data is Vec<TimerData> for start_timer tool calls.
     /// meal_plans is Vec<MealArtifactData> for display_meal_plan tool calls.
     /// The full_messages vector contains all messages from the agent loop
     /// (including tool calls and results) for persisting in the session.
     pub async fn chat(
         &self,
         conversation: &[Message],
-    ) -> Result<(String, Vec<String>, Vec<String>, Vec<(f64, String)>, Vec<MealArtifactData>, Vec<Message>), AiError> {
+    ) -> Result<(String, Vec<String>, Vec<String>, Vec<TimerData>, Vec<MealArtifactData>, Vec<Message>), AiError> {
         // Ensure MCP is running
         {
             let processes_guard = self.mcp_processes.lock().await;
@@ -645,7 +659,7 @@ impl AiAgent {
 
         let mut tool_uses: Vec<String> = Vec::new();
         let mut recipe_ids: Vec<String> = Vec::new();
-        let mut timer_data: Vec<(f64, String)> = Vec::new();
+        let mut timer_data: Vec<TimerData> = Vec::new();
         let mut meal_plan_data: Vec<MealArtifactData> = Vec::new();
         let mut final_text = String::new();
         let mut executed_tool_signatures: HashSet<String> = HashSet::new();

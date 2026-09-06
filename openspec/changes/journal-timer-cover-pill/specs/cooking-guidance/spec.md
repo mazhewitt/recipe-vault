@@ -52,9 +52,13 @@ The system SHALL display a countdown timer in the UI when timer_start event is r
 - **AND** the frontend records that the timer belongs to recipe R
 
 #### Scenario: Highlight is re-applied on re-render
-- **WHEN** a timer with a step is running for recipe R and recipe R is rendered again (navigating away and back, or a page refresh of the same recipe)
+- **WHEN** a timer with a step is running for recipe R and recipe R is rendered again within the same page session (for example navigating away and back)
 - **THEN** the same step is highlighted again after rendering
 
 #### Scenario: No highlight without a step or on another recipe
 - **WHEN** a timer is running with no step_number, or a recipe other than the one the timer was started from is displayed
 - **THEN** no method step carries the timer highlight
+
+#### Scenario: Timer does not survive a page reload
+- **WHEN** the page is reloaded while a timer is running
+- **THEN** no timer pill is shown and no method step carries the timer highlight

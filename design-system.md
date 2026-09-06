@@ -515,13 +515,34 @@ Single scrollable column:
 
 ## Component: Timer Widget
 
-A floating speech-bubble style timer.
+A cream pill clipped to the top-right edge of the recipe book cover. It lives inside `.recipe-book` (directly after `.book-cover`) and is positioned relative to the book, so it scrolls and resizes with the book and can never overlap the fixed user identity pill. There is no speech-bubble tail.
 
-| Property | Desktop | Tablet | Mobile |
-|----------|---------|--------|--------|
-| Position | Fixed top-right (25px, 50px) | Fixed top-right (10px, 20px) | Fixed top-right (10px, 12px) |
-| Size | Standard | Standard | Compact (smaller padding) |
-| Bubble tail | Visible | Visible | Hidden (simpler pill shape) |
+| Property | Desktop / Tablet | Mobile (≤ 600px) |
+|----------|------------------|------------------|
+| Position | `absolute; top: -10px; right: 12px` (just above the cover's top rim, clearing the fixed user pill by ~6px) | `top: 6px; right: 8px` (inside the frame, which clips overflow on phones) |
+| Height | 36px | 30px |
+| Padding | `4px 8px 4px 14px` | `2px 6px 2px 10px` |
+| Text | Kalam 18px / 400, `"{label}: M:SS"` | Kalam 14px |
+| Clock icon | 18px | 14px |
+| Close target | 28 × 28px (min-width/min-height) | 28 × 28px |
+| Background / border | `--color-paper-cream`, `2px solid --color-ink-dark`, `--radius-pill`, `--shadow-soft` | Same |
+| z-index | 3 (above `.pages-container` and `.book-cover`) | Same |
+
+Contents in order: clock icon, `.timer-text`, `.timer-cancel` (circular hover/focus tint). The pill is `display: none` when no timer runs.
+
+### Step Highlight Band
+
+When a timer carries a `step_number`, the matching `.prep-step[data-step="N"]` on the recipe the timer was started from gets `.timer-active`:
+
+| Property | Value |
+|----------|-------|
+| Background | `--color-timer-band` (`#fff4c2`) |
+| Radius | `--radius-sm` |
+| Bleed | `margin: 0 -8px`, `padding-right: 8px`, `padding-left: 38px` (30px number gutter + 8px) |
+| Label | `::after` "timer running", Kalam 13px, `--color-ink-light`, top-right of the step |
+| Motion | None — the band appears without animation, so `prefers-reduced-motion` needs no override |
+
+The highlight is re-applied whenever the same recipe is rendered again, never shown on another recipe, and cleared when the timer completes or is cancelled.
 
 ---
 

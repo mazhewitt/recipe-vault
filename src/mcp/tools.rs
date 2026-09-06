@@ -216,6 +216,11 @@ pub fn start_timer_tool() -> ToolDefinition {
                 "label": {
                     "type": "string",
                     "description": "Short description of what the timer is for (e.g., 'Marinate chicken', 'Simmer sauce')"
+                },
+                "step_number": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The 1-based method step this wait belongs to, when there is one"
                 }
             },
             "required": ["duration_minutes", "label"]
@@ -329,15 +334,41 @@ pub fn handle_start_timer(_client: &ApiClient, params: JsonValue) -> Result<Json
         return Err(JsonRpcError::invalid_params("duration_minutes must be greater than 0"));
     }
 
+    // Optional 1-based method step the timer belongs to
+    let step_number = match params.get("step_number") {
+        None | Some(JsonValue::Null) => None,
+        Some(v) => {
+            // Accept integer-valued floats (e.g. 2.0) since some models emit them
+            let n = v
+                .as_u64()
+                .or_else(|| v.as_f64().filter(|f| f.fract() == 0.0 && *f >= 0.0).map(|f| f as u64))
+                .ok_or_else(|| JsonRpcError::invalid_params("step_number must be a positive integer"))?;
+            if n == 0 {
+                return Err(JsonRpcError::invalid_params("step_number must be at least 1"));
+            }
+            Some(n)
+        }
+    };
+
     // Generate a timer ID
     let timer_id = uuid::Uuid::new_v4().to_string();
 
-    Ok(json!({
+    let mut message = format!("Timer started: {} for {} minutes", label, duration_minutes);
+    if let Some(n) = step_number {
+        message.push_str(&format!(" (step {})", n));
+    }
+
+    let mut result = json!({
         "timer_id": timer_id,
         "duration_minutes": duration_minutes,
         "label": label,
-        "message": format!("Timer started: {} for {} minutes", label, duration_minutes)
-    }))
+        "message": message
+    });
+    if let Some(n) = step_number {
+        result["step_number"] = json!(n);
+    }
+
+    Ok(result)
 }
 
 /// Handle create_recipe tool call
@@ -616,5 +647,82 @@ mod tests {
             Some(5),
             "Difficulty maximum should be 5"
         );
+    }
+
+    fn timer_test_client() -> ApiClient {
+        ApiClient::new("http://127.0.0.1:0".to_string(), None, None).unwrap()
+    }
+
+    #[test]
+    fn test_start_timer_tool_schema_has_optional_step_number() {
+        let tool = start_timer_tool();
+        let props = tool.input_schema.get("properties").unwrap();
+        let step = props.get("step_number").expect("step_number property");
+        assert_eq!(step.get("type").and_then(|v| v.as_str()), Some("integer"));
+        assert_eq!(step.get("minimum").and_then(|v| v.as_u64()), Some(1));
+        let required = tool.input_schema.get("required").and_then(|v| v.as_array()).unwrap();
+        assert!(!required.iter().any(|v| v.as_str() == Some("step_number")));
+    }
+
+    #[test]
+    fn test_start_timer_without_step_number() {
+        let client = timer_test_client();
+        let result = handle_start_timer(
+            &client,
+            json!({"duration_minutes": 30, "label": "Marinate chicken"}),
+        )
+        .unwrap();
+        assert!(result.get("timer_id").is_some());
+        assert_eq!(result["duration_minutes"], json!(30.0));
+        assert_eq!(result["label"], "Marinate chicken");
+        assert!(result.get("step_number").is_none(), "step_number must be omitted when absent");
+        assert_eq!(result["message"], "Timer started: Marinate chicken for 30 minutes");
+    }
+
+    #[test]
+    fn test_start_timer_with_step_number() {
+        let client = timer_test_client();
+        let result = handle_start_timer(
+            &client,
+            json!({"duration_minutes": 30, "label": "Marinate chicken", "step_number": 2}),
+        )
+        .unwrap();
+        assert_eq!(result["step_number"], json!(2));
+        assert_eq!(result["message"], "Timer started: Marinate chicken for 30 minutes (step 2)");
+    }
+
+    #[test]
+    fn test_start_timer_accepts_integer_valued_float_step_number() {
+        let client = timer_test_client();
+        let result = handle_start_timer(
+            &client,
+            json!({"duration_minutes": 30, "label": "Marinate chicken", "step_number": 2.0}),
+        )
+        .unwrap();
+        assert_eq!(result["step_number"], json!(2));
+    }
+
+    #[test]
+    fn test_start_timer_rejects_zero_step_number() {
+        let client = timer_test_client();
+        let err = handle_start_timer(
+            &client,
+            json!({"duration_minutes": 30, "label": "Marinate chicken", "step_number": 0}),
+        )
+        .unwrap_err();
+        assert_eq!(err.code, -32602, "expected invalid params error");
+    }
+
+    #[test]
+    fn test_start_timer_rejects_non_integer_step_number() {
+        let client = timer_test_client();
+        for bad in [json!(1.5), json!("2"), json!(-1)] {
+            let err = handle_start_timer(
+                &client,
+                json!({"duration_minutes": 30, "label": "Marinate chicken", "step_number": bad}),
+            )
+            .unwrap_err();
+            assert_eq!(err.code, -32602, "expected invalid params error");
+        }
     }
 }

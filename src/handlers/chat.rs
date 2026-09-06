@@ -62,6 +62,8 @@ pub enum SseEvent {
     TimerStart {
         duration_minutes: f64,
         label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        step_number: Option<u32>,
     },
     #[serde(rename = "done")]
     Done {
@@ -70,6 +72,18 @@ pub enum SseEvent {
     },
     #[serde(rename = "error")]
     Error { message: String, recoverable: bool },
+}
+
+impl SseEvent {
+    /// Serialise only the payload of this event (the `data` half of the tagged
+    /// representation), suitable for the SSE `data:` line.
+    pub fn data_json(&self) -> String {
+        serde_json::to_value(self)
+            .ok()
+            .and_then(|v| v.get("data").cloned())
+            .map(|d| d.to_string())
+            .unwrap_or_default()
+    }
 }
 
 /// POST /api/chat - Send a message and receive a streaming response
@@ -199,14 +213,19 @@ pub async fn chat(
                     }
 
                     // Send timer_start events (for start_timer tool calls)
-                    for (duration_minutes, label) in &timer_data {
-                        tracing::info!("Emitting timer_start event: duration={}, label={}", duration_minutes, label);
+                    for timer in &timer_data {
+                        tracing::info!(
+                            "Emitting timer_start event: duration={}, label={}, step={:?}",
+                            timer.duration_minutes, timer.label, timer.step_number
+                        );
+                        let event = SseEvent::TimerStart {
+                            duration_minutes: timer.duration_minutes,
+                            label: timer.label.clone(),
+                            step_number: timer.step_number,
+                        };
                         yield Ok(Event::default()
                             .event("timer_start")
-                            .data(serde_json::json!({
-                                "duration_minutes": duration_minutes,
-                                "label": label
-                            }).to_string()));
+                            .data(event.data_json()));
                     }
 
                     // Stream the response text in chunks

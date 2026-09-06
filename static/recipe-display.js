@@ -5,6 +5,7 @@
 
 import { escapeHtml } from './utils.js';
 import { getCachedRecipe, prefetchAdjacent, animatePageTurn } from './page-transitions.js';
+import { applyStepHighlight } from './timer.js';
 
 // Import global state accessors (these will be set by app.js)
 export let state = null;
@@ -547,11 +548,17 @@ export function renderRecipe(recipe) {
         leftContent.innerHTML = ingredientsHtml;
         rightContent.innerHTML = preparationHtml;
     }
+
+    // Re-apply any running timer's step highlight for this recipe
+    applyStepHighlight(recipe.id);
 }
 
 export async function fetchAndDisplayRecipe(recipeId) {
     showRecipeLoading();
     state.viewMode = 'recipe';
+    // Record the id before any await so a timer_start arriving in the same
+    // SSE turn as the recipe_artifact binds to this recipe, not the last one.
+    state.currentRecipeId = recipeId;
     try {
         // Check prefetch cache first
         const cached = getCachedRecipe(recipeId);

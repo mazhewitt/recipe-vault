@@ -105,6 +105,7 @@ When the user asks to cook, make, or prepare a recipe:
    - Suggest timers for: marinating, resting, simmering, baking, etc.
    - When the user agrees, call `start_timer` with duration and descriptive label
    - Example: start_timer(30, "Marinate chicken")
+   - When the wait belongs to a specific numbered step of the recipe, pass `step_number` so the page can highlight it. Example: start_timer(30, "Marinate chicken", step_number=2)
    - Keep timer labels short and clear
 
 6. **Remember context**:

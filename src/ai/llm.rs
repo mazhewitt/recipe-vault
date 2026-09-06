@@ -261,6 +261,10 @@ impl LlmProvider {
                 return LlmResponse::Text("I've assembled your meal plan for you!".to_string());
             }
 
+            if lower.contains("timer") {
+                return LlmResponse::Text("Timer started for step 2.".to_string());
+            }
+
             if lower.contains("list") {
                 return LlmResponse::Text(
                     "Here are all your saved recipes:\n\n## 1. **Chicken Curry**\n\
@@ -310,6 +314,19 @@ impl LlmProvider {
                 id: "toolu_mock_meal_list".to_string(),
                 name: "list_recipes".to_string(),
                 arguments: serde_json::json!({}),
+                thought_signature: None,
+            }])
+        } else if lower_message.contains("timer") {
+            // Start a short timer attached to method step 2 so e2e tests can assert
+            // the timer pill and the step highlight deterministically.
+            LlmResponse::ToolUse(vec![ToolCall {
+                id: "toolu_mock_timer".to_string(),
+                name: "start_timer".to_string(),
+                arguments: serde_json::json!({
+                    "duration_minutes": 0.1,
+                    "label": "Mock timer",
+                    "step_number": 2
+                }),
                 thought_signature: None,
             }])
         } else if lower_message.contains("list") {

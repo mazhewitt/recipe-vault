@@ -190,6 +190,103 @@ fn test_sse_error_event_format() {
     assert!(error_event["recoverable"].is_boolean());
 }
 
+// ==== Timer SSE event: step_number end to end ====
+
+use recipe_vault::ai::{AiAgent, AiAgentConfig, ContentBlock, LlmProvider, McpServerConfig, Message, TimerData};
+use recipe_vault::handlers::chat::SseEvent;
+
+/// Build an AiAgent over the mock LLM and the real MCP binary (built by cargo for
+/// integration tests). start_timer never calls the recipe API, so no server is needed.
+fn mock_agent() -> AiAgent {
+    let recipes_server = McpServerConfig {
+        name: "recipes".to_string(),
+        command: env!("CARGO_BIN_EXE_recipe-vault-mcp").to_string(),
+        args: vec![],
+        env: [
+            ("API_BASE_URL".to_string(), "http://127.0.0.1:1".to_string()),
+            ("API_KEY".to_string(), "test-api-key".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+    };
+    AiAgent::new(
+        LlmProvider::mock(None),
+        AiAgentConfig {
+            mcp_servers: vec![recipes_server],
+            system_prompt: None,
+        },
+    )
+}
+
+fn user_message(text: &str) -> Message {
+    Message::User {
+        content: vec![ContentBlock::Text { text: text.to_string() }],
+    }
+}
+
+fn timer_start_json(timer: &TimerData) -> serde_json::Value {
+    let event = SseEvent::TimerStart {
+        duration_minutes: timer.duration_minutes,
+        label: timer.label.clone(),
+        step_number: timer.step_number,
+    };
+    serde_json::from_str(&event.data_json()).unwrap()
+}
+
+#[tokio::test]
+async fn test_start_timer_over_mock_llm_yields_timer_start_with_step_number() {
+    let agent = mock_agent();
+    agent.start().await.expect("agent should start the MCP server");
+
+    let (text, tools_used, _recipe_ids, timer_data, _meal_plans, _messages) = agent
+        .chat(&[user_message("Please start a timer")])
+        .await
+        .expect("chat over the mock provider should succeed");
+    agent.stop().await.ok();
+
+    assert_eq!(tools_used, vec!["start_timer".to_string()]);
+    assert_eq!(
+        timer_data,
+        vec![TimerData {
+            duration_minutes: 0.1,
+            label: "Mock timer".to_string(),
+            step_number: Some(2),
+        }]
+    );
+    assert_eq!(text, "Timer started for step 2.");
+
+    let json = timer_start_json(&timer_data[0]);
+    assert_eq!(json["duration_minutes"], json!(0.1));
+    assert_eq!(json["label"], "Mock timer");
+    assert_eq!(json["step_number"], json!(2));
+}
+
+#[test]
+fn test_timer_start_event_omits_step_number_when_absent() {
+    let json = timer_start_json(&TimerData {
+        duration_minutes: 30.0,
+        label: "Marinate chicken".to_string(),
+        step_number: None,
+    });
+    assert_eq!(json["duration_minutes"], json!(30.0));
+    assert_eq!(json["label"], "Marinate chicken");
+    assert!(
+        json.get("step_number").is_none(),
+        "step_number must be omitted from the wire format when there is no step: {json}"
+    );
+    assert_eq!(json.as_object().unwrap().len(), 2);
+}
+
+#[test]
+fn test_timer_start_event_includes_step_number_when_present() {
+    let json = timer_start_json(&TimerData {
+        duration_minutes: 30.0,
+        label: "Marinate chicken".to_string(),
+        step_number: Some(2),
+    });
+    assert_eq!(json, json!({"duration_minutes": 30.0, "label": "Marinate chicken", "step_number": 2}));
+}
+
 // ==== Integration Tests (require external dependencies) ====
 // These tests are ignored by default and require:
 // - ANTHROPIC_API_KEY environment variable

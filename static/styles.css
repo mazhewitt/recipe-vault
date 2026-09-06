@@ -29,6 +29,7 @@
     --color-border-light: #d4c4a8;
     --color-label-cream: #d4c4a8;
     --color-accent-brown: #6b4423;
+    --color-timer-band: #fff4c2;
 
     /* Typography */
     --font-handwritten: 'Kalam', 'Caveat', cursive;
@@ -143,48 +144,35 @@ body::before {
 }
 
 /* ==================== TIMER WIDGET ==================== */
+/* Cream pill clipped to the top-right edge of the book cover. Positioned
+   relative to .recipe-book (position: relative) so it scrolls and resizes
+   with the book. top: -10px overhangs the cover's 8px rim by 2px, which is
+   the most it can rise without touching the fixed .user-info pill
+   (bottom edge 61px at desktop; the book's top edge is at ~77px). */
 .timer-widget {
-    position: fixed;
-    top: 25px;
-    right: 50px;
-    background: #f5f0e5;
+    position: absolute;
+    top: -10px;
+    right: 12px;
+    z-index: 11; /* above .page-nav and .mobile-edge-nav (10) so the close target is tappable */
+    height: 36px;
+    background: var(--color-paper-cream);
     border: 2px solid var(--color-ink-dark);
     border-radius: var(--radius-pill);
-    padding: 8px 20px;
+    padding: 4px 8px 4px 14px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     box-shadow: var(--shadow-soft);
-    z-index: 100;
 }
 
-.timer-widget::before {
-    content: '';
-    position: absolute;
-    bottom: -10px;
-    left: 30px;
-    width: 20px;
-    height: 20px;
-    background: #f5f0e5;
-    border-right: 2px solid var(--color-ink-dark);
-    border-bottom: 2px solid var(--color-ink-dark);
-    transform: rotate(45deg);
-}
-
-.timer-widget::after {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 32px;
-    width: 16px;
-    height: 16px;
-    background: #f5f0e5;
-    transform: rotate(45deg);
+.timer-icon {
+    display: flex;
+    align-items: center;
 }
 
 .timer-icon svg {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
     stroke: var(--color-ink-dark);
     fill: none;
     stroke-width: 2;
@@ -192,9 +180,61 @@ body::before {
 
 .timer-text {
     font-family: var(--font-handwritten);
-    font-size: 20px;
+    font-size: 18px;
+    line-height: 1;
     color: var(--color-ink-dark);
     font-weight: 400;
+    white-space: nowrap;
+}
+
+.timer-cancel {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--color-ink-dark);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+
+.timer-cancel:hover,
+.timer-cancel:focus-visible {
+    background: rgba(45, 36, 24, 0.12);
+    outline: none;
+}
+
+/* Step highlight while a timer belongs to a method step */
+.prep-step.timer-active {
+    background: var(--color-timer-band);
+    border-radius: var(--radius-sm);
+    margin-left: -8px;
+    margin-right: -8px;
+    padding-left: 38px; /* 30px step-number gutter + 8px bleed */
+    padding-right: 100px; /* room for the "timer running" label */
+}
+
+.prep-step.timer-active .step-number {
+    left: 8px;
+}
+
+.prep-step.timer-active::after {
+    content: "timer running";
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    font-family: var(--font-handwritten);
+    font-size: 13px;
+    line-height: 1;
+    color: var(--color-ink-light);
+    pointer-events: none;
 }
 
 /* ==================== NOTEPAD COMPONENT ==================== */
@@ -1418,11 +1458,6 @@ body::before {
         display: none;
     }
 
-    .timer-widget {
-        top: 10px;
-        right: 20px;
-    }
-
     .user-info {
         top: 10px;
         right: 20px;
@@ -1538,25 +1573,26 @@ body::before {
         height: 36px;
     }
 
+    /* Compact pill. .app-container clips overflow at this breakpoint and the
+       cover sits flush with the book frame, so the pill sits just inside the
+       top-right of the frame instead of overhanging it. */
     .timer-widget {
-        top: 10px;
-        right: 12px;
-        padding: 6px 14px;
+        top: 6px;
+        right: 8px;
+        z-index: 11; /* above .mobile-edge-nav */
+        height: 30px;
+        padding: 2px 6px 2px 10px;
+        gap: 6px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
 
-    .timer-widget::before,
-    .timer-widget::after {
-        display: none; /* Simplify on mobile */
-    }
-
     .timer-text {
-        font-size: 16px;
+        font-size: 14px;
     }
 
     .timer-icon svg {
-        width: 18px;
-        height: 18px;
+        width: 14px;
+        height: 14px;
     }
 
     .user-info {

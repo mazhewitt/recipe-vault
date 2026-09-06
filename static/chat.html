@@ -19,20 +19,6 @@
         <a href="/cdn-cgi/access/logout" class="logout-link">Logout</a>
     </div>
 
-    <!-- Timer Widget -->
-    <div class="timer-widget" id="timer-widget" style="display: none;">
-        <div class="timer-icon">
-            <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="13" r="9"/>
-                <polyline points="12 7 12 13 15 15"/>
-                <path d="M9 2h6"/>
-                <path d="M12 2v2"/>
-            </svg>
-        </div>
-        <span class="timer-text" id="timer-text">Timer: 00:00</span>
-        <button class="timer-cancel" onclick="cancelTimer()" type="button" title="Cancel timer" aria-label="Cancel timer">✕</button>
-    </div>
-
     <div class="app-container">
         <!-- Notepad Section -->
         <div class="notepad-container">
@@ -78,6 +64,20 @@
             <div class="section-label clickable" id="recipe-book-header">Recipe Book</div>
             <div class="recipe-book">
                 <div class="book-cover"></div>
+
+                <!-- Timer pill, clipped to the top-right of the cover -->
+                <div class="timer-widget" id="timer-widget" style="display: none;">
+                    <div class="timer-icon">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="13" r="9"/>
+                            <polyline points="12 7 12 13 15 15"/>
+                            <path d="M9 2h6"/>
+                            <path d="M12 2v2"/>
+                        </svg>
+                    </div>
+                    <span class="timer-text" id="timer-text">Timer: 00:00</span>
+                    <button class="timer-cancel" onclick="cancelTimer()" type="button" title="Cancel timer" aria-label="Cancel timer">✕</button>
+                </div>
                 <button id="page-prev" class="page-nav prev" aria-label="Previous recipe" disabled>&lt;</button>
                 <button id="page-next" class="page-nav next" aria-label="Next recipe" disabled>&gt;</button>
 

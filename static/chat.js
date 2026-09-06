@@ -305,7 +305,7 @@ export async function sendMessage() {
                         case 'timer_start':
                             // Timer start
                             if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
-                                state.startTimer(parsed.duration_minutes, parsed.label);
+                                state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
                             }
                             break;
 
@@ -334,7 +334,7 @@ export async function sendMessage() {
                             } else if (parsed.recipe_id !== undefined) {
                                 state.fetchAndDisplayRecipe(parsed.recipe_id);
                             } else if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
-                                state.startTimer(parsed.duration_minutes, parsed.label);
+                                state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
                             } else if (parsed.tool) {
                                 setLoading(true, `Using ${parsed.tool}...`);
                                 addMessage(`Using tool: ${parsed.tool}`, 'tool-use');

@@ -76,7 +76,7 @@ const sharedState = {
 // Initialize modules with shared state
 RecipeDisplay.initializeState(sharedState);
 Chat.initializeState(sharedState);
-Timer.initializeState ? Timer.initializeState(sharedState) : null;
+Timer.initializeState(sharedState);
 Navigation.initializeState(sharedState);
 PageTransitions.initializeState(sharedState);
 MealPlanDisplay.initializeState(sharedState);
@@ -147,6 +147,7 @@ async function handleImageFile(imageFile) {
 // Global functions for HTML onclick handlers and Playwright tests
 window.sendMessage = Chat.sendMessage;
 window.switchTab = Navigation.switchTab;
+window.startTimer = Timer.startTimer;
 window.cancelTimer = Timer.cancelTimer;
 window.removeImage = removeImage;
 window.fetchAndDisplayRecipe = RecipeDisplay.fetchAndDisplayRecipe;
