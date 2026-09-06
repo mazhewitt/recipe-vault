@@ -17,6 +17,10 @@ Key specs:
 - `openspec/specs/frontend-modules/` — JS module structure
 - `openspec/specs/deployment/` — Docker, Synology, CI/CD
 
+## Issue tracker
+
+Two-tier: informal incoming work (bug reports, half-formed ideas, review follow-ups) lives as Markdown under `.scratch/<slug>/`; promoted work becomes an OpenSpec change under `openspec/changes/<name>/`. See `docs/agents/issue-tracker.md`. Triage state is a `Status:` line (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) per `docs/agents/triage-labels.md`. When asked to file an issue, create a `.scratch/` file, not an OpenSpec change.
+
 ## Database Migration Rules
 
 **NEVER modify a migration that has already been applied.** sqlx tracks checksums of migration files. If you change a migration after it has run on any environment (dev, staging, production), sqlx will refuse to run migrations entirely, preventing the application from starting.
