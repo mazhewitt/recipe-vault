@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+Prompt caching for the AI agent to reduce latency and cost on repeated system context.
+
+## Requirements
 
 ### Requirement: System prompt is sent with cache control
 When making a request to the Anthropic Messages API, the system prompt SHALL be sent as a structured content block with `cache_control: {type: "ephemeral"}` so the Anthropic API can cache the prompt prefix and skip re-tokenising it on subsequent calls.

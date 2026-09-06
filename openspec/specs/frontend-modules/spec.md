@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change ui-code-refactor. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: ES Module Structure
 
 The system SHALL organize frontend JavaScript code into ES modules with clear separation of concerns.
@@ -11,14 +13,18 @@ The system SHALL organize frontend JavaScript code into ES modules with clear se
 - **WHEN** the frontend is deployed
 - **THEN** the following module files exist in `/static/`:
   - `app.js` (entry point and coordination)
-  - `recipe-display.js` (recipe rendering and navigation)
-  - `chat.js` (chat UI and SSE handling)
+  - `recipe-display.js` (recipe and contents rendering)
+  - `chat.js` (chat input and SSE handling)
+  - `margin-notes.js` (chat thread store and margin / sticky rendering)
   - `timer.js` (cooking timer functionality)
-  - `navigation.js` (responsive navigation state)
+  - `navigation.js` (recipe navigation state)
+  - `page-transitions.js` (page-turn animation, swipe gestures, prefetch cache)
+  - `meal-plan-display.js` (meal plan panel rendering)
+  - `utils.js` (shared helpers: `escapeHtml`, `renderMarkdown`)
 
 #### Scenario: Entry point loads modules
-- **WHEN** `index.html` is loaded in the browser
-- **THEN** it includes `<script type="module" src="/app.js">`
+- **WHEN** `chat.html` is loaded in the browser
+- **THEN** it includes `<script type="module" src="/static/app.js?v=<version>">`
 - **AND** `app.js` imports the other modules using ES6 `import` syntax
 
 #### Scenario: Module exports functions
@@ -36,9 +42,9 @@ The system SHALL enforce clear responsibilities for each module.
 - **AND** other modules import and call exported functions from `recipe-display.js`
 
 #### Scenario: Chat module responsibility
-- **WHEN** code needs to handle SSE events or render chat messages
+- **WHEN** code needs to send a chat request or handle SSE events
 - **THEN** that logic resides in `chat.js`
-- **AND** other modules import and call exported functions from `chat.js`
+- **AND** `chat.js` delegates drawing AI replies on the page to `margin-notes.js`
 
 #### Scenario: Timer module responsibility
 - **WHEN** code needs to manage cooking timer state or UI
@@ -54,6 +60,15 @@ The system SHALL enforce clear responsibilities for each module.
 - **WHEN** the app initializes
 - **THEN** `app.js` coordinates initialization of other modules
 - **AND** does not contain business logic specific to recipes, chat, timers, or navigation
+
+#### Scenario: Margin notes module responsibility
+- **WHEN** code needs to store the chat thread or render notes into `#page-margin`
+- **THEN** that logic resides in `margin-notes.js`
+- **AND** it exposes `addNote`, `updateStreamingNote`, `finalizeStreamingNote`, `getThread` and `render`
+
+#### Scenario: Utility module has no imports from feature modules
+- **WHEN** `utils.js` provides `escapeHtml` or `renderMarkdown`
+- **THEN** it imports nothing from other application modules, so any module can import it without creating a cycle
 
 ### Requirement: No Global State Pollution
 
@@ -82,4 +97,3 @@ The system SHALL target modern browsers that support native ES modules.
 - **WHEN** the application is deployed
 - **THEN** JavaScript files are served directly without bundling or transpilation
 - **AND** module loading is handled natively by the browser
-

@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+Extracting a recipe from a URL supplied by the user and saving it to the vault.
+
+## Requirements
 
 ### Requirement: Fetch Recipe from URL
 The system SHALL provide a tool that fetches web content from a given URL and returns it in markdown format suitable for recipe extraction.

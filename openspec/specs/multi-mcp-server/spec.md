@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+Configuration and routing of multiple MCP servers exposed to the AI agent.
+
+## Requirements
 
 ### Requirement: Multiple MCP Server Management
 The system SHALL support spawning and managing multiple MCP server processes concurrently. Each server SHALL be identified by a unique name and run as an independent child process communicating via stdin/stdout.

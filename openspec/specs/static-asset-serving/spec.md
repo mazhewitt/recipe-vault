@@ -2,7 +2,9 @@
 
 ## Purpose
 Provide a small, focused specification for serving frontend static assets (HTML, CSS, JavaScript, images) from the server at the `/static` URL path. This ensures that UI files are available, correctly typed, and cacheable. (TBD: expand with additional asset types or performance rules as needed.)
+
 ## Requirements
+
 ### Requirement: Static assets are served from the static directory
 
 The server SHALL serve files from the `static/` directory at the `/static/` URL path.
@@ -38,21 +40,30 @@ The server SHALL include caching headers that allow browsers to cache static ass
 - **WHEN** a browser sends a conditional request with `If-None-Match` or `If-Modified-Since` for an unchanged file
 - **THEN** the server returns HTTP 304 Not Modified with no body
 
----
+#### Scenario: Assets revalidate on every load
+
+- **WHEN** a browser requests any file under `/static/`
+- **THEN** the response includes `Cache-Control: no-cache`
+- **AND** the browser revalidates the cached copy with a conditional request before reuse
 
 ### Requirement: Chat page references external CSS and JavaScript
 
-The chat page HTML SHALL load styles and scripts from external files rather than inline content.
+The chat page HTML SHALL load styles and scripts from external files rather than inline content, with a version query string on the entry points so deployments invalidate cached copies.
 
 #### Scenario: CSS loaded via link tag
 
 - **WHEN** the chat page HTML is rendered
-- **THEN** it includes a `<link rel="stylesheet" href="/static/styles.css">` tag in the head
+- **THEN** it includes a `<link rel="stylesheet" href="/static/styles.css?v=<version>">` tag in the head, where `<version>` is the application's crate version
 
 #### Scenario: JavaScript loaded via script tag
 
 - **WHEN** the chat page HTML is rendered
-- **THEN** it includes a `<script src="/static/app.js"></script>` tag before the closing body tag
+- **THEN** it includes a `<script type="module" src="/static/app.js?v=<version>"></script>` tag before the closing body tag
+
+#### Scenario: Version placeholder is substituted
+
+- **WHEN** the chat page template contains `{{asset_version}}`
+- **THEN** the server replaces every occurrence with the crate version before responding
 
 ### Requirement: Share page includes inline styles
 
@@ -63,4 +74,3 @@ The share page SHALL include its own minimal inline CSS rather than referencing 
 - **THEN** styling is included via an inline `<style>` block in the `<head>`
 - **AND** no external stylesheet is referenced
 - **AND** the page renders correctly without loading any additional CSS files
-

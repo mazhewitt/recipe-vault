@@ -1,4 +1,7 @@
-## ADDED Requirements
+## Purpose
+Searching the web for recipes from chat and offering to import results.
+
+## Requirements
 
 ### Requirement: Web Search Intent Detection
 The system SHALL distinguish between a user asking to *find* a recipe (search the web) and asking to *create* a recipe (generate from Claude's knowledge). Phrases such as "find me", "search for", "look up", or "get me a recipe for" SHALL trigger web search intent. Phrases such as "create", "make up", "write me", or "generate" SHALL trigger generation intent. Ambiguous phrasing SHALL result in Claude asking which the user means before proceeding.
