@@ -204,8 +204,11 @@ function pageTurnTransition(pagesContainer, direction, renderFn) {
             return;
         }
 
-        // Create overlay matching source page dimensions
-        const rect = sourcePage.getBoundingClientRect();
+        // Create overlay matching the dimensions of what it actually carries: the
+        // page content. The right page also spans the margin column, whose notes
+        // are not part of the page being turned and must stay visible.
+        const contentEl = sourcePage.querySelector('.page-content');
+        const rect = (contentEl || sourcePage).getBoundingClientRect();
         const containerRect = pagesContainer.getBoundingClientRect();
 
         const overlay = document.createElement('div');
@@ -213,7 +216,6 @@ function pageTurnTransition(pagesContainer, direction, renderFn) {
         overlay.classList.add(direction === 'forward' ? 'turn-forward' : 'turn-backward');
 
         // Copy the page content into the overlay
-        const contentEl = sourcePage.querySelector('.page-content');
         overlay.innerHTML = contentEl ? contentEl.innerHTML : sourcePage.innerHTML;
 
         // Position overlay exactly over the source page

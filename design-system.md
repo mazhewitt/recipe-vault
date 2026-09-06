@@ -59,6 +59,8 @@ Recipe Vault embraces a **handwritten journal aesthetic** that evokes the warmth
 | `--color-border-light` | `#d4c4a8` | Subtle dividers |
 | `--color-label-cream` | `#d4c4a8` | Section labels on dark bg |
 | `--color-accent-brown` | `#6b4423` | Section headers |
+| `--color-biro` | `#1f3d8a` | Margin note handwriting (AI replies) |
+| `--color-sticky` | `#fbe9a0` | Sticky note background on the contents page |
 
 ---
 
@@ -543,6 +545,43 @@ When a timer carries a `step_number`, the matching `.prep-step[data-step="N"]` o
 | Motion | None — the band appears without animation, so `prefers-reduced-motion` needs no override |
 
 The highlight is re-applied whenever the same recipe is rendered again, never shown on another recipe, and cleared when the timer completes or is cancelled.
+
+---
+
+## Component: Margin Notes
+
+AI replies are handwritten in the margin of the open page rather than in a separate transcript. `#page-margin` is a static `<aside class="page-margin" aria-live="polite">` inside `#page-right`, a sibling of `#page-right-content`, so it survives page turns and re-renders. Layout is keyed off `body[data-view-mode]`, mirrored from the app's `viewMode` state. While a reply is streaming the aside carries `aria-busy="true"`, so a screen reader announces the completed note once instead of re-announcing it on every chunk.
+
+| Property | Desktop (> 1024px) | Tablet (601–1024px) | Mobile (≤ 600px) |
+|----------|--------------------|---------------------|------------------|
+| Layout (recipe view) | `#page-right` is a grid: `minmax(0, 1fr) 150px`, 12px column gap | Grid collapses; notes render beneath the page content, full width | Right page hidden — notes not shown |
+| Layout (contents view) | `#page-margin` absolute, `top: 24px; right: 24px`, 150px wide | Same | Not shown |
+| Visible notes | Last three non-user thread entries, oldest first (latest non-user entry only in contents view) | Same | — |
+
+### Note Styles
+
+| Kind | Selector | Style |
+|------|----------|-------|
+| Reply | `.margin-note[data-kind="reply"]` | Kalam 14px / 1.45, `--color-biro`, rotated ~1° (alternating direction); markdown rendered |
+| Status line | `.margin-note[data-kind="status"]` | Kalam 13px italic, `--color-ink-medium`; tool activity and timer confirmations; text escaped |
+| Error | `.margin-note[data-kind="error"]` | Kalam 14px, `--color-leather`; text escaped |
+| Streaming | `.margin-note.streaming` | Blinking `\|` caret via `::after` while chunks arrive |
+
+### Sticky Note
+
+On the contents page the latest non-user note (reply, status or error) is drawn as a single `.sticky-note` (added alongside `.margin-note`) pinned to the top-right of the right page.
+
+| Property | Value |
+|----------|-------|
+| Background | `--color-sticky` (`#fbe9a0`) |
+| Text | Kalam 14px, `--color-biro` |
+| Padding / radius | `12px 14px`, `--radius-sm`-ish (2px) |
+| Shadow | `--shadow-soft` |
+| Rotation | `rotate(2deg)` |
+
+### Motion
+
+New notes fade in over 200ms with a 4px upward slide (`@keyframes marginNoteIn`). Under `prefers-reduced-motion: reduce` both the fade-in and the caret blink are disabled. Note elements are reused across renders and are only moved when their order actually changes, so the animation does not replay while a reply streams.
 
 ---
 

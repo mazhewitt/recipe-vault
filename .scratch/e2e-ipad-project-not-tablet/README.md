@@ -32,3 +32,28 @@ CSS, and the Journal 2.0 changes add more (margin column collapse at ≤1024px i
    them separately.
 
 ## Comments
+
+### 2026-09-06 — findings from the `journal-margin-notes` implementation run
+
+Re-confirmed independently by the fix agent during the adversarial review of
+`journal-margin-notes`:
+
+- `playwright.config.ts:24` still spreads `devices['iPad (gen 7) portrait']`;
+  in the installed `@playwright/test` only `iPad (gen 7)` and
+  `iPad (gen 7) landscape` exist, so the `ipad` project runs at 1280x720.
+- Consequence observed: the pre-existing tablet e2e test guarded by
+  `width > 1024 || width <= 600` was skipped on every project, so it had never
+  run. It "passed" by being skipped.
+- A critic reproduced a real tablet defect the config was hiding: at ≤1024px
+  `#page-right` becomes a flex column and `.page-content` keeps `height: 100%`,
+  which pushed `#page-margin` below the fold. Fixed in `static/styles.css`
+  as part of `journal-margin-notes`.
+- Workaround shipped with that change: the tablet-collapse test in
+  `tests/e2e/tests/margin-notes.spec.ts` sets its own 900x1000 viewport
+  (skipped under mobile emulation, where the viewport cannot be resized), so
+  the margin collapse is covered regardless of this config bug.
+- `playwright.config.ts` was deliberately left untouched (config change, out
+  of that change's scope). Proposed fix above still stands; once the device
+  name is corrected, expect other tablet-only layout failures to surface and
+  the 900px override in `margin-notes.spec.ts` can be dropped in favour of the
+  project viewport.

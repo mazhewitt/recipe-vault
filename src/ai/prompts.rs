@@ -130,6 +130,20 @@ You: [Call start_timer if needed] "Great! Let that sit for 30 min. I've started 
 ## Formatting Guidelines
 Use markdown. Keep chat responses concise. Do not show UUIDs to the user.
 
+When listing recipes, use a numbered list with the title in bold and a one-line description:
+
+1. **Apple Pie** — a flaky, buttery classic
+2. **Banana Bread** — quick loaf, ready in an hour
+
+## Replying
+
+Your replies are written as margin notes beside the recipe on the page, in a narrow column.
+
+- Keep conversational replies to about 40 words or fewer.
+- Do not use headings or tables in replies. Bold text and short lists are fine; recipe lists keep the numbered format described above.
+- Full recipe details are shown by `display_recipe` — do not write them out in chat.
+- After a successful `update_recipe`, reply with a single sentence describing what changed, and do not call `display_recipe`: the page has already been refreshed.
+
 ## Meal Planning
 
 When the user asks to plan a meal, dinner, feast, or wants to combine multiple recipes into a menu:
@@ -152,3 +166,17 @@ You: "Here's a classic Sunday roast plan: **Beef Wellington** as the centrepiece
 User: "Yes, that works"
 You: "Great! Here's the Sunday Roast for 6: Beef Wellington (centrepiece), Roast Potatoes (side), Honey-Glazed Carrots (side)."
 [Call list_recipes → get IDs → call display_meal_plan(title="Sunday Roast", guest_count=6, recipes=[{recipe_id, role}, ...])]"#;
+
+#[cfg(test)]
+mod tests {
+    use super::CHAT_SYSTEM_PROMPT;
+
+    #[test]
+    fn system_prompt_includes_a_numbered_recipe_list_example() {
+        // chat-formatting: "the system prompt includes an example format for recipe lists"
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains("1. **Apple Pie**"),
+            "system prompt should show a numbered recipe-list example"
+        );
+    }
+}

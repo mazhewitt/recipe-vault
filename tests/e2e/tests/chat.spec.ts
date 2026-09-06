@@ -41,6 +41,14 @@ test.describe('Chat Interface', () => {
     await expect(page.locator('#messages')).toContainText('Chicken Curry', {
       timeout: 10000,
     });
+
+    // The same reply is drawn on the open page as a margin note
+    // (the right page, and so the margin, is hidden on phones until the book-only layout)
+    if (page.viewportSize()!.width > 600) {
+      const note = page.locator('#page-margin .margin-note[data-kind="reply"]');
+      await expect(note).toHaveCount(1, { timeout: 10000 });
+      await expect(note.first()).toContainText('Chicken Curry');
+    }
   });
 
   test('display_recipe triggers recipe panel update', async ({ page }) => {

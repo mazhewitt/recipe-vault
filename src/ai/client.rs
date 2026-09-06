@@ -610,6 +610,24 @@ impl AiAgent {
             None
         };
 
+        // A successful update_recipe means the page the reader is looking at is now
+        // stale: return the recipe id so the chat handler emits recipe_artifact, and
+        // ask the model for a one-sentence margin note about the change.
+        if tool_call.name == "update_recipe" {
+            let updated_id = serde_json::from_str::<serde_json::Value>(content)
+                .ok()
+                .and_then(|parsed| {
+                    parsed
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                });
+            if let Some(id) = updated_id {
+                tracing::info!("update_recipe succeeded for recipe {}, refreshing page", id);
+                return Ok((format!("{}{}", content, UPDATE_RECIPE_UI_INSTRUCTION), Some(id), timer_data, None));
+            }
+        }
+
         if content.is_empty() {
             Ok((serde_json::to_string_pretty(&result)?, None, timer_data, None))
         } else {
@@ -752,8 +770,20 @@ impl AiAgent {
 
         // Return messages starting after the original conversation
         let new_messages = messages[conversation.len()..].to_vec();
-        Ok((final_text, tool_uses, recipe_ids, timer_data, meal_plan_data, new_messages))
+        Ok((final_text, tool_uses, dedupe_recipe_ids(recipe_ids), timer_data, meal_plan_data, new_messages))
     }
+}
+
+/// Appended to a successful `update_recipe` tool result so the model knows the page
+/// has already been refreshed and answers with a single margin note.
+const UPDATE_RECIPE_UI_INSTRUCTION: &str = "\n\n[UI] The recipe page has been refreshed. Reply with one short margin note (one sentence) saying what changed. Do not call display_recipe.";
+
+/// Deduplicate recipe ids while preserving first-seen order, so one turn emits
+/// one `recipe_artifact` event per recipe even when `update_recipe` and
+/// `display_recipe` both return the same id.
+pub fn dedupe_recipe_ids(ids: Vec<String>) -> Vec<String> {
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    ids.into_iter().filter(|id| seen.insert(id.clone())).collect()
 }
 
 #[cfg(test)]

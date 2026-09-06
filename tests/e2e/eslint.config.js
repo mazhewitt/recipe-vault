@@ -13,6 +13,7 @@ export default [
         fetch: "readonly",
         alert: "readonly",
         sessionStorage: "readonly",
+        localStorage: "readonly",
         marked: "readonly",
         TextDecoder: "readonly",
         FileReader: "readonly",

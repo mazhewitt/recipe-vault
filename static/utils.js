@@ -24,3 +24,31 @@ export function escapeHtml(unsafe) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
+
+/**
+ * Renders markdown text to HTML.
+ * Uses marked.js library if available, otherwise falls back to basic patterns.
+ *
+ * NOTE: This function returns HTML that will be inserted via innerHTML.
+ * It is used for AI-generated content which is considered trusted (controlled by us).
+ * User input should NOT be passed through this function - use escapeHtml() instead.
+ */
+export function renderMarkdown(text) {
+    try {
+        if (typeof marked !== 'undefined' && marked.parse) {
+            return marked.parse(text);
+        }
+    } catch (e) {
+        console.error('Markdown parsing error:', e);
+    }
+    // Fallback: basic markdown rendering
+    return text
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+        .replace(/\n/g, '<br>');
+}

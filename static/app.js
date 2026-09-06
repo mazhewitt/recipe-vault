@@ -10,6 +10,7 @@ import * as Timer from './timer.js';
 import * as Navigation from './navigation.js';
 import * as PageTransitions from './page-transitions.js';
 import * as MealPlanDisplay from './meal-plan-display.js';
+import * as MarginNotes from './margin-notes.js';
 
 // Global state
 let conversationId = null;
@@ -49,7 +50,9 @@ const sharedState = {
     get currentRecipeTitle() { return currentRecipeTitle; },
     set currentRecipeTitle(val) { currentRecipeTitle = val; },
     get viewMode() { return viewMode; },
-    set viewMode(val) { viewMode = val; },
+    // Mirrored to the body so CSS can key the margin column off the current view;
+    // the margin re-projects because the visible slice and styling depend on the mode
+    set viewMode(val) { viewMode = val; document.body.dataset.viewMode = val; MarginNotes.render(); },
     get attachedImage() { return attachedImage; },
     set attachedImage(val) { attachedImage = val; },
     // Recipe most recently displayed this session; survives returning to the contents page
@@ -80,6 +83,10 @@ Timer.initializeState(sharedState);
 Navigation.initializeState(sharedState);
 PageTransitions.initializeState(sharedState);
 MealPlanDisplay.initializeState(sharedState);
+MarginNotes.initializeState(sharedState);
+
+// Seed the body attribute with the initial view mode
+document.body.dataset.viewMode = viewMode;
 
 // Image handling functions
 function fileToBase64(file) {
@@ -156,6 +163,7 @@ window.fetchRecipeList = fetchRecipeList;
 window.loadNextRecipe = Navigation.loadNextRecipe;
 window.loadPrevRecipe = Navigation.loadPrevRecipe;
 window.updateNavigationState = Navigation.updateNavigationState;
+window.getMarginThread = MarginNotes.getThread;
 
 // Setup functions
 async function setupImagePasteHandler() {

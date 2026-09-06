@@ -4,8 +4,9 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
     middleware,
+    response::IntoResponse,
     routing::post,
-    Router,
+    Json, Router,
 };
 use rstest::*;
 use serde_json::json;
@@ -318,4 +319,149 @@ async fn test_chat_conversation_context_maintained() {
     // 2. Send follow-up with same conversation_id
     // 3. Verify Claude understands context
     println!("This test requires manual execution with a running server");
+}
+
+// ==== update_recipe refresh: recipe_artifact + [UI] margin-note instruction ====
+
+const UI_INSTRUCTION: &str = "\n\n[UI] The recipe page has been refreshed. Reply with one short margin note (one sentence) saying what changed. Do not call display_recipe.";
+
+/// Spawn a stub of the recipe API for the MCP binary to talk to.
+/// `ok` selects between a successful update (returns a recipe JSON with an `id`)
+/// and a failing update (500 with no body).
+async fn spawn_stub_api(recipe_id: &'static str, ok: bool) -> String {
+    use axum::routing::put;
+
+    let app = Router::new().route(
+        "/api/recipes/:id",
+        put(move || async move {
+            if ok {
+                (
+                    StatusCode::OK,
+                    Json(json!({
+                        "id": recipe_id,
+                        "title": "Chicken Curry",
+                        "servings": 2,
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                        "ingredients": [],
+                        "steps": []
+                    })),
+                )
+                    .into_response()
+            } else {
+                (StatusCode::INTERNAL_SERVER_ERROR, "boom").into_response()
+            }
+        }),
+    );
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+    format!("http://{}", addr)
+}
+
+fn mock_agent_against(base_url: &str, mock_recipe_id: Option<String>) -> AiAgent {
+    let recipes_server = McpServerConfig {
+        name: "recipes".to_string(),
+        command: env!("CARGO_BIN_EXE_recipe-vault-mcp").to_string(),
+        args: vec![],
+        env: [
+            ("API_BASE_URL".to_string(), base_url.to_string()),
+            ("API_KEY".to_string(), "test-api-key".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+    };
+    AiAgent::new(
+        LlmProvider::mock(mock_recipe_id),
+        AiAgentConfig {
+            mcp_servers: vec![recipes_server],
+            system_prompt: None,
+        },
+    )
+}
+
+fn tool_result_contents(messages: &[Message]) -> Vec<String> {
+    messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Tool { tool_results } => Some(tool_results),
+            _ => None,
+        })
+        .flatten()
+        .map(|r| r.content.clone())
+        .collect()
+}
+
+#[tokio::test]
+async fn test_update_recipe_emits_recipe_artifact_and_ui_instruction() {
+    let recipe_id = "11111111-2222-3333-4444-555555555555";
+    let base_url = spawn_stub_api(recipe_id, true).await;
+    let agent = mock_agent_against(&base_url, Some(recipe_id.to_string()));
+    agent.start().await.expect("agent should start the MCP server");
+
+    let (text, tools_used, recipe_ids, _timers, _meal_plans, messages) = agent
+        .chat(&[user_message("Please halve this recipe")])
+        .await
+        .expect("chat over the mock provider should succeed");
+    agent.stop().await.ok();
+
+    assert_eq!(tools_used, vec!["update_recipe".to_string()]);
+    assert_eq!(
+        recipe_ids,
+        vec![recipe_id.to_string()],
+        "update_recipe should surface the updated recipe id for the recipe_artifact event"
+    );
+    let contents = tool_result_contents(&messages);
+    assert_eq!(contents.len(), 1, "expected one tool result: {contents:?}");
+    assert!(
+        contents[0].ends_with(UI_INSTRUCTION),
+        "tool result should be suffixed with the [UI] instruction, got: {}",
+        contents[0]
+    );
+    assert_eq!(text, "Halved it — serves 2 now.");
+}
+
+#[tokio::test]
+async fn test_failed_update_recipe_emits_no_artifact_and_leaves_text_unchanged() {
+    let recipe_id = "66666666-7777-8888-9999-000000000000";
+    let base_url = spawn_stub_api(recipe_id, false).await;
+    let agent = mock_agent_against(&base_url, Some(recipe_id.to_string()));
+    agent.start().await.expect("agent should start the MCP server");
+
+    let (_text, _tools_used, recipe_ids, _timers, _meal_plans, messages) = agent
+        .chat(&[user_message("Please halve this recipe")])
+        .await
+        .expect("chat over the mock provider should succeed");
+    agent.stop().await.ok();
+
+    assert!(
+        recipe_ids.is_empty(),
+        "a failed update_recipe must not emit a recipe_artifact: {recipe_ids:?}"
+    );
+    let contents = tool_result_contents(&messages);
+    assert_eq!(contents.len(), 1, "expected one tool result: {contents:?}");
+    assert!(
+        !contents[0].contains("[UI]"),
+        "the error text must be returned unchanged, got: {}",
+        contents[0]
+    );
+}
+
+#[test]
+fn test_recipe_ids_are_deduplicated_preserving_order() {
+    use recipe_vault::ai::dedupe_recipe_ids;
+
+    assert_eq!(
+        dedupe_recipe_ids(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "a".to_string(),
+            "c".to_string(),
+            "b".to_string(),
+        ]),
+        vec!["a".to_string(), "b".to_string(), "c".to_string()]
+    );
 }

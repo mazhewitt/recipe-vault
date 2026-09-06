@@ -30,6 +30,8 @@
     --color-label-cream: #d4c4a8;
     --color-accent-brown: #6b4423;
     --color-timer-band: #fff4c2;
+    --color-biro: #1f3d8a;
+    --color-sticky: #fbe9a0;
 
     /* Typography */
     --font-handwritten: 'Kalam', 'Caveat', cursive;
@@ -1428,6 +1430,104 @@ body::before {
     text-decoration: underline;
 }
 
+/* ==================== MARGIN NOTES ==================== */
+.page-margin {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 18px; /* line up with .page-content */
+    box-sizing: border-box;
+}
+
+.page-margin:empty {
+    display: none;
+}
+
+/* Recipe view: the right page becomes content + a 150px margin column */
+body[data-view-mode="recipe"] #page-right {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 150px;
+    align-items: start;
+    column-gap: 12px;
+}
+
+/* Contents view: the reply is pinned to the top-right of the right page */
+body[data-view-mode="index"] #page-margin {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 150px;
+    padding-top: 0;
+    z-index: 2;
+}
+
+.margin-note {
+    font-family: var(--font-handwritten);
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--color-biro);
+    transform: rotate(-1.2deg);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    animation: marginNoteIn 200ms ease-out;
+}
+
+.margin-note:nth-child(even) {
+    transform: rotate(0.8deg);
+}
+
+.margin-note p {
+    margin: 0 0 6px 0;
+}
+
+.margin-note p:last-child {
+    margin-bottom: 0;
+}
+
+.margin-note[data-kind="status"] {
+    color: var(--color-ink-medium);
+    font-size: 13px;
+    font-style: italic;
+}
+
+.margin-note[data-kind="error"] {
+    color: var(--color-leather);
+}
+
+.margin-note.streaming::after {
+    content: '|';
+    margin-left: 1px;
+    animation: marginCaretBlink 1s step-end infinite;
+}
+
+.sticky-note {
+    background: var(--color-sticky);
+    color: var(--color-biro);
+    padding: 12px 14px;
+    border-radius: 2px;
+    box-shadow: var(--shadow-soft);
+    transform: rotate(2deg);
+}
+
+@keyframes marginNoteIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; }
+}
+
+@keyframes marginCaretBlink {
+    50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .margin-note {
+        animation: none;
+    }
+
+    .margin-note.streaming::after {
+        animation: none;
+    }
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1024px) {
     body {
@@ -1480,6 +1580,23 @@ body::before {
         font-size: 13px;
         min-width: 20px;
         padding: 3px;
+    }
+
+    /* Collapse the margin column: notes render beneath the right page content */
+    body[data-view-mode="recipe"] #page-right {
+        display: flex;
+    }
+
+    /* The content block sizes to its content so the margin follows it directly
+       instead of being pushed below a full-height box */
+    body[data-view-mode="recipe"] #page-right-content {
+        height: auto;
+        flex: 0 0 auto;
+    }
+
+    body[data-view-mode="recipe"] #page-margin {
+        width: 100%;
+        padding-top: 12px;
     }
 }
 

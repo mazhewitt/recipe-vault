@@ -153,6 +153,21 @@ pub enum LlmResponse {
     TextWithToolUse { text: String, tool_calls: Vec<ToolCall> },
 }
 
+/// Extract the recipe id from the `[Current recipe context]` block the chat
+/// handler appends to the user message, for the mock provider.
+fn mock_current_recipe_id(messages: &[Message]) -> Option<String> {
+    messages.iter().rev().find_map(|m| match m {
+        Message::User { content } => content.iter().find_map(|block| match block {
+            ContentBlock::Text { text } => text
+                .lines()
+                .find_map(|line| line.strip_prefix("recipe_id: "))
+                .map(|id| id.trim().to_string()),
+            _ => None,
+        }),
+        _ => None,
+    })
+}
+
 impl LlmProvider {
     pub fn new(provider_type: LlmProviderType, api_key: String, model: String, http_client: Option<reqwest::Client>) -> Self {
         Self {
@@ -265,6 +280,10 @@ impl LlmProvider {
                 return LlmResponse::Text("Timer started for step 2.".to_string());
             }
 
+            if lower.contains("halve") || lower.contains("update") {
+                return LlmResponse::Text("Halved it — serves 2 now.".to_string());
+            }
+
             if lower.contains("list") {
                 return LlmResponse::Text(
                     "Here are all your saved recipes:\n\n## 1. **Chicken Curry**\n\
@@ -326,6 +345,20 @@ impl LlmProvider {
                     "duration_minutes": 0.1,
                     "label": "Mock timer",
                     "step_number": 2
+                }),
+                thought_signature: None,
+            }])
+        } else if (lower_message.contains("halve") || lower_message.contains("update"))
+            && let Some(recipe_id) = mock_current_recipe_id(messages).or_else(|| self.mock_recipe_id.clone())
+        {
+            // Edit the active recipe so the margin-note refresh path is testable
+            // without a real provider.
+            LlmResponse::ToolUse(vec![ToolCall {
+                id: "toolu_mock_update".to_string(),
+                name: "update_recipe".to_string(),
+                arguments: serde_json::json!({
+                    "recipe_id": recipe_id,
+                    "servings": 2
                 }),
                 thought_signature: None,
             }])
