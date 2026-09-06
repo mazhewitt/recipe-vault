@@ -6,9 +6,11 @@ use axum::{
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
+use axum::http::{header, HeaderValue};
 use tower_http::{
     cors::CorsLayer,
     services::ServeDir,
+    set_header::SetResponseHeaderLayer,
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -172,7 +174,17 @@ async fn main() {
         .with_state(share_state);
 
     let app = Router::new()
-        .nest_service("/static", ServeDir::new("./static"))
+        // Static assets: ETag/Last-Modified come from ServeDir; `no-cache` makes
+        // browsers revalidate un-versioned module imports on every load.
+        .nest_service(
+            "/static",
+            tower::ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("no-cache"),
+                ))
+                .service(ServeDir::new("./static")),
+        )
         .merge(ui_routes)
         .nest("/api", api_routes)
         .layer(middleware::from_fn_with_state(

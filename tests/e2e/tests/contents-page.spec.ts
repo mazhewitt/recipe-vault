@@ -1,0 +1,182 @@
+import { test, expect } from '@playwright/test';
+import { authenticate, createRecipe } from './helpers';
+
+const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
+
+// Minimal 1x1 red JPEG used for a photo upload
+const RED_DOT_JPEG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAFA3PEY8ED5GWEZGPDpCakJEZkBQXl1UXmZicH19f3h9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3n/2wBDAFpGPDpCakJEZkBQXl1UXmZicH19f3h9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3n/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1FVWV1hZWmNkZWZnaGlqc3R1dnd4eXqGhf8hIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD5/oooorAP/9k=', 'base64');
+
+async function clearRecipes(page: any) {
+  const list = await page.request.get('/api/recipes', { headers: API_HEADERS });
+  for (const r of await list.json()) {
+    await page.request.delete(`/api/recipes/${r.id}`, { headers: API_HEADERS });
+  }
+}
+
+async function openBook(page: any) {
+  await page.reload();
+  if (page.viewportSize()!.width <= 600) await page.click('#tab-book');
+  await expect(page.locator('.index-title')).toBeVisible();
+}
+
+test.describe('Contents page (Journal 2.0)', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearRecipes(page);
+    await authenticate(page);
+  });
+
+  test('title, alphabet strip, page numbers and footer render', async ({ page }) => {
+    const suffix = Date.now().toString();
+    for (const t of ['Apple Pie', 'Banana Bread', 'Carrot Cake']) {
+      await createRecipe(page, { title: `${t} ${suffix}`, ingredients: [], steps: [] });
+    }
+    await openBook(page);
+
+    await expect(page.locator('.index-title')).toHaveText('~ Contents ~');
+
+    // Title precedes the alphabet strip in the left page
+    const order = await page.locator('#page-left-content').evaluate(el => {
+      const title = el.querySelector('.index-title');
+      const strip = el.querySelector('.index-alphabet-nav');
+      return title && strip ? title.compareDocumentPosition(strip) : 0;
+    });
+    expect(order & 4).toBe(4); // Node.DOCUMENT_POSITION_FOLLOWING
+
+    // Page numbers follow the alphabetical list order: 3, 5, 7
+    const items = page.locator('.index-recipe-item');
+    await expect(items).toHaveCount(3);
+    await expect(items.nth(0).locator('.index-page-number')).toHaveText('p. 3');
+    await expect(items.nth(1).locator('.index-page-number')).toHaveText('p. 5');
+    await expect(items.nth(2).locator('.index-page-number')).toHaveText('p. 7');
+    await expect(items.nth(2)).toHaveAttribute('data-page', '7');
+
+    // Seeded recipes have no photo, so every polaroid is the empty variant
+    await expect(page.locator('.index-polaroid.empty')).toHaveCount(3);
+    await expect(page.locator('.index-polaroid img')).toHaveCount(0);
+
+    // Footer shows the count; desktop left page says "continued overleaf" when the right page has entries
+    const footers = page.locator('.index-footer');
+    await expect(footers.first()).toContainText('3 recipes');
+    if (page.viewportSize()!.width > 600) {
+      await expect(page.locator('#page-left-content .index-footer')).toContainText('continued overleaf');
+      await expect(page.locator('#page-right-content .index-footer')).not.toContainText('continued overleaf');
+    } else {
+      await expect(footers).toHaveCount(1);
+      await expect(footers.first()).not.toContainText('continued overleaf');
+    }
+  });
+
+  test('entry shows a polaroid thumbnail after a photo upload', async ({ page }) => {
+    const suffix = Date.now().toString();
+    const recipeId = await createRecipe(page, { title: `Photo Recipe ${suffix}`, ingredients: [], steps: [] });
+    await page.request.post(`/api/recipes/${recipeId}/photo`, {
+      headers: API_HEADERS,
+      multipart: { photo: { name: 'test.jpg', mimeType: 'image/jpeg', buffer: RED_DOT_JPEG } },
+    });
+    await openBook(page);
+
+    const item = page.locator(`.index-recipe-item[data-recipe-id="${recipeId}"]`);
+    await expect(item.locator('.index-polaroid img')).toHaveAttribute('src', new RegExp(`/api/recipes/${recipeId}/photo`));
+    await expect(item.locator('.index-polaroid')).not.toHaveClass(/empty/);
+  });
+
+  test('returning to contents highlights the last-viewed recipe', async ({ page }) => {
+    const suffix = Date.now().toString();
+    // Target is the first recipe so a single "previous" step returns to the contents page
+    const target = await createRecipe(page, { title: `Apple Pie ${suffix}`, ingredients: [], steps: [] });
+    await createRecipe(page, { title: `Banana Bread ${suffix}`, ingredients: [], steps: [] });
+    await openBook(page);
+
+    await expect(page.locator('.index-recipe-item.current')).toHaveCount(0);
+
+    await page.locator(`.index-recipe-item[data-recipe-id="${target}"]`).click();
+    await expect(page.locator('.recipe-title')).toContainText('Apple Pie');
+
+    // Back to the contents page: the header is hidden on phones, so use the edge nav there
+    if (page.viewportSize()!.width <= 600) {
+      await page.click('#mobile-edge-prev');
+    } else {
+      await page.click('#recipe-book-header');
+    }
+    await expect(page.locator('.index-title')).toBeVisible();
+
+    const current = page.locator('.index-recipe-item.current');
+    await expect(current).toHaveCount(1);
+    await expect(current).toHaveAttribute('data-recipe-id', target);
+    await expect(current).toHaveAttribute('aria-current', 'page');
+  });
+});
+
+test.describe('Recipe typography and meta line (Journal 2.0)', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  test('serif body, red step numbers and a single meta line', async ({ page }) => {
+    const suffix = Date.now().toString();
+    const recipeId = await createRecipe(page, {
+      title: `Meta Recipe ${suffix}`,
+      ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
+      steps: [
+        { step_number: 1, instruction: 'Mix the flour' },
+        { step_number: 2, instruction: 'Bake it' },
+      ],
+      prep_time_minutes: 10,
+      cook_time_minutes: 20,
+      servings: 4,
+    });
+
+    await page.evaluate((id) => {
+      // @ts-ignore - fetchAndDisplayRecipe is defined in app.js
+      fetchAndDisplayRecipe(id);
+    }, recipeId);
+    await expect(page.locator('.recipe-title')).toContainText('Meta Recipe');
+
+    // Body text uses the serif token, headers stay handwritten
+    const bodyFont = await page.locator('.ingredients-list').evaluate(el => getComputedStyle(el).fontFamily);
+    expect(bodyFont).toContain('Libre Baskerville');
+    const headerFont = await page.locator('.section-header').first().evaluate(el => getComputedStyle(el).fontFamily);
+    expect(headerFont).toContain('Kalam');
+
+    // Quantity span keeps the visible text intact
+    await expect(page.locator('.ingredient-line').first()).toContainText('1 cup flour');
+    await expect(page.locator('.ingredient-qty').first()).toHaveText('1 cup');
+
+    // Method header and numbered steps
+    await expect(page.locator('.section-header').filter({ hasText: 'method' })).toBeVisible();
+    const steps = page.locator('.prep-step');
+    await expect(steps).toHaveCount(2);
+    await expect(steps.nth(0)).toHaveAttribute('data-step', '1');
+    await expect(steps.nth(0).locator('.step-number')).toHaveText('1.');
+    await expect(steps.nth(1).locator('.step-text')).toHaveText('Bake it');
+
+    // Meta line: total (prep + cook), serves, breakdown
+    const meta = page.locator('.recipe-meta-line');
+    await expect(meta).toHaveCount(1);
+    await expect(meta).toContainText('30 min');
+    await expect(meta).toContainText('serves 4');
+    await expect(meta.locator('.meta-breakdown')).toHaveText('(prep 10 · cook 20)');
+    await expect(page.locator('.recipe-meta')).toHaveCount(0);
+  });
+
+  test('meta line formats hours and omits missing values', async ({ page }) => {
+    const suffix = Date.now().toString();
+    const recipeId = await createRecipe(page, {
+      title: `Slow Recipe ${suffix}`,
+      ingredients: [],
+      steps: [],
+      cook_time_minutes: 75,
+    });
+
+    await page.evaluate((id) => {
+      // @ts-ignore - fetchAndDisplayRecipe is defined in app.js
+      fetchAndDisplayRecipe(id);
+    }, recipeId);
+    await expect(page.locator('.recipe-title')).toContainText('Slow Recipe');
+
+    const meta = page.locator('.recipe-meta-line');
+    await expect(meta.locator('.meta-total')).toHaveText('1h 15');
+    await expect(meta.locator('.meta-serves')).toHaveCount(0);
+    await expect(meta.locator('.meta-breakdown')).toHaveText('(cook 75)');
+  });
+});

@@ -18,6 +18,8 @@ let currentRecipeTitle = null;
 let recipeListCache = null;
 let viewMode = 'index'; // 'index' | 'recipe'
 let attachedImage = null; // Stores pasted image data
+let lastRecipeId = null; // Last recipe displayed this session (for contents highlight)
+let photoEpoch = 0; // Bumped after photo uploads to bust thumbnail cache
 
 // Image size limit (5MB)
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -50,6 +52,12 @@ const sharedState = {
     set viewMode(val) { viewMode = val; },
     get attachedImage() { return attachedImage; },
     set attachedImage(val) { attachedImage = val; },
+    // Recipe most recently displayed this session; survives returning to the contents page
+    get lastRecipeId() { return lastRecipeId; },
+    set lastRecipeId(val) { lastRecipeId = val; },
+    // Bumped after a photo upload so contents thumbnails refetch
+    get photoEpoch() { return photoEpoch; },
+    set photoEpoch(val) { photoEpoch = val; },
 
     // Shared functions
     fetchRecipeList,
@@ -294,6 +302,7 @@ function setupRecipePhotoUpload() {
                 return;
             }
             // Re-render the recipe to show the new photo
+            photoEpoch += 1;
             await RecipeDisplay.fetchAndDisplayRecipe(targetRecipeId);
         } catch (err) {
             console.error('Photo upload error:', err);
@@ -378,7 +387,7 @@ function setupOrientationChangeHandler() {
     window.addEventListener('resize', async () => {
         if (viewMode === 'index') {
             const list = await fetchRecipeList(true); // Force refresh to get latest recipes
-            RecipeDisplay.renderIndex(list);
+            RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId });
         }
     });
 }
@@ -401,7 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load initial state
     const list = await fetchRecipeList();
-    RecipeDisplay.renderIndex(list);
+    RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId });
     Navigation.updateNavigationState();
 
     // Initialize mobile tab state (default to book tab)

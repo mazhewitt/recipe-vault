@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Source+Sans+3:wght@400;600&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Source Sans 3', 'Gill Sans', 'Segoe UI', sans-serif; color: #2d2418; background: #f7f2e8; }
+    a { color: #8B2D1A; } a:hover { color: #b83d28; }
+    .serif { font-family: 'DM Serif Display', Georgia, 'Times New Roman', serif; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-radius: 8px; font-size: 15px; color: #2d2418; }
+    .nav-item:hover { background: #ede5d3; }
+    .nav-item.active { background: #2d2418; color: #f7f2e8; }
+    .thumb { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; }
+    .letter { font-size: 12px; letter-spacing: 0.12em; color: #6b5a4a; padding: 12px 12px 4px; font-weight: 600; }
+    .ing { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #e6dcc6; font-size: 15px; }
+    .ing b { font-weight: 600; color: #5a4a3a; min-width: 64px; }
+    .step { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid #e6dcc6; font-size: 16px; line-height: 1.55; }
+    .stepno { font-family: 'DM Serif Display', Georgia, serif; font-size: 26px; color: #c9a86c; line-height: 1; }
+    .timer-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid #c9a86c; border-radius: 999px; font-size: 13px; color: #8B2D1A; margin-top: 6px; }
+    .meta { display: flex; flex-direction: column; gap: 2px; }
+    .meta small { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a7a60; }
+    .meta span { font-size: 16px; font-weight: 600; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: grid; grid-template-columns: 280px minmax(0, 1fr); background: #f7f2e8; overflow: hidden;">
+
+  <!-- Sidebar: recipe list -->
+  <aside style="display: flex; flex-direction: column; background: #f1ead9; border-right: 1px solid #e6dcc6; padding: 24px 16px; gap: 8px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 8px 12px;">
+      <div class="serif" style="font-size: 24px;">Recipe Vault</div>
+      <div style="font-size: 13px; color: #5a4a3a;">Hewitt family</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; background: #fbf8f0; border: 1px solid #e0d3b5; border-radius: 10px; padding: 10px 12px; color: #6b5a4a; font-size: 14px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <span>Search 32 recipes</span>
+    </div>
+    <div style="display: flex; gap: 6px; padding: 8px 0 4px; flex-wrap: wrap;">
+      <span style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #2d2418; color: #f7f2e8;">All</span>
+      <span style="font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #d4c4a8; color: #5a4a3a;">Mains</span>
+      <span style="font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #d4c4a8; color: #5a4a3a;">Veggie</span>
+      <span style="font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #d4c4a8; color: #5a4a3a;">Bakes</span>
+    </div>
+    <div style="display: flex; flex-direction: column; overflow: hidden; flex-grow: 1;">
+      <div class="letter">C</div>
+      <div class="nav-item"><div class="thumb" style="background: #d9c58f;"></div><span>Cauliflower Soup</span></div>
+      <div class="nav-item"><div class="thumb" style="background: #c98a4b;"></div><span>Chicken Biryani</span></div>
+      <div class="nav-item"><div class="thumb" style="background: #b7602f;"></div><span>Chicken Pepper Soup</span></div>
+      <div class="nav-item"><div class="thumb" style="background: #8B2D1A;"></div><span>Chilli (Meat)</span></div>
+      <div class="nav-item"><div class="thumb" style="background: #9a7b3c;"></div><span>Chilli (Vegetarian)</span></div>
+      <div class="letter">K</div>
+      <div class="nav-item"><div class="thumb" style="background: #a2432a;"></div><span>Kung Pao Chicken</span></div>
+      <div class="letter">L</div>
+      <div class="nav-item active"><div class="thumb" style="background: #6f2a1c;"></div><span>Lamb Rogan Josh</span></div>
+      <div class="letter">O</div>
+      <div class="nav-item"><div class="thumb" style="background: #d8b787;"></div><span>Oat Cakes</span></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 8px 0; border-top: 1px solid #e0d3b5; font-size: 13px; color: #5a4a3a;">
+      <div style="width: 28px; height: 28px; border-radius: 50%; background: #c9a86c;"></div>
+      <span style="flex-grow: 1;">mazda@aduki.co.uk</span>
+      <span style="color: #8a7a60;">Log out</span>
+    </div>
+  </aside>
+
+  <!-- Main recipe -->
+  <main style="position: relative; display: flex; flex-direction: column; overflow: hidden;">
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 420px; height: 300px;">
+      <div style="padding: 40px 56px 28px; display: flex; flex-direction: column; justify-content: flex-end; gap: 18px;">
+        <div style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #8a7a60;">
+          <span>Mains</span><span>·</span><span>Added by Mazda, updated Aug 2026</span>
+        </div>
+        <h1 class="serif" style="font-size: 52px; line-height: 1.05; margin: 0; font-weight: 400;">Lamb Rogan Josh</h1>
+        <div style="display: flex; gap: 40px;">
+          <div class="meta"><small>Prep</small><span>20 min</span></div>
+          <div class="meta"><small>Cook</small><span>1 h 45</span></div>
+          <div class="meta"><small>Serves</small><span>4</span></div>
+          <div class="meta"><small>Difficulty</small>
+            <span style="display: flex; gap: 4px; align-items: center; height: 24px;">
+              <i style="width: 9px; height: 9px; border-radius: 50%; background: #8B2D1A;"></i><i style="width: 9px; height: 9px; border-radius: 50%; background: #8B2D1A;"></i><i style="width: 9px; height: 9px; border-radius: 50%; background: #8B2D1A;"></i><i style="width: 9px; height: 9px; border-radius: 50%; border: 1px solid #8a7a60;"></i><i style="width: 9px; height: 9px; border-radius: 50%; border: 1px solid #8a7a60;"></i>
+            </span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; background: #8B2D1A; color: #f7f2e8; border: none; border-radius: 10px; font: 600 15px 'Source Sans 3', sans-serif;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l14 8-14 8z"></path></svg>
+            Start cooking
+          </button>
+          <button style="height: 44px; padding: 0 16px; background: transparent; color: #2d2418; border: 1px solid #c9a86c; border-radius: 10px; font: 600 15px 'Source Sans 3', sans-serif;">Scale to 6</button>
+          <button style="height: 44px; padding: 0 16px; background: transparent; color: #2d2418; border: 1px solid #c9a86c; border-radius: 10px; font: 600 15px 'Source Sans 3', sans-serif;">Share</button>
+        </div>
+      </div>
+      <div style="margin: 24px 24px 0 0; border-radius: 16px; background: radial-gradient(circle at 30% 30%, #b8502f, #6f2a1c 70%); display: flex; align-items: flex-end; padding: 16px;">
+        <span style="font-size: 12px; color: rgba(255,255,255,0.75); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 999px;">Photo · tap to enlarge</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 56px; padding: 24px 56px 150px; overflow: hidden; flex-grow: 1;">
+      <section style="display: flex; flex-direction: column;">
+        <h2 class="serif" style="font-size: 24px; margin: 0 0 8px; font-weight: 400;">Ingredients</h2>
+        <div class="ing"><b>800 g</b><span style="flex-grow: 1;">lamb shoulder, diced</span></div>
+        <div class="ing"><b>2</b><span style="flex-grow: 1;">onions, finely sliced</span></div>
+        <div class="ing"><b>4 cloves</b><span style="flex-grow: 1;">garlic, crushed</span></div>
+        <div class="ing"><b>1 thumb</b><span style="flex-grow: 1;">ginger, grated</span></div>
+        <div class="ing"><b>2 tbsp</b><span style="flex-grow: 1;">Kashmiri chilli powder</span></div>
+        <div class="ing"><b>1 tsp</b><span style="flex-grow: 1;">ground fennel</span></div>
+        <div class="ing"><b>400 g</b><span style="flex-grow: 1;">chopped tomatoes</span></div>
+        <div class="ing"><b>150 g</b><span style="flex-grow: 1;">natural yoghurt</span></div>
+        <div class="ing"><b>1 handful</b><span style="flex-grow: 1;">coriander, to finish</span></div>
+        <div style="margin-top: 14px; font-size: 13px; color: #8a7a60;">Serves 4 · quantities scale with the button above</div>
+      </section>
+      <section style="display: flex; flex-direction: column;">
+        <h2 class="serif" style="font-size: 24px; margin: 0 0 8px; font-weight: 400;">Method</h2>
+        <div class="step"><div class="stepno">1</div><div>Brown the lamb in batches in a heavy pan until deeply coloured. Set aside.</div></div>
+        <div class="step"><div class="stepno">2</div><div>Soften the onions in the same pan, then add garlic and ginger and cook for two minutes. <br><span class="timer-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2M9 2h6"></path></svg>Set 2 min timer</span></div></div>
+        <div class="step"><div class="stepno">3</div><div>Stir in the spices, then the tomatoes and yoghurt. Return the lamb, cover and simmer gently. <br><span class="timer-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2M9 2h6"></path></svg>Set 90 min timer</span></div></div>
+        <div class="step"><div class="stepno">4</div><div>Uncover, reduce until the sauce clings to the meat, and finish with coriander.</div></div>
+      </section>
+    </div>
+
+    <!-- Ask the cook bar -->
+    <div style="position: absolute; left: 56px; right: 56px; bottom: 24px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="align-self: flex-end; max-width: 520px; background: #fbf8f0; border: 1px solid #e0d3b5; border-radius: 14px 14px 4px 14px; padding: 12px 16px; font-size: 14px; line-height: 1.5; box-shadow: 0 6px 20px rgba(45,36,24,0.08);">
+        <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a7a60; margin-bottom: 4px;">Cook</div>
+        Rogan josh freezes well. Double it and add the extra to a shopping list?
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; background: #2d2418; color: #f7f2e8; border-radius: 14px; padding: 10px 12px 10px 18px; box-shadow: 0 10px 30px rgba(45,36,24,0.25);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c9a86c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"></path><path d="M5 17l.9 2.1L8 20l-2.1.9L5 23l-.9-2.1L2 20l2.1-.9z"></path></svg>
+        <span style="flex-grow: 1; font-size: 15px; color: #a0937a;">Ask the cook — “swap lamb for chickpeas”, “what can I make with what's in the fridge?”</span>
+        <span style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #4a3628; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d4c4a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></span>
+        <span style="width: 44px; height: 44px; border-radius: 10px; background: #8B2D1A; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f7f2e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></span>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+</body>
+</html>

@@ -69,10 +69,10 @@ test.describe('Responsive Layout', () => {
     // On mobile, the left page should be 100% of the pages-container
     expect(leftWidth).toBeCloseTo(containerWidth, 0);
 
-    // Verify both ingredients and preparation are in the left content
+    // Verify both ingredients and method are in the left content
     const leftContent = page.locator('#page-left-content');
     await expect(leftContent).toContainText('ingredients:');
-    await expect(leftContent).toContainText('preparation');
+    await expect(leftContent).toContainText('method');
     await expect(leftContent).toContainText('test ingredient');
     await expect(leftContent).toContainText('test step');
   });

@@ -149,7 +149,7 @@ test.describe('UI Improvements', () => {
 
     // Should show index
     await expect(page.locator('.index-title')).toBeVisible();
-    await expect(page.locator('.index-title')).toContainText('Index');
+    await expect(page.locator('.index-title')).toContainText('Contents');
     
     // We can check if the index is rendered by looking for recipe items
     await expect(page.locator('.index-recipe-item').first()).toBeVisible();

@@ -100,9 +100,37 @@ async function refreshDifficultyIfPending(recipe) {
     }
 }
 
+/**
+ * Read a positive-minute field, accepting both the API spelling
+ * (`prep_time_minutes`) and the legacy short spelling (`prep_time`).
+ */
+export function getMinutesField(recipe, name) {
+    const raw = recipe[`${name}_minutes`] ?? recipe[name];
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** Format minutes as "45 min" or "1h 15" for the meta line. */
+export function formatDuration(minutes) {
+    if (!Number.isFinite(minutes) || minutes <= 0) return '';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest ? `${hours}h ${String(rest).padStart(2, '0')}` : `${hours}h`;
+}
+
+/**
+ * Cosmetic page number for the recipe at position `index` in the full
+ * alphabetical list. The contents page occupies p.1-2 and each recipe is
+ * a notional two-page spread.
+ */
+export function pageNumberFor(index) {
+    return 2 * index + 3;
+}
+
 export function getTotalTimeMinutes(recipe) {
-    const prepTime = Number(recipe.prep_time);
-    const cookTime = Number(recipe.cook_time);
+    const prepTime = getMinutesField(recipe, 'prep_time') ?? NaN;
+    const cookTime = getMinutesField(recipe, 'cook_time') ?? NaN;
     const hasPrep = Number.isFinite(prepTime) && prepTime > 0;
     const hasCook = Number.isFinite(cookTime) && cookTime > 0;
 
@@ -122,10 +150,12 @@ export function getTotalTimeMinutes(recipe) {
     return stepTotal > 0 ? stepTotal : null;
 }
 
-export function renderIndex(recipes) {
+export function renderIndex(recipes, options = {}) {
     const leftContent = document.getElementById('page-left-content');
     const rightContent = document.getElementById('page-right-content');
     const alphabetLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const currentRecipeId = options.currentRecipeId != null ? String(options.currentRecipeId) : null;
+    const photoEpoch = state?.photoEpoch ?? 0;
 
     if (recipes.length === 0) {
         // SAFE: Static HTML, no user data
@@ -142,10 +172,10 @@ export function renderIndex(recipes) {
 
     // Group by first letter
     const groups = {};
-    recipes.forEach(recipe => {
+    recipes.forEach((recipe, position) => {
         const letter = recipe.title[0].toUpperCase();
         if (!groups[letter]) groups[letter] = [];
-        groups[letter].push(recipe);
+        groups[letter].push({ recipe, position });
     });
 
     const sortedLetters = Object.keys(groups).sort();
@@ -182,12 +212,26 @@ export function renderIndex(recipes) {
         `;
     }
 
+    function renderEntry({ recipe, position }) {
+        const pageNumber = pageNumberFor(position);
+        const isCurrent = currentRecipeId !== null && String(recipe.id) === currentRecipeId;
+        const hasPhoto = Boolean(recipe.photo_filename);
+        // SAFE: recipe.id is a server-generated id; photoEpoch is a number
+        const polaroid = hasPhoto
+            ? `<span class="index-polaroid"><img src="/api/recipes/${recipe.id}/photo?e=${photoEpoch}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('empty')"></span>`
+            : `<span class="index-polaroid empty"></span>`;
+        // SANITIZED: recipe.title is user input
+        return `<div class="index-recipe-item${isCurrent ? ' current' : ''}" data-recipe-id="${recipe.id}" data-page="${pageNumber}"${isCurrent ? ' aria-current="page"' : ''}>${polaroid}<span class="index-recipe-name">${escapeHtml(recipe.title)}</span><span class="index-page-number">p. ${pageNumber}</span></div>`;
+    }
+
+    function renderFooter(count, continued) {
+        const noun = count === 1 ? 'recipe' : 'recipes';
+        return `<div class="index-footer">${count} ${noun}${continued ? ' · continued overleaf' : ''}</div>`;
+    }
+
     function renderGroup(letters, page) {
         return letters.map(letter => {
-            const recipeItems = groups[letter].map(recipe =>
-                // SANITIZED: recipe.title is user input
-                `<div class="index-recipe-item" data-recipe-id="${recipe.id}">${escapeHtml(recipe.title)}</div>`
-            ).join('');
+            const recipeItems = groups[letter].map(renderEntry).join('');
             const groupId = sectionIdFor(letter, page);
             return `
                 <div class="index-letter-group" id="${groupId}">
@@ -204,11 +248,12 @@ export function renderIndex(recipes) {
             if (activeAlphabet.has(letter)) lettersToPage[letter] = 'left';
         });
 
-        // SAFE: Index title is static, renderGroup handles sanitization
+        // SAFE: Contents title is static, renderGroup handles sanitization
         leftContent.innerHTML = `
+            <div class="index-title">~ Contents ~</div>
             ${renderAlphabet(lettersToPage)}
-            <div class="index-title">~ Index ~</div>
             ${renderGroup(sortedLetters, 'left')}
+            ${renderFooter(recipes.length, false)}
         `;
         rightContent.innerHTML = '';
     } else {
@@ -250,18 +295,40 @@ export function renderIndex(recipes) {
             if (activeAlphabet.has(letter)) lettersToPage[letter] = 'right';
         });
 
+        const rightHasEntries = rightLetters.length > 0;
+
         // SAFE: Static title, renderGroup handles sanitization
         leftContent.innerHTML = `
+            <div class="index-title">~ Contents ~</div>
             ${renderAlphabet(lettersToPage)}
-            <div class="index-title">~ Index ~</div>
             ${renderGroup(leftLetters, 'left')}
+            ${renderFooter(recipes.length, rightHasEntries)}
         `;
 
-        rightContent.innerHTML = renderGroup(rightLetters, 'right');
+        rightContent.innerHTML = rightHasEntries
+            ? `${renderGroup(rightLetters, 'right')}${renderFooter(recipes.length, false)}`
+            : '';
     }
 
+    // Reset scroll, then bring the last-viewed recipe into view if present.
+    // The scrollable container is .page (parent of .page-content).
+    const leftPage = document.getElementById('page-left');
+    const rightPage = document.getElementById('page-right');
+    if (leftPage) leftPage.scrollTop = 0;
+    if (rightPage) rightPage.scrollTop = 0;
     leftContent.scrollTop = 0;
     rightContent.scrollTop = 0;
+
+    const currentRow = currentRecipeId !== null
+        ? document.querySelector('.index-recipe-item.current')
+        : null;
+    if (currentRow) {
+        const container = currentRow.closest('.page');
+        if (container) {
+            const top = Math.max(0, currentRow.offsetTop - container.clientHeight / 3);
+            container.scrollTop = top;
+        }
+    }
 
     // Add click handlers for recipe names
     document.querySelectorAll('.index-recipe-item').forEach(item => {
@@ -340,11 +407,11 @@ export function renderRecipe(recipe) {
 
     // Build ingredients list
     const ingredientsList = (recipe.ingredients || []).map(ing => {
-        const qty = ing.quantity ? `${ing.quantity} ` : '';
-        const unit = ing.unit ? `${ing.unit} ` : '';
-        // SANITIZED: ingredient.name and notes are user input
+        // SANITIZED: quantity, unit, name and notes are user input
+        const qtyText = [ing.quantity, ing.unit].filter(v => v !== null && v !== undefined && v !== '').map(v => escapeHtml(String(v))).join(' ');
+        const qty = qtyText ? `<span class="ingredient-qty">${qtyText}</span> ` : '';
         const notes = ing.notes ? ` <span class="step-note">(${escapeHtml(ing.notes)})</span>` : '';
-        return `<div class="ingredient-line">${qty}${unit}${escapeHtml(ing.name)}${notes}</div>`;
+        return `<div class="ingredient-line">${qty}${escapeHtml(ing.name)}${notes}</div>`;
     }).join('');
 
     // Build difficulty dots
@@ -363,7 +430,7 @@ export function renderRecipe(recipe) {
             ? `<span class="step-duration">${step.duration_minutes} min</span>`
             : '';
         // SANITIZED: step.instruction is user input
-        return `<div class="prep-step">${i + 1}. ${escapeHtml(step.instruction)}${duration}</div>`;
+        return `<div class="prep-step" data-step="${i + 1}"><span class="step-number">${i + 1}.</span> <span class="step-text">${escapeHtml(step.instruction)}</span>${duration}</div>`;
     }).join('');
 
     // Format email for display (show name portion before @)
@@ -388,6 +455,28 @@ export function renderRecipe(recipe) {
         : '';
 
     const totalTimeMinutes = getTotalTimeMinutes(recipe);
+    const prepMinutes = getMinutesField(recipe, 'prep_time');
+    const cookMinutes = getMinutesField(recipe, 'cook_time');
+    const servings = recipe.servings ? Number(recipe.servings) : null;
+
+    // Single handwritten meta line: total · serves · difficulty (prep · cook)
+    const metaParts = [];
+    if (totalTimeMinutes) {
+        metaParts.push(`<span class="meta-total">${formatDuration(totalTimeMinutes)}</span>`);
+    }
+    if (servings) {
+        // SANITIZED: servings coerced to a number above
+        metaParts.push(`<span class="meta-serves">serves ${servings}</span>`);
+    }
+    if (difficulty) {
+        metaParts.push(`<span class="meta-difficulty" title="Difficulty ${difficulty}/5"><span class="meta-label">difficulty</span> <span class="difficulty-dots">${difficultyDots}</span></span>`);
+    }
+    const breakdown = [];
+    if (prepMinutes) breakdown.push(`prep ${prepMinutes}`);
+    if (cookMinutes) breakdown.push(`cook ${cookMinutes}`);
+    const metaLine = metaParts.length
+        ? `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}${breakdown.length ? `<span class="meta-breakdown">(${breakdown.join(' · ')})</span>` : ''}</div>`
+        : '';
 
     // Photo display
     const hasPhoto = recipe.photo_filename && recipe.photo_filename !== '';
@@ -429,76 +518,18 @@ export function renderRecipe(recipe) {
             ${shareIcon}
             ${addPhotoIcon}
         </div>
+        ${metaLine}
         ${photoHtml}
 
         <div class="section-header">ingredients:</div>
         <div class="ingredients-list">
             ${ingredientsList || '<div class="ingredient-line">No ingredients listed</div>'}
-            ${recipe.servings ? `<div class="serving-note">--> serves ${recipe.servings}</div>` : ''}
-        </div>
-
-        <div class="recipe-meta">
-            <div class="meta-item">
-                <span class="meta-label">Difficulty</span>
-                <div class="difficulty-dots">${difficultyDots}</div>
-                <span class="meta-value">${difficulty ? `${difficulty}/5` : 'Not rated'}</span>
-            </div>
-            ${recipe.servings ? `
-            <div class="meta-item">
-                <span class="meta-label">Serves</span>
-                <div class="meta-icon">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M3 11h18v2H3z"/>
-                        <path d="M5 11V8a7 7 0 0114 0v3"/>
-                        <path d="M7 13v4a2 2 0 002 2h6a2 2 0 002-2v-4"/>
-                    </svg>
-                </div>
-                <span class="meta-value">${recipe.servings}</span>
-            </div>
-            ` : ''}
-            ${recipe.prep_time ? `
-            <div class="meta-item">
-                <span class="meta-label">Prep time</span>
-                <div class="meta-icon">
-                    <svg viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                </div>
-                <span class="meta-value">${recipe.prep_time} min</span>
-            </div>
-            ` : ''}
-            ${recipe.cook_time ? `
-            <div class="meta-item">
-                <span class="meta-label">Cook time</span>
-                <div class="meta-icon">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 2a4 4 0 00-4 4v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2h-2V6a4 4 0 00-4-4z"/>
-                        <path d="M10 14h4"/>
-                        <path d="M12 12v4"/>
-                    </svg>
-                </div>
-                <span class="meta-value">${recipe.cook_time} min</span>
-            </div>
-            ` : ''}
-            ${totalTimeMinutes ? `
-            <div class="meta-item">
-                <span class="meta-label">Total time</span>
-                <div class="meta-icon">
-                    <svg viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                </div>
-                <span class="meta-value">${totalTimeMinutes} min</span>
-            </div>
-            ` : ''}
         </div>
     `;
 
     // SANITIZED: recipe.notes and recipe.description are user input
     const preparationHtml = `
-        <div class="section-header">preparation</div>
+        <div class="section-header">method:</div>
 
         <div class="prep-list">
             ${stepsList || '<div class="prep-step">No preparation steps listed</div>'}
@@ -553,6 +584,7 @@ export async function fetchAndDisplayRecipe(recipeId) {
         }
         renderRecipe(recipe);
         state.currentRecipeId = recipe.id || recipe.recipe?.id || state.currentRecipeId;
+        state.lastRecipeId = state.currentRecipeId;
         state.currentRecipeTitle = recipe.title || recipe.recipe?.title || state.currentRecipeTitle;
         // Refresh recipe list to include newly created recipes
         await state.fetchRecipeList(true);

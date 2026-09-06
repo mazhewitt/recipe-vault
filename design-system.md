@@ -64,43 +64,53 @@ Recipe Vault embraces a **handwritten journal aesthetic** that evokes the warmth
 
 ## Typography
 
+Two families (Journal 2.0, 2026-09): **Kalam** is the handwriting — titles, section headers, letter headers, labels, step numbers, metadata, chat/notes. **Libre Baskerville** is the reading text — ingredients, method steps, contents entries.
+
 ### Font Stack
 
 ```css
-font-family: 'Kalam', 'Caveat', cursive;
+--font-handwritten: 'Kalam', 'Caveat', cursive;
+--font-serif: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
 ```
 
-Load via Google Fonts: `Kalam:wght@300;400;700`
+Load via Google Fonts: `Kalam:wght@300;400;700` and `Libre+Baskerville:ital,wght@0,400;0,700;1,400` (with `preconnect` to `fonts.gstatic.com`).
 
 ### Type Scale
 
-| Element | Size | Weight | Line Height | Color |
-|---------|------|--------|-------------|-------|
-| Section Label | 22px | 400 | 1.2 | label-cream |
-| Recipe Title | 27px | 400 | 1.3 | ink-dark |
-| Index Title | 26px | 700 | 1.3 | ink-dark |
-| Index Letter Header | 22px | 700 | 1.4 | leather |
-| Section Header | 19px | 400 | 1.4 | accent-brown |
-| Component Header | 18px | 400 | 1.4 | ink-dark |
-| Index Recipe Item | 16px | 400 | 1.4 | ink-dark |
-| Body / Chat | 15px | 400 | 1.6 | ink-dark |
-| Ingredients | 14px | 400 | 1.7 | ink-dark |
-| Preparation Steps | 13px | 400 | 1.65 | ink-dark |
-| Labels | 11px | 400 | 1.4 | ink-muted |
-| Timer Display | 20px | 400 | 1.2 | ink-dark |
+| Element | Font | Size | Weight | Line Height | Color |
+|---------|------|------|--------|-------------|-------|
+| Section Label | Kalam | 22px | 400 | 1.2 | label-cream |
+| Recipe Title | Kalam | 27px | 400 | 1.3 | ink-dark |
+| Contents Title | Kalam | 30px | 700 | 1.3 | ink-dark |
+| Contents Letter Header | Kalam | 22px | 700 | 1.4 | leather |
+| Section Header | Kalam | 19px | 400 | 1.4 | accent-brown |
+| Component Header | Kalam | 18px | 400 | 1.4 | ink-dark |
+| Step Number | Kalam | 18px | 700 | 1.4 | leather |
+| Contents Entry | Libre Baskerville | 15px | 400 | 1.35 | ink-dark |
+| Body / Chat | Kalam | 15px | 400 | 1.6 | ink-dark |
+| Meta Line | Kalam | 15px | 400 | 1.4 | ink-medium |
+| Ingredients | Libre Baskerville | 14px | 400 | 1.7 | ink-dark |
+| Method Steps | Libre Baskerville | 14px | 400 | 1.65 | ink-dark |
+| Contents Page Number / Footer | Kalam | 13–14px | 400 | 1.4 | ink-light |
+| Labels | Kalam | 11px | 400 | 1.4 | ink-muted |
+| Timer Display | Kalam | 20px | 400 | 1.2 | ink-dark |
+
+**Contrast rule:** on paper, nothing under 16px may be lighter than `--color-ink-light` (`#6b5a4a`). `--color-ink-muted` (`#8a7a60`) is decorative only (separators, disabled letters).
 
 ### Mobile Type Adjustments
 
-On mobile (< 480px), increase base sizes for readability on small screens:
+On mobile (≤ 600px), increase base sizes for readability on small screens:
 
 | Element | Desktop | Mobile |
 |---------|---------|--------|
 | Recipe Title | 27px | 24px |
-| Index Title | 26px | 22px |
-| Index Letter Header | 22px | 20px |
+| Contents Title | 30px | 24px |
+| Contents Letter Header | 22px | 20px |
+| Contents Entry | 15px | 16px |
 | Body / Chat | 15px | 16px (system minimum) |
 | Ingredients | 14px | 15px |
-| Preparation Steps | 13px | 14px |
+| Method Steps | 14px | 15px |
+| Meta Line | 15px | 14px |
 
 ---
 

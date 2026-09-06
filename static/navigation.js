@@ -122,7 +122,7 @@ export async function showIndex() {
     state.currentRecipeId = null;
     state.currentRecipeTitle = null;
     const list = await state.fetchRecipeList(true);
-    state.renderIndex(list);
+    state.renderIndex(list, { currentRecipeId: state.lastRecipeId });
     updateNavigationState();
 }
 

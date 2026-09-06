@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif; color: #2d2418; }
+    a { color: #8B2D1A; } a:hover { color: #b83d28; }
+    .hand { font-family: 'Kalam', 'Comic Sans MS', cursive; }
+    .wood { background: linear-gradient(135deg, #2a1f17 0%, #3d2c20 50%, #2a1f17 100%); }
+    .page { background: #f8f4e8; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+    .tab { position: absolute; right: -2px; width: 34px; height: 84px; border-radius: 6px 0 0 6px; display: flex; align-items: center; justify-content: center; }
+    .tab span { transform: rotate(90deg); white-space: nowrap; font-family: 'Kalam', cursive; font-size: 13px; color: #f8f4e8; }
+    .toc { display: grid; grid-template-columns: 56px minmax(0, 1fr) 60px; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px dotted #d4c4a8; font-size: 15px; }
+    .toc .pg { text-align: right; color: #8a7a60; font-family: 'Kalam', cursive; }
+    .pola { width: 56px; height: 48px; background: #fff; padding: 3px 3px 8px; box-shadow: 1px 1px 4px rgba(0,0,0,0.25); transform: rotate(-3deg); }
+    .pola i { display: block; width: 100%; height: 100%; }
+    .ing { font-size: 14px; line-height: 1.75; }
+    .ing b { font-weight: 700; color: #5a4a3a; }
+    .step { font-size: 14px; line-height: 1.7; margin-bottom: 8px; padding-left: 26px; position: relative; }
+    .step .n { position: absolute; left: 0; top: 0; font-family: 'Kalam', cursive; font-size: 18px; color: #8B2D1A; font-weight: 700; }
+    .margin-note { font-family: 'Kalam', cursive; font-size: 14px; line-height: 1.45; color: #1f3d8a; transform: rotate(-1.5deg); }
+    .sticky { font-family: 'Kalam', cursive; font-size: 13px; line-height: 1.4; color: #2d2418; background: #fbe9a0; padding: 12px 14px; box-shadow: 2px 3px 8px rgba(0,0,0,0.3); }
+  </style>
+</helmet>
+<div class="wood" style="width: 1440px; height: 900px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center;">
+
+  <!-- user pill -->
+  <div style="position: absolute; top: 18px; right: 28px; display: flex; gap: 12px; align-items: center; font-family: 'Kalam', cursive; font-size: 14px; color: #d4c4a8; background: rgba(0,0,0,0.35); padding: 6px 14px; border-radius: 999px;">
+    <span>mazda@aduki.co.uk</span><span style="color: #a0937a;">Logout</span>
+  </div>
+
+  <!-- kitchen timer clipped to the cover -->
+  <div style="position: absolute; top: 74px; right: 128px; display: flex; align-items: center; gap: 10px; background: #f0e6cc; padding: 8px 14px; border-radius: 999px; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); font-family: 'Kalam', cursive; font-size: 18px; z-index: 5;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5a4a3a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2M9 2h6"></path></svg>
+    <span>Simmer 1:27:40</span>
+    <span style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5a4a3a" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+  </div>
+
+  <!-- the book -->
+  <div style="width: 1240px; height: 760px; background: linear-gradient(180deg, #8B2D1A 0%, #a33520 10%, #b83d28 50%, #a33520 90%, #8B2D1A 100%); border-radius: 14px; box-shadow: 6px 6px 20px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.2); padding: 10px 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); position: relative;">
+    <div style="position: absolute; top: 10px; bottom: 10px; left: 50%; width: 24px; transform: translateX(-50%); background: linear-gradient(90deg, rgba(0,0,0,0.3), rgba(0,0,0,0.1) 30%, rgba(255,255,255,0.05) 50%, rgba(0,0,0,0.1) 70%, rgba(0,0,0,0.3)); z-index: 3;"></div>
+
+    <!-- LEFT PAGE: contents -->
+    <div class="page" style="padding: 32px 40px 28px 44px; border-radius: 4px 0 0 4px; box-shadow: inset -4px 0 12px rgba(0,0,0,0.08);">
+      <div class="hand" style="font-size: 30px; font-weight: 700; text-align: center; margin-bottom: 4px;">~ Contents ~</div>
+      <div class="hand" style="display: flex; justify-content: center; gap: 7px; font-size: 13px; color: #8a7a60; margin-bottom: 18px; letter-spacing: 0.05em;">
+        <span>A</span><span>B</span><b style="color: #8B2D1A;">C</b><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span><span>J</span><b style="color: #8B2D1A;">K</b><b style="color: #8B2D1A;">L</b><span>M</span><span>N</span><b style="color: #8B2D1A;">O</b><b style="color: #8B2D1A;">P</b><span>Q</span><span>R</span><span>S</span><span>T</span><span>U</span><span>V</span><span>W</span><span>X</span><span>Y</span><span>Z</span>
+      </div>
+      <div class="hand" style="font-size: 22px; font-weight: 700; color: #8B2D1A; margin-bottom: 4px;">C</div>
+      <div class="toc"><div class="pola"><i style="background: #d9c58f;"></i></div><span>Cauliflower Soup</span><span class="pg">p. 3</span></div>
+      <div class="toc"><div class="pola"><i style="background: #c98a4b;"></i></div><span>Chicken Biryani</span><span class="pg">p. 5</span></div>
+      <div class="toc"><div class="pola" style="background: #ebe0c4;"><i style="border: 1px dashed #c9a86c; box-sizing: border-box;"></i></div><span>Chicken Pepper Soup</span><span class="pg">p. 7</span></div>
+      <div class="toc"><div class="pola"><i style="background: #8B2D1A;"></i></div><span>Chilli (Meat)</span><span class="pg">p. 9</span></div>
+      <div class="hand" style="font-size: 22px; font-weight: 700; color: #8B2D1A; margin: 14px 0 4px;">K</div>
+      <div class="toc"><div class="pola"><i style="background: #a2432a;"></i></div><span>Kung Pao Chicken</span><span class="pg">p. 13</span></div>
+      <div class="hand" style="font-size: 22px; font-weight: 700; color: #8B2D1A; margin: 14px 0 4px;">L</div>
+      <div class="toc" style="background: #f0e6cc; margin: 0 -10px; padding: 8px 10px; border-radius: 6px;"><div class="pola"><i style="background: #6f2a1c;"></i></div><span style="font-weight: 700;">Lamb Rogan Josh</span><span class="pg">p. 15</span></div>
+      <div class="hand" style="font-size: 22px; font-weight: 700; color: #8B2D1A; margin: 14px 0 4px;">O</div>
+      <div class="toc"><div class="pola"><i style="background: #d8b787;"></i></div><span>Oat Cakes</span><span class="pg">p. 17</span></div>
+      <div style="flex-grow: 1;"></div>
+      <div class="hand" style="font-size: 14px; color: #6b5a4a; text-align: center;">32 recipes · 4 meal plans · continued overleaf</div>
+      <!-- edge tabs -->
+      <div class="tab" style="top: 90px; right: auto; left: -2px; border-radius: 0 6px 6px 0; background: #8B2D1A;"><span>All</span></div>
+      <div class="tab" style="top: 172px; right: auto; left: -2px; border-radius: 0 6px 6px 0; background: #c9a86c;"><span style="color: #2d2418;">Mains</span></div>
+      <div class="tab" style="top: 254px; right: auto; left: -2px; border-radius: 0 6px 6px 0; background: #6b4423;"><span>Sweets</span></div>
+      <div class="tab" style="top: 336px; right: auto; left: -2px; border-radius: 0 6px 6px 0; background: #5a4a3a;"><span>Meals</span></div>
+    </div>
+
+    <!-- RIGHT PAGE: recipe with margin notes -->
+    <div class="page" style="padding: 32px 44px 28px 40px; border-radius: 0 4px 4px 0; box-shadow: inset 4px 0 12px rgba(0,0,0,0.05); display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 22px;">
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+          <div class="hand" style="font-size: 28px; line-height: 1.2;">Lamb Rogan Josh</div>
+          <div class="pola" style="width: 96px; height: 76px; transform: rotate(2.5deg); flex-shrink: 0;"><i style="background: radial-gradient(circle at 30% 30%, #b8502f, #6f2a1c 70%);"></i></div>
+        </div>
+        <div class="hand" style="display: flex; gap: 18px; font-size: 13px; color: #6b5a4a; margin: 6px 0 16px;">
+          <span>2 h 05 total</span><span>serves 4</span><span style="display: inline-flex; gap: 3px; align-items: center;">difficulty <i style="width: 8px; height: 8px; border-radius: 50%; background: #8B2D1A; display: inline-block;"></i><i style="width: 8px; height: 8px; border-radius: 50%; background: #8B2D1A; display: inline-block;"></i><i style="width: 8px; height: 8px; border-radius: 50%; background: #8B2D1A; display: inline-block;"></i><i style="width: 8px; height: 8px; border-radius: 50%; border: 1px solid #5a4a3a; display: inline-block;"></i><i style="width: 8px; height: 8px; border-radius: 50%; border: 1px solid #5a4a3a; display: inline-block;"></i></span>
+        </div>
+        <div class="hand" style="font-size: 19px; color: #6b4423; border-bottom: 1px solid #c9a86c; margin-bottom: 8px; text-decoration: underline; text-underline-offset: 4px;">ingredients:</div>
+        <div class="ing"><b>800 g</b> lamb shoulder, diced</div>
+        <div class="ing"><b>2</b> onions, finely sliced · <b>4 cloves</b> garlic, crushed</div>
+        <div class="ing"><b>1 thumb</b> ginger · <b>2 tbsp</b> Kashmiri chilli · <b>1 tsp</b> fennel</div>
+        <div class="ing"><b>400 g</b> tomatoes · <b>150 g</b> yoghurt · coriander to finish</div>
+        <div class="hand" style="font-size: 19px; color: #6b4423; border-bottom: 1px solid #c9a86c; margin: 16px 0 8px; text-decoration: underline; text-underline-offset: 4px;">method:</div>
+        <div class="step"><span class="n">1.</span>Brown the lamb in batches until deeply coloured.</div>
+        <div class="step"><span class="n">2.</span>Soften onions, add garlic and ginger, cook 2 min.</div>
+        <div class="step" style="background: #fdf6dc; margin-left: -8px; padding-left: 34px; border-radius: 4px;"><span class="n" style="left: 8px;">3.</span>Add spices, tomatoes, yoghurt and lamb. Cover, simmer 90 min. <span class="hand" style="color: #8B2D1A; font-size: 13px; white-space: nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8B2D1A" stroke-width="2" stroke-linecap="round" style="vertical-align: -1px;"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2M9 2h6"></path></svg> timer running</span></div>
+        <div class="step"><span class="n">4.</span>Reduce until the sauce clings, finish with coriander.</div>
+        <div style="flex-grow: 1;"></div>
+        <div style="display: flex; align-items: center; gap: 8px; border-top: 1px dashed #d4c4a8; padding-top: 10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5a4a3a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5zM2 2l7.6 7.6"></path></svg>
+          <span class="hand" style="flex-grow: 1; font-size: 15px; color: #6b5a4a;">Write a note to the cook…</span>
+          <span class="hand" style="font-size: 13px; color: #6b5a4a;">p. 15</span>
+        </div>
+      </div>
+      <!-- margin column -->
+      <div style="display: flex; flex-direction: column; gap: 18px; padding-top: 80px;">
+        <div class="margin-note">You asked for it milder → I've halved the chilli in this copy. Say “undo” to put it back.</div>
+        <div class="sticky" style="transform: rotate(2deg);">Shopping list for Sat: lamb, yoghurt, coriander. Everything else is in.</div>
+        <div class="margin-note" style="color: #5a4a3a;">Step 3 timer set. I'll nudge you at 1:30.</div>
+      </div>
+      <div class="tab" style="top: 90px; background: #8B2D1A;"><span>Ingredients</span></div>
+      <div class="tab" style="top: 172px; background: #c9a86c;"><span style="color: #2d2418;">Method</span></div>
+      <div class="tab" style="top: 254px; background: #6b4423;"><span>Notes</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Journal 2.0" },
+    { "id": "page-2", "name": "Direction A (not chosen)" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Journal 2.0 — desktop", "x": 0, "y": 0, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "JournalMobile.dc.html", "title": "Journal 2.0 — phone", "x": 1540, "y": 0, "w": 390, "h": 844, "page": "page-1" },
+    { "file": "Counter.dc.html", "title": "A · Counter — desktop", "x": 0, "y": 0, "w": 1440, "h": 900, "page": "page-2" },
+    { "file": "CounterMobile.dc.html", "title": "A · Counter — phone", "x": 1540, "y": 0, "w": 390, "h": 844, "page": "page-2" }
+  ],
+  "annotations": [
+    { "id": "dir-b", "x": 2020, "y": 0, "w": 300, "page": "page-1", "text": "Journal 2.0 — chosen direction\n\nKeeps the book but makes it work harder: a real contents page with photos and edge tabs, AI replies written as margin notes and sticky notes inside the book instead of a separate notepad, and a readable serif for ingredients and steps (Kalam stays for headings and notes).\n\nWatch-out: the two-page spread still caps how much fits on screen, and skeuomorphism is harder to keep consistent as features grow." },
+    { "id": "dir-a", "x": 2020, "y": 0, "w": 300, "page": "page-2", "text": "Direction A · Counter — not chosen\n\nKept for reference. Flat warm editorial layout with a persistent recipe list and the AI as a command bar." }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}
