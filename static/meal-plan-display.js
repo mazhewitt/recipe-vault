@@ -1,12 +1,11 @@
 /**
  * Meal Plan Display Module
  * Handles rendering a composed meal plan in the recipe book panel.
- * On desktop: renders into #page-right-content.
- * On mobile: renders into #page-left-content (right page is hidden entirely).
+ * The meal plan always occupies the right page (#page-right-content); the
+ * contents stay on the left page.
  */
 
 import { escapeHtml } from './utils.js';
-import { isMobile } from './recipe-display.js';
 
 // Import global state accessors (will be set by app.js)
 export let state = null;
@@ -24,10 +23,12 @@ export function initializeState(appState) {
  * @param {Array} mealPlan.recipes - Array of {recipe_id, title, role}
  */
 export function renderMealPlan(mealPlan) {
-    // On mobile the right page is display:none — render into left content instead.
-    const containerId = isMobile() ? 'page-left-content' : 'page-right-content';
-    const rightContent = document.getElementById(containerId);
+    const rightContent = document.getElementById('page-right-content');
     if (!rightContent) return;
+
+    // Switch the view mode first: body[data-view-mode="meal"] is what makes the
+    // right page visible on phones and hides the recipe tabs.
+    if (state) state.viewMode = 'meal';
 
     const guestBadge = mealPlan.guest_count
         ? `<span class="meal-plan-guest-badge">For ${escapeHtml(String(mealPlan.guest_count))} people</span>`

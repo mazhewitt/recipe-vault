@@ -259,6 +259,45 @@ function pageTurnTransition(pagesContainer, direction, renderFn) {
     });
 }
 
+// --- Tab Crossfade ---
+
+/**
+ * Crossfades `el`, applies `applyFn` at the midpoint, fades back in.
+ * Holds the same module-scoped `animating` lock as animatePageTurn, so a tab
+ * crossfade and a page turn can never overlap in either direction.
+ * Sets NO `data-nav-direction` and creates NO overlay.
+ * Under `prefers-reduced-motion: reduce` the change is applied immediately.
+ *
+ * @param {Element|null} el       element to fade (usually #page-right-content)
+ * @param {Function} applyFn      called once at the midpoint; may be async
+ * @param {number} [ms=200]       total duration
+ * @returns {Promise<boolean>}    false iff the call was ignored because the
+ *                                lock was already held; true otherwise
+ */
+export async function crossfadeElement(el, applyFn, ms = 200) {
+    if (animating) return false;
+    if (!el) { await Promise.resolve(applyFn()); return true; }
+    animating = true;
+    try {
+        if (prefersReducedMotion.matches) {
+            await Promise.resolve(applyFn());
+            return true;
+        }
+        const half = Math.max(0, Math.round(ms / 2));
+        el.style.transition = `opacity ${half}ms ease-out`;
+        el.style.opacity = '0';
+        await new Promise(r => setTimeout(r, half));
+        await Promise.resolve(applyFn());
+        el.style.opacity = '1';
+        await new Promise(r => setTimeout(r, half));
+        el.style.transition = '';
+        el.style.opacity = '';
+        return true;
+    } finally {
+        animating = false;
+    }
+}
+
 // --- Swipe Gesture Navigation (simplified: detect direction, trigger nav) ---
 
 export function initSwipeGestures(container) {

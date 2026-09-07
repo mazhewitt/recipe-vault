@@ -27,7 +27,7 @@ async function navigateToRecipe(page: Page, recipeId: string) {
     (window as any).fetchAndDisplayRecipe(id);
   }, recipeId);
 
-  await page.waitForSelector('.recipe-title', { timeout: 5000 });
+  await page.waitForSelector('#page-right-content .recipe-title', { timeout: 5000 });
 }
 
 // 1x1 pixel red JPEG
@@ -57,8 +57,8 @@ test.describe('UI Improvements', () => {
 
     await navigateToRecipe(page, recipeId);
 
-    // Photo should be visible
-    const photo = page.locator('.recipe-photo');
+    // Photo should be visible, in its polaroid frame on the right page
+    const photo = page.locator('#page-right-content .recipe-polaroid .recipe-photo');
     await expect(photo).toBeVisible({ timeout: 10000 });
 
     // Photo upload input should be absent
@@ -90,7 +90,7 @@ test.describe('UI Improvements', () => {
 
     await navigateToRecipe(page, recipeId);
 
-    const photo = page.locator('.recipe-photo');
+    const photo = page.locator('#page-right-content .recipe-polaroid .recipe-photo');
     await expect(photo).toBeVisible({ timeout: 10000 });
     await photo.click();
 
@@ -123,7 +123,7 @@ test.describe('UI Improvements', () => {
 
     await navigateToRecipe(page, recipeId);
 
-    const photo = page.locator('.recipe-photo');
+    const photo = page.locator('#page-right-content .recipe-polaroid .recipe-photo');
     await expect(photo).toBeVisible({ timeout: 10000 });
     await photo.click();
     await expect(page.locator('#photo-preview-overlay')).toHaveClass(/visible/);
@@ -132,15 +132,13 @@ test.describe('UI Improvements', () => {
     await expect(page.locator('#photo-preview-overlay')).not.toHaveClass(/visible/);
   });
 
+  // The book header is the documented way back to the contents at every width
   test('should navigate to index when clicking "Recipe Book" header', async ({ page }) => {
-    const isMobile = page.viewportSize()!.width <= 600;
-    if (isMobile) {
-      test.skip(true, 'Header is hidden on mobile');
-      return;
-    }
-
     const recipeId = await createTestRecipe(page, 'Header Nav Test');
     await navigateToRecipe(page, recipeId);
+
+    // While the recipe is open, the contents column marks it as the current entry
+    await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
 
     const header = page.locator('#recipe-book-header');
     await expect(header).toBeVisible();
@@ -148,10 +146,11 @@ test.describe('UI Improvements', () => {
     await header.click();
 
     // Should show index
-    await expect(page.locator('.index-title')).toBeVisible();
-    await expect(page.locator('.index-title')).toContainText('Contents');
-    
-    // We can check if the index is rendered by looking for recipe items
-    await expect(page.locator('.index-recipe-item').first()).toBeVisible();
+    await expect(page.locator('#page-left-content .index-title')).toBeVisible();
+    await expect(page.locator('#page-left-content .index-title')).toContainText('Contents');
+    await expect(page.locator('#page-left-content .index-recipe-item').first()).toBeVisible();
+    // ...and the recipe is off the page
+    await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'index');
+    await expect(page.locator('#page-right-content .recipe-title')).toHaveCount(0);
   });
 });

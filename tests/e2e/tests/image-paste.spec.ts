@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate } from './helpers';
+import { authenticate, expectReply, threadEntries } from './helpers';
 
 /**
  * Create a base64 encoded test image of specified size
@@ -71,12 +71,7 @@ test.describe('Image Paste Feature', () => {
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
 
-    // On mobile, switch to chat tab
-    if (page.viewportSize()!.width <= 600) {
-      await page.click('#tab-chat');
-    }
-
-    // Ensure message input is ready
+    // The note input is on screen at every width now - no tab to switch to
     await expect(page.locator('#message-input')).toBeVisible();
   });
 
@@ -99,8 +94,8 @@ test.describe('Image Paste Feature', () => {
     await pasteImage(page, testImage.base64, testImage.mediaType, 6 * 1024 * 1024);
 
     // Verify error message is shown
-    await expect(page.locator('.paste-error')).toBeVisible({ timeout: 2000 });
-    await expect(page.locator('.paste-error')).toContainText('Image too large');
+    await expect(page.locator('.note-input > .paste-error')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('.note-input > .paste-error')).toContainText('Image too large');
 
     // Verify attachment indicator is NOT visible
     await expect(page.locator('#image-attachment')).not.toBeVisible();
@@ -132,8 +127,8 @@ test.describe('Image Paste Feature', () => {
     // Send without typing text (just press Enter)
     await page.locator('#message-input').press('Enter');
 
-    // Verify message was sent - look for AI response
-    await expect(page.locator('#messages')).toContainText('AI:', { timeout: 10000 });
+    // Verify the note was sent - the reply lands in the page margin
+    await expectReply(page, 'mock assistant');
 
     // Verify attachment indicator is cleared after send
     await expect(page.locator('#image-attachment')).not.toBeVisible();
@@ -144,11 +139,14 @@ test.describe('Image Paste Feature', () => {
     await page.locator('#message-input').fill('What recipes do you have?');
     await page.locator('#message-input').press('Enter');
 
-    // Verify user message appears
-    await expect(page.locator('#messages')).toContainText('User: What recipes do you have?');
+    // The note itself is recorded in the thread, verbatim and unprefixed
+    await expect.poll(() => threadEntries(page)).toContainEqual({
+      kind: 'user',
+      text: 'What recipes do you have?',
+    });
 
-    // Verify AI response appears
-    await expect(page.locator('#messages')).toContainText('AI:', { timeout: 10000 });
+    // ...and the reply lands in the page margin
+    await expectReply(page, 'mock assistant');
   });
 
   test('can send message with both image and text', async ({ page }) => {
@@ -166,11 +164,14 @@ test.describe('Image Paste Feature', () => {
     // Send message
     await page.locator('#message-input').press('Enter');
 
-    // Verify user message appears with text
-    await expect(page.locator('#messages')).toContainText('User: This is my grandmas recipe', { timeout: 5000 });
+    // The note itself is recorded in the thread, verbatim and unprefixed
+    await expect.poll(() => threadEntries(page)).toContainEqual({
+      kind: 'user',
+      text: 'This is my grandmas recipe, can you extract it?',
+    });
 
-    // Verify AI response appears
-    await expect(page.locator('#messages')).toContainText('AI:', { timeout: 10000 });
+    // ...and the reply lands in the page margin
+    await expectReply(page, 'mock assistant');
 
     // Verify attachment indicator is cleared after send
     await expect(page.locator('#image-attachment')).not.toBeVisible();
@@ -182,13 +183,13 @@ test.describe('Image Paste Feature', () => {
     await pasteImage(page, testImage.base64, testImage.mediaType, 6 * 1024 * 1024);
 
     // Verify error message is shown
-    await expect(page.locator('.paste-error')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('.note-input > .paste-error')).toBeVisible({ timeout: 2000 });
 
     // Wait for auto-dismiss (3 seconds)
     await page.waitForTimeout(3500);
 
     // Verify error is no longer visible
-    await expect(page.locator('.paste-error')).not.toBeVisible();
+    await expect(page.locator('.note-input > .paste-error')).not.toBeVisible();
   });
 
   test('multiple images - only latest is attached', async ({ page }) => {
@@ -238,11 +239,11 @@ test.describe('Image Paste Feature', () => {
     await page.locator('#message-input').fill('First recipe');
     await page.locator('#message-input').press('Enter');
 
-    await expect(page.locator('#messages')).toContainText('User: First recipe', { timeout: 5000 });
+    await expect.poll(() => threadEntries(page)).toContainEqual({ kind: 'user', text: 'First recipe' });
     await expect(page.locator('#image-attachment')).not.toBeVisible();
 
-    // Wait for AI response
-    await expect(page.locator('#messages')).toContainText('AI:', { timeout: 10000 });
+    // Wait for the reply before starting the second turn
+    await expectReply(page, 'mock assistant');
 
     // Second image and send
     const secondImage = createTestImage(600);
@@ -252,7 +253,7 @@ test.describe('Image Paste Feature', () => {
     await page.locator('#message-input').fill('Second recipe');
     await page.locator('#message-input').press('Enter');
 
-    await expect(page.locator('#messages')).toContainText('User: Second recipe', { timeout: 5000 });
+    await expect.poll(() => threadEntries(page)).toContainEqual({ kind: 'user', text: 'Second recipe' });
     await expect(page.locator('#image-attachment')).not.toBeVisible();
   });
 

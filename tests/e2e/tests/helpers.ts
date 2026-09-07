@@ -21,7 +21,11 @@ export interface Recipe {
   prep_time_minutes?: number;
   cook_time_minutes?: number;
   servings?: number;
+  /** Set it on creation to suppress the pending-difficulty re-render mid-test. */
+  difficulty?: number;
 }
+
+export type TabName = 'ingredients' | 'method' | 'notes';
 
 /**
  * Authenticate with the server (navigation only, relies on DEV_USER_EMAIL)
@@ -158,9 +162,52 @@ export async function seedRecipes(page: Page, count: number = 3): Promise<string
   return ids;
 }
 
+/** The phone breakpoint, the one the app itself uses (max-width: 600px). */
+export function isPhone(page: Page): boolean {
+  return page.viewportSize()!.width <= 600;
+}
+
 /**
- * Wait for recipe list to load
+ * The visible tab strip for this viewport: paper tabs on the page's top edge on
+ * a phone, edge tabs on the book's outer edge everywhere else.
  */
-export async function waitForRecipeList(page: Page): Promise<void> {
-  await expect(page.locator('#recipe-list')).toBeVisible();
+export function tabSelector(page: Page, tab: TabName): string {
+  return isPhone(page)
+    ? `.page-tab[data-tab="${tab}"]`
+    : `.edge-tab[data-tab="${tab}"]`;
+}
+
+/** Taps a section tab and waits for the right page to actually adopt it. */
+export async function openTab(page: Page, tab: TabName): Promise<void> {
+  await page.locator(tabSelector(page, tab)).click();
+  await expect(page.locator('#page-right')).toHaveAttribute('data-tab', tab);
+}
+
+/** Opens a recipe on the right page and waits for it to render. */
+export async function openRecipe(page: Page, recipeId: string): Promise<void> {
+  await page.evaluate((id) => {
+    // @ts-ignore - fetchAndDisplayRecipe is exposed by app.js
+    fetchAndDisplayRecipe(id);
+  }, recipeId);
+  await expect(page.locator('.recipe-title')).toBeVisible({ timeout: 10000 });
+}
+
+/** Writes a note in the note input and sends it with Enter. */
+export async function sendNote(page: Page, text: string): Promise<void> {
+  await page.locator('#message-input').fill(text);
+  await page.locator('#message-input').press('Enter');
+}
+
+/** The thread entries margin-notes.js holds for this session. */
+export async function threadEntries(page: Page): Promise<Array<{ kind: string; text: string }>> {
+  return page.evaluate(() =>
+    // @ts-ignore - getMarginThread is exposed by app.js
+    getMarginThread().map((n: { kind: string; text: string }) => ({ kind: n.kind, text: n.text }))
+  );
+}
+
+/** Waits for the assistant's reply to this turn to reach the page margin. */
+export async function expectReply(page: Page, contains: string): Promise<void> {
+  await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
+    .toContainText(contains, { timeout: 15000 });
 }

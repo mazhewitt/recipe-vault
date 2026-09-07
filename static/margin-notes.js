@@ -4,8 +4,8 @@
  *
  * The thread is the single record of the conversation for the page: replies,
  * tool/timer status lines, errors and the user's own messages. Only the last
- * three non-user entries are drawn in the margin; the rest stay in memory for
- * the Notes tab.
+ * three non-user entries are drawn in the margin; the whole thread is drawn
+ * into the Notes tab by renderThread().
  */
 
 import { escapeHtml, renderMarkdown } from './utils.js';
@@ -140,4 +140,45 @@ export function render() {
 
     // Suppress announcements until the streaming note is complete
     container.setAttribute('aria-busy', streamingId === null ? 'false' : 'true');
+
+    refreshOpenThread();
+}
+
+/**
+ * Keeps an open Notes tab live. The margin and the thread are two views of the
+ * same store, and the Notes panel is on screen (in place of the recipe body)
+ * while #page-right[data-tab="notes"] — on a phone the margin is hidden
+ * outright there, so without this a note sent from the Notes tab would be
+ * rendered nowhere at all. No-op when the tab is not open.
+ */
+function refreshOpenThread() {
+    const pageRight = document.getElementById('page-right');
+    if (!pageRight || pageRight.dataset.tab !== 'notes') return;
+    renderThread(document.querySelector('#page-right-content .notes-thread'));
+}
+
+/**
+ * Renders the FULL session thread — user notes, replies, status lines and
+ * errors, oldest first — into the given container (the Notes tab's
+ * `.notes-thread`). Idempotent; safe to call on every Notes-tab activation.
+ * Never touches #page-margin and sets no aria-live.
+ * @param {Element|null} container - the `.notes-thread` element
+ * @returns {number} number of entries rendered
+ */
+export function renderThread(container) {
+    if (!container) return 0;
+
+    if (thread.length === 0) {
+        container.innerHTML = '<p class="notes-thread-empty">No notes yet.</p>';
+        container.setAttribute('data-empty', 'true');
+        return 0;
+    }
+
+    container.removeAttribute('data-empty');
+    // bodyFor() keeps the margin's XSS rules: only AI replies are markdown,
+    // everything else — user notes included — is escaped
+    container.innerHTML = thread.map(note =>
+        `<div class="thread-note" data-kind="${note.kind}" data-note-id="${note.id}">${bodyFor(note)}</div>`
+    ).join('');
+    return thread.length;
 }

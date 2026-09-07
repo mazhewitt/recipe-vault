@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe } from './helpers';
+import { authenticate, createRecipe, sendNote } from './helpers';
 
 function isPhone(page: any): boolean {
   return page.viewportSize()!.width <= 600;
@@ -44,7 +44,6 @@ function intersects(a: { x: number; y: number; width: number; height: number },
 test.describe('Timer cover pill (Journal 2.0)', () => {
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
-    if (isPhone(page)) await page.click('#tab-book');
   });
 
   test('pill sits on the book cover and highlights the step', async ({ page }) => {
@@ -188,15 +187,12 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
     const { first } = await seedTwoRecipes(page);
     await openRecipe(page, first, 'Timer Recipe');
 
-    if (isPhone(page)) await page.click('#tab-chat');
+    await sendNote(page, 'start a timer');
 
-    await page.locator('#message-input').fill('start a timer');
-    await page.locator('#message-input').press('Enter');
-
-    await expect(page.locator('#messages')).toContainText('User: start a timer', { timeout: 5000 });
-    await expect(page.locator('#messages')).toContainText('AI:', { timeout: 10000 });
-
-    if (isPhone(page)) await page.click('#tab-book');
+    // The timer_start event is announced in the margin as its own status line
+    await expect(page.locator('#page-margin .margin-note[data-kind="status"]')
+      .filter({ hasText: 'Timer set' }))
+      .toContainText('Timer set: Mock timer', { timeout: 10000 });
 
     await expect(page.locator('#timer-widget')).toBeVisible();
     await expect(page.locator('#timer-text')).toContainText('Mock timer');

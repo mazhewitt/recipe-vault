@@ -22,8 +22,12 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] },
     },
     {
+      // Tablet width (768x1024), deliberately run in Chromium: `make e2e-setup`
+      // and CI install chromium only, so the WebKit descriptor this project
+      // used to carry could not run here. Safari-specific rendering is not
+      // covered by this suite; see the change's design.md.
       name: 'ipad',
-      use: { ...devices['iPad (gen 7) portrait'] },
+      use: { ...devices['iPad (gen 7)'], browserName: 'chromium', defaultBrowserType: 'chromium' },
     },
   ],
 

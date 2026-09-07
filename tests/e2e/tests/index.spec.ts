@@ -88,10 +88,8 @@ test.describe('Recipe Index', () => {
       });
     }
 
-    // Switch to book tab and reload
-    await page.click('#tab-book');
     await page.reload();
-    await page.click('#tab-book'); // Ensure visible after reload
+    await expect(page.locator('.index-title')).toBeVisible();
 
     // Verify all content is on left page
     const leftPage = page.locator('#page-left-content');
@@ -112,7 +110,6 @@ test.describe('Recipe Index', () => {
     });
 
     await page.reload();
-    if (page.viewportSize()!.width <= 600) await page.click('#tab-book');
 
     // Click the recipe in the index
     await page.locator('.index-recipe-item').filter({ hasText: title }).click();
@@ -135,7 +132,6 @@ test.describe('Recipe Index', () => {
     });
 
     await page.reload();
-    if (page.viewportSize()!.width <= 600) await page.click('#tab-book');
 
     // Click next arrow
     const nav = getNavSelectors(page);
@@ -154,7 +150,6 @@ test.describe('Recipe Index', () => {
     if (recipes.length > 0) return;
 
     await page.reload();
-    if (page.viewportSize()!.width <= 600) await page.click('#tab-book');
 
     await expect(page.locator('.recipe-placeholder-text')).toContainText('Your recipe book is empty');
   });

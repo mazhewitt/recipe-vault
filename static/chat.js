@@ -1,36 +1,12 @@
 /**
  * Chat Module
- * Handles chat UI, SSE streaming, and message rendering
+ * Handles the note input and SSE streaming. It renders nothing itself: every
+ * note, reply, status line and error goes to margin-notes.js.
  */
 
-import { escapeHtml, renderMarkdown } from './utils.js';
 import * as MealPlanDisplay from './meal-plan-display.js';
 import * as MarginNotes from './margin-notes.js';
 import { clearPrefetchCache } from './page-transitions.js';
-
-// Re-exported so existing importers of chat.js keep working (definition lives in utils.js)
-export { renderMarkdown };
-
-/**
- * Classic-notepad fallback: with localStorage `rv-ui` set to `classic`, nothing
- * is rendered into the page margin and the notepad behaves as it did before
- * margin notes existed. Read once at module load; localStorage can throw in
- * private windows, in which case margin rendering stays enabled.
- * Removed in the book-only layout step.
- */
-function readClassicFlag() {
-    try {
-        return localStorage.getItem('rv-ui') === 'classic';
-    } catch {
-        return false;
-    }
-}
-
-const classicMode = readClassicFlag();
-
-export function isClassic() {
-    return classicMode;
-}
 
 // Recipe ids already fetched during the current chat turn (reset in sendMessage)
 let fetchedRecipeIds = new Set();
@@ -53,67 +29,6 @@ export let state = null;
 
 export function initializeState(appState) {
     state = appState;
-}
-
-export function scrollToBottom() {
-    const messages = document.getElementById('messages');
-    messages.scrollTop = messages.scrollHeight;
-}
-
-export function addMessage(content, role, isStreaming = false) {
-    const messages = document.getElementById('messages');
-    const div = document.createElement('div');
-    div.className = `message ${role}` + (isStreaming ? ' streaming' : '');
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-
-    // Format with speaker label
-    const speaker = role === 'user' ? 'User' : (role === 'assistant' ? 'AI' : '');
-    const prefix = speaker ? `<strong>${speaker}:</strong> ` : '';
-
-    if (role === 'assistant') {
-        // CONTROLLED: AI-generated content, rendered as markdown (trusted source)
-        contentDiv.innerHTML = prefix + renderMarkdown(content);
-    } else if (role === 'tool-use') {
-        // SANITIZED: Tool names could theoretically contain user input
-        contentDiv.innerHTML = `<em>${escapeHtml(content)}</em>`;
-    } else if (role === 'error') {
-        // SANITIZED: Error messages may contain user input or data
-        contentDiv.innerHTML = `<strong>Error:</strong> ${escapeHtml(content)}`;
-    } else {
-        // SANITIZED: User messages are user input and must be escaped
-        contentDiv.innerHTML = prefix + escapeHtml(content);
-    }
-
-    div.appendChild(contentDiv);
-
-    if (isStreaming) {
-        div.id = 'streaming-message';
-    }
-    messages.appendChild(div);
-    scrollToBottom();
-    return div;
-}
-
-export function updateStreamingMessage(content) {
-    let msg = document.getElementById('streaming-message');
-    if (msg) {
-        const contentDiv = msg.querySelector('.message-content');
-        // CONTROLLED: AI-generated streaming content (trusted source)
-        contentDiv.innerHTML = '<strong>AI:</strong> ' + renderMarkdown(content);
-    } else {
-        msg = addMessage(content, 'assistant', true);
-    }
-    scrollToBottom();
-}
-
-export function finalizeStreamingMessage() {
-    const msg = document.getElementById('streaming-message');
-    if (msg) {
-        msg.classList.remove('streaming');
-        msg.removeAttribute('id');
-    }
 }
 
 export function setLoading(loading, text = 'Thinking...') {
@@ -211,20 +126,15 @@ export async function sendMessage() {
     input.value = '';
     // Reset textarea height after clearing
     input.style.height = 'auto';
-    addMessage(message, 'user');
-    if (!classicMode) MarginNotes.addNote(message, 'user');
+    MarginNotes.addNote(message, 'user');
     setLoading(true);
 
     // Each turn fetches a given recipe id at most once
     fetchedRecipeIds = new Set();
 
     // A previous turn that ended without a done event (dropped connection) would
-    // otherwise leave its streaming message/note open and have this turn overwrite
-    // it. Classic mode keeps the notepad's original lifecycle untouched.
-    if (!classicMode) {
-        finalizeStreamingMessage();
-        MarginNotes.finalizeStreamingNote();
-    }
+    // otherwise leave its streaming note open and have this turn overwrite it
+    MarginNotes.finalizeStreamingNote();
 
     let streamedText = '';
 
@@ -280,12 +190,11 @@ export async function sendMessage() {
             const errorText = await response.text();
             console.error('Server error:', response.status, errorText);
 
+            MarginNotes.finalizeStreamingNote();
             if (response.status === 413) {
-                addMessage('Error: Image too large for server. Try a smaller image or compress it first.', 'error');
-                if (!classicMode) MarginNotes.addNote('Error: Image too large for server. Try a smaller image or compress it first.', 'error');
+                MarginNotes.addNote('Error: Image too large for server. Try a smaller image or compress it first.', 'error');
             } else {
-                addMessage(`Error: ${response.statusText || 'Server error'}`, 'error');
-                if (!classicMode) MarginNotes.addNote(`Error: ${response.statusText || 'Server error'}`, 'error');
+                MarginNotes.addNote(`Error: ${response.statusText || 'Server error'}`, 'error');
             }
             setLoading(false);
             return;
@@ -306,8 +215,7 @@ export async function sendMessage() {
                             // Text streaming
                             if (parsed.text) {
                                 streamedText += parsed.text;
-                                updateStreamingMessage(streamedText);
-                                if (!classicMode) MarginNotes.updateStreamingNote(streamedText);
+                                MarginNotes.updateStreamingNote(streamedText);
                             }
                             break;
 
@@ -315,8 +223,7 @@ export async function sendMessage() {
                             // Tool call notification
                             if (parsed.tool) {
                                 setLoading(true, `Using ${parsed.tool}...`);
-                                addMessage(`Using tool: ${parsed.tool}`, 'tool-use');
-                                if (!classicMode) MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status');
+                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status');
                             }
                             break;
 
@@ -336,12 +243,10 @@ export async function sendMessage() {
                             // Timer start
                             if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
-                                if (!classicMode) {
-                                    MarginNotes.addNote(
-                                        `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
-                                        'status'
-                                    );
-                                }
+                                MarginNotes.addNote(
+                                    `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
+                                    'status'
+                                );
                             }
                             break;
 
@@ -350,19 +255,14 @@ export async function sendMessage() {
                             if (parsed.conversation_id) {
                                 state.conversationId = parsed.conversation_id;
                             }
-                            finalizeStreamingMessage();
-                            if (!classicMode) MarginNotes.finalizeStreamingNote();
+                            MarginNotes.finalizeStreamingNote();
                             break;
 
                         case 'error':
                             // Error handling
                             if (parsed.message) {
-                                if (!classicMode) {
-                                    finalizeStreamingMessage();
-                                    MarginNotes.finalizeStreamingNote();
-                                }
-                                addMessage(parsed.message, 'error');
-                                if (!classicMode) MarginNotes.addNote(parsed.message, 'error');
+                                MarginNotes.finalizeStreamingNote();
+                                MarginNotes.addNote(parsed.message, 'error');
                             }
                             break;
 
@@ -371,30 +271,24 @@ export async function sendMessage() {
                             if (parsed.text !== undefined) {
                                 if (parsed.text) {
                                     streamedText += parsed.text;
-                                    updateStreamingMessage(streamedText);
-                                    if (!classicMode) MarginNotes.updateStreamingNote(streamedText);
+                                    MarginNotes.updateStreamingNote(streamedText);
                                 }
                             } else if (parsed.recipe_id !== undefined) {
                                 handleRecipeArtifact(parsed.recipe_id);
                             } else if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
-                                if (!classicMode) {
-                                    MarginNotes.addNote(
-                                        `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
-                                        'status'
-                                    );
-                                }
+                                MarginNotes.addNote(
+                                    `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
+                                    'status'
+                                );
                             } else if (parsed.tool) {
                                 setLoading(true, `Using ${parsed.tool}...`);
-                                addMessage(`Using tool: ${parsed.tool}`, 'tool-use');
-                                if (!classicMode) MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status');
+                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status');
                             } else if (parsed.conversation_id) {
                                 state.conversationId = parsed.conversation_id;
-                                finalizeStreamingMessage();
-                                if (!classicMode) MarginNotes.finalizeStreamingNote();
+                                MarginNotes.finalizeStreamingNote();
                             } else if (parsed.message && parsed.recoverable !== undefined) {
-                                addMessage(parsed.message, 'error');
-                                if (!classicMode) MarginNotes.addNote(parsed.message, 'error');
+                                MarginNotes.addNote(parsed.message, 'error');
                             }
                             break;
                     }
@@ -406,22 +300,14 @@ export async function sendMessage() {
                 console.error('SSE stream error:', error);
                 // The stream died without a done event: end the streaming note so the
                 // next turn starts a new one instead of overwriting this partial reply
-                if (!classicMode) {
-                    finalizeStreamingMessage();
-                    MarginNotes.finalizeStreamingNote();
-                }
-                addMessage('Connection error. Please try again.', 'error');
-                if (!classicMode) MarginNotes.addNote('Connection error. Please try again.', 'error');
+                MarginNotes.finalizeStreamingNote();
+                MarginNotes.addNote('Connection error. Please try again.', 'error');
             }
         );
     } catch (error) {
         console.error('Error:', error);
-        if (!classicMode) {
-            finalizeStreamingMessage();
-            MarginNotes.finalizeStreamingNote();
-        }
-        addMessage('Connection error. Please try again.', 'error');
-        if (!classicMode) MarginNotes.addNote('Connection error. Please try again.', 'error');
+        MarginNotes.finalizeStreamingNote();
+        MarginNotes.addNote('Connection error. Please try again.', 'error');
     }
 
     setLoading(false);

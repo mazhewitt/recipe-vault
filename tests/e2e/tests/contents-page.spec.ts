@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe } from './helpers';
+import { authenticate, createRecipe, isPhone, openTab } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -15,7 +15,6 @@ async function clearRecipes(page: any) {
 
 async function openBook(page: any) {
   await page.reload();
-  if (page.viewportSize()!.width <= 600) await page.click('#tab-book');
   await expect(page.locator('.index-title')).toBeVisible();
 }
 
@@ -142,7 +141,9 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     await expect(page.locator('.ingredient-line').first()).toContainText('1 cup flour');
     await expect(page.locator('.ingredient-qty').first()).toHaveText('1 cup');
 
-    // Method header and numbered steps
+    // Method header and numbered steps. The phone shows one panel at a time, so
+    // the method section is behind its tab there.
+    if (isPhone(page)) await openTab(page, 'method');
     await expect(page.locator('.section-header').filter({ hasText: 'method' })).toBeVisible();
     const steps = page.locator('.prep-step');
     await expect(steps).toHaveCount(2);

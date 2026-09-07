@@ -8,12 +8,7 @@ test.describe('Image Upload Feature', () => {
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
 
-    // On mobile, switch to chat tab
-    if (page.viewportSize()!.width <= 600) {
-      await page.click('#tab-chat');
-    }
-
-    // Ensure message input is ready
+    // The note input is on screen at every width now - no tab to switch to
     await expect(page.locator('#message-input')).toBeVisible();
   });
 
@@ -53,8 +48,8 @@ test.describe('Image Upload Feature', () => {
     await fileChooser.setFiles(largeFilePath);
 
     // Verify error message is shown
-    await expect(page.locator('.paste-error')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.paste-error')).toContainText('Image too large');
+    await expect(page.locator('.note-input > .paste-error')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.note-input > .paste-error')).toContainText('Image too large');
 
     // Verify attachment indicator is NOT visible
     await expect(page.locator('#image-attachment')).not.toBeVisible();

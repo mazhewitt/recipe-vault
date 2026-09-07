@@ -1,104 +1,164 @@
-import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe } from './helpers';
+import { test, expect, Page } from '@playwright/test';
+import { authenticate, createRecipe, openRecipe, isPhone, Recipe } from './helpers';
 
-test.describe('Responsive Layout', () => {
+const RECIPE: Recipe = {
+  title: 'Responsive Test Recipe',
+  description: 'Test for the book-only layout',
+  ingredients: [{ name: 'test ingredient', quantity: 1 }],
+  steps: [{ step_number: 1, instruction: 'test step' }],
+  difficulty: 3,
+};
+
+async function seedAndOpen(page: Page): Promise<void> {
+  const recipeId = await createRecipe(page, { ...RECIPE, title: `${RECIPE.title} ${Date.now()}` });
+  await openRecipe(page, recipeId);
+}
+
+test.describe('Responsive Layout (book only)', () => {
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
   });
 
-  test('mobile tab switching works', async ({ page }) => {
-    // Only run this test on mobile viewports
-    if (page.viewportSize()!.width > 600) return;
+  test('the notepad column and the mobile tab bar are gone', async ({ page }) => {
+    for (const gone of ['#tab-book', '#tab-chat', '.mobile-tab-bar', '.mobile-tab',
+                        '.notepad-container', '.notepad', '#messages', '.text-input']) {
+      await expect(page.locator(gone), `${gone} must not exist`).toHaveCount(0);
+    }
 
-    // Default should be book tab
-    const bookContainer = page.locator('.book-container');
-    const notepadContainer = page.locator('.notepad-container');
-    const tabBook = page.locator('#tab-book');
-    const tabChat = page.locator('#tab-chat');
-
-    await expect(bookContainer).toBeVisible();
-    await expect(notepadContainer).not.toBeVisible();
-    await expect(tabBook).toHaveClass(/active/);
-
-    // Switch to Chat tab
-    await tabChat.click();
-    await expect(bookContainer).not.toBeVisible();
-    await expect(notepadContainer).toBeVisible();
-    await expect(tabChat).toHaveClass(/active/);
-    await expect(tabBook).not.toHaveClass(/active/);
-
-    // Switch back to Book tab
-    await tabBook.click();
-    await expect(bookContainer).toBeVisible();
-    await expect(notepadContainer).not.toBeVisible();
-    await expect(tabBook).toHaveClass(/active/);
+    // The note input is the single chat surface, and it lives in the book column
+    await expect(page.locator('.book-container > form.note-input#note-input')).toHaveCount(1);
+    await expect(page.locator('#message-input')).toBeVisible();
+    await expect(page.locator('#send-button')).toBeVisible();
   });
 
-  test('recipe renders single-page on mobile', async ({ page }) => {
-    // Only run this test on mobile viewports
-    if (page.viewportSize()!.width > 600) return;
+  test('phone shows the paper tabs and the note input below the book', async ({ page }) => {
+    test.skip(!isPhone(page), 'phone layout only');
+    await seedAndOpen(page);
 
-    // Create a recipe
+    // Paper tabs on the page's top edge; the desktop edge tabs stay hidden
+    const paperTabs = page.locator('.page-tabs');
+    await expect(paperTabs).toBeVisible();
+    await expect(page.locator('.page-tab')).toHaveCount(3);
+    await expect(page.locator('.page-tab[data-tab="ingredients"]')).toHaveClass(/active/);
+    await expect(page.locator('.edge-tabs')).toBeHidden();
+
+    // The note input is a static bar beneath the book, not a slip on the page
+    const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);
+    expect(position).toBe('static');
+    const book = (await page.locator('.recipe-book').boundingBox())!;
+    const input = (await page.locator('.note-input').boundingBox())!;
+    expect(input.y).toBeGreaterThanOrEqual(book.y + book.height - 1);
+    expect(input.width).toBeGreaterThan(page.viewportSize()!.width * 0.9);
+
+    // 44px touch targets on the send and attach buttons
+    for (const sel of ['#send-button', '#clipboard-button']) {
+      const box = (await page.locator(sel).boundingBox())!;
+      expect(box.height, `${sel} height`).toBeGreaterThanOrEqual(44);
+      expect(box.width, `${sel} width`).toBeGreaterThanOrEqual(44);
+    }
+
+    // One page at a time: the contents page is not on screen while a recipe is open
+    await expect(page.locator('#page-left')).toBeHidden();
+    await expect(page.locator('#page-right')).toBeVisible();
+    await expect(page.locator('#page-right-content')).toContainText('test ingredient');
+
+    // Nothing overflows sideways
+    const overflow = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
+  });
+
+  test('phone hides both tab strips on the contents page', async ({ page }) => {
+    test.skip(!isPhone(page), 'phone layout only');
+    await seedAndOpen(page);
+    await expect(page.locator('.page-tabs')).toBeVisible();
+
+    await page.locator('#recipe-book-header').click();
+    await expect(page.locator('.index-title')).toBeVisible();
+
+    await expect(page.locator('.page-tabs')).toBeHidden();
+    await expect(page.locator('.edge-tabs')).toBeHidden();
+    // The contents page is the visible page now
+    await expect(page.locator('#page-left')).toBeVisible();
+    await expect(page.locator('#note-page-number')).toHaveText('p. 1');
+  });
+
+  test('desktop shows the edge tabs and the note input on the right page', async ({ page }) => {
+    test.skip(isPhone(page), 'wide layout only');
+    await seedAndOpen(page);
+
+    // Edge tabs on the book's outer edge; the phone paper tabs stay hidden
+    await expect(page.locator('.edge-tabs')).toBeVisible();
+    await expect(page.locator('.edge-tab')).toHaveCount(3);
+    await expect(page.locator('.edge-tab[data-tab="ingredients"]')).toHaveClass(/active/);
+    await expect(page.locator('.page-tabs')).toBeHidden();
+
+    // The note input is a slip pinned over the foot of the right page
+    const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);
+    expect(position).toBe('absolute');
+    const input = (await page.locator('.note-input').boundingBox())!;
+    const pages = (await page.locator('.pages-container').boundingBox())!;
+    const rightPage = (await page.locator('#page-right').boundingBox())!;
+    // Right of the spine...
+    expect(input.x).toBeGreaterThan(pages.x + pages.width / 2);
+    // ...and over the page rather than below the book
+    expect(input.y).toBeLessThan(rightPage.y + rightPage.height);
+
+    // The recipe is on the right page and the contents stay on the left
+    await expect(page.locator('#page-right-content')).toContainText('test ingredient');
+    await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
+  });
+
+  test('desktop hides the edge tabs on the contents page', async ({ page }) => {
+    test.skip(isPhone(page), 'wide layout only');
+    await seedAndOpen(page);
+    await expect(page.locator('.edge-tabs')).toBeVisible();
+
+    await page.locator('#recipe-book-header').click();
+    await expect(page.locator('.index-title')).toBeVisible();
+
+    await expect(page.locator('.edge-tabs')).toBeHidden();
+    await expect(page.locator('.page-tabs')).toBeHidden();
+  });
+
+  test('tablet widths collapse the margin beneath the page content', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'viewport cannot be resized under mobile emulation');
+    // 601-1024px: book full width, margin under the content, edge tabs still shown
+    await page.setViewportSize({ width: 900, height: 1000 });
+
     const recipeId = await createRecipe(page, {
-      title: 'Responsive Test Recipe',
-      description: 'Test for mobile rendering',
-      ingredients: [{ name: 'test ingredient', quantity: 1 }],
-      steps: [{ step_number: 1, instruction: 'test step' }],
+      title: `Tablet Layout ${Date.now()}`,
+      ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
+      steps: Array.from({ length: 14 }, (_, i) => ({
+        step_number: i + 1,
+        instruction: `Step ${i + 1}: stir the mixture slowly and evenly until smooth`,
+      })),
+      difficulty: 3,
     });
+    await openRecipe(page, recipeId);
 
-    // Display the recipe
-    await page.evaluate((id) => {
-      // @ts-ignore
-      fetchAndDisplayRecipe(id);
-    }, recipeId);
+    await expect(page.locator('.edge-tabs')).toBeVisible();
+    await expect(page.locator('.page-tabs')).toBeHidden();
 
-    // Wait for render
-    await page.waitForTimeout(500);
+    const direction = await page.locator('#page-right').evaluate(el => getComputedStyle(el).flexDirection);
+    expect(direction).toBe('column');
 
-    // Verify left page is visible and full width
-    const leftPage = page.locator('#page-left');
-    const rightPage = page.locator('#page-right');
+    await page.locator('#message-input').fill('hello tablet');
+    await page.locator('#message-input').press('Enter');
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
 
-    await expect(leftPage).toBeVisible();
-    await expect(rightPage).not.toBeVisible();
-
-    // Check width of left page is nearly same as book-container
-    const leftWidth = await leftPage.evaluate(el => el.getBoundingClientRect().width);
-    const containerWidth = await page.locator('.pages-container').evaluate(el => el.getBoundingClientRect().width);
-    
-    // On mobile, the left page should be 100% of the pages-container
-    expect(leftWidth).toBeCloseTo(containerWidth, 0);
-
-    // Verify both ingredients and method are in the left content
-    const leftContent = page.locator('#page-left-content');
-    await expect(leftContent).toContainText('ingredients:');
-    await expect(leftContent).toContainText('method');
-    await expect(leftContent).toContainText('test ingredient');
-    await expect(leftContent).toContainText('test step');
-  });
-
-  test('tablet layout stacks components', async ({ page }) => {
-    // Only run this test on tablet viewports (e.g., 768px wide)
-    const viewport = page.viewportSize()!;
-    if (viewport.width <= 600 || viewport.width > 1024) return;
-
-    const bookContainer = page.locator('.book-container');
-    const notepadContainer = page.locator('.notepad-container');
-
-    // Both should be visible in tablet layout
-    await expect(bookContainer).toBeVisible();
-    await expect(notepadContainer).toBeVisible();
-
-    // Verify stacked layout (column)
-    const containerFlexDir = await page.locator('.app-container').evaluate(el => 
-      window.getComputedStyle(el).flexDirection
+    const contentBottom = await page.locator('#page-right-content').evaluate(
+      el => el.getBoundingClientRect().bottom
     );
-    expect(containerFlexDir).toBe('column');
+    const margin = (await page.locator('#page-margin').boundingBox())!;
+    // Directly beneath the content, not overlapping it and not at the page foot
+    expect(margin.y).toBeGreaterThanOrEqual(contentBottom - 1);
+    expect(margin.y).toBeLessThanOrEqual(contentBottom + 60);
 
-    // Verify book is on top via order property
-    const bookOrder = await bookContainer.evaluate(el => 
-      window.getComputedStyle(el).order
-    );
-    expect(bookOrder).toBe('-1');
+    // The note input is still a slip over the page at this width
+    const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);
+    expect(position).toBe('absolute');
   });
 });

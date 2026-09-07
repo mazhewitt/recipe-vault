@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe } from './helpers';
+import { authenticate, createRecipe, openRecipe, openTab, sendNote } from './helpers';
 
 test.describe('XSS Protection', () => {
   test.beforeEach(async ({ page }) => {
@@ -99,27 +99,37 @@ test.describe('XSS Protection', () => {
     // Skip: API validation may reject certain description content
   });
 
-  test('chat message with HTML tags renders as text', async ({ page }) => {
-    // On mobile, switch to chat tab
-    if (page.viewportSize()!.width <= 600) {
-      await page.click('#tab-chat');
-    }
+  test('a note with HTML tags renders as text in the Notes tab', async ({ page }) => {
+    // The thread lives on the Notes tab of an open recipe
+    const recipeId = await createRecipe(page, {
+      title: `XSS Note Recipe ${Date.now()}`,
+      ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
+      steps: [{ step_number: 1, instruction: 'Mix' }],
+      difficulty: 3,
+    });
+    await openRecipe(page, recipeId);
 
     const maliciousMessage = '<b>Bold</b> and <script>alert("XSS")</script>';
+    await sendNote(page, maliciousMessage);
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
+      .toHaveCount(1, { timeout: 10000 });
 
-    await page.locator('#message-input').fill(maliciousMessage);
-    await page.locator('#message-input').press('Enter');
+    await openTab(page, 'notes');
 
-    // Wait for message to appear
-    await expect(page.locator('#messages')).toContainText('User:', { timeout: 5000 });
+    const thread = page.locator('#page-right-content .notes-thread');
+    const threadHtml = await thread.innerHTML();
 
-    // Get the messages HTML
-    const messagesHtml = await page.locator('#messages').innerHTML();
+    // The payload is present, and present only in escaped form
+    expect(threadHtml).toContain('&lt;b&gt;Bold&lt;/b&gt;');
+    expect(threadHtml).toContain('&lt;script&gt;');
+    expect(threadHtml).not.toMatch(/<b>Bold<\/b>/);
+    expect(threadHtml).not.toMatch(/<script/);
 
-    // Verify HTML tags are escaped in user message
-    expect(messagesHtml).toContain('&lt;b&gt;');
-    expect(messagesHtml).toContain('&lt;script&gt;');
-    expect(messagesHtml).not.toMatch(/<script>alert/);
+    // ...and reads back as the exact text that was typed
+    await expect(thread.locator('.thread-note[data-kind="user"]')).toHaveText(maliciousMessage);
+    // No live nodes were created from it
+    expect(await thread.locator('script').count()).toBe(0);
+    expect(await thread.locator('b').count()).toBe(0);
 
     // Verify no alert dialog
     const dialogPromise = page.waitForEvent('dialog', { timeout: 500 }).catch(() => null);

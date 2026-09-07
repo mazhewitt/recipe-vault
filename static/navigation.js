@@ -1,9 +1,10 @@
 /**
  * Navigation Module
- * Handles responsive navigation and mobile state
+ * Handles recipe navigation state (arrows, edge chevrons, phone footer links)
  */
 
 import { animatePageTurn, isAnimating } from './page-transitions.js';
+import { setNotePageNumber } from './recipe-display.js';
 
 // Import global state accessors (will be set by app.js)
 export let state = null;
@@ -23,7 +24,6 @@ export async function updateNavigationState() {
     const nextEdge = document.getElementById('mobile-edge-next');
 
     const list = await state.fetchRecipeList();
-    if (!prevBtn || !nextBtn) return;
 
     let prevDisabled, nextDisabled;
 
@@ -50,14 +50,16 @@ export async function updateNavigationState() {
     }
 
     // Update desktop buttons
-    prevBtn.disabled = prevDisabled;
-    nextBtn.disabled = nextDisabled;
+    if (prevBtn) prevBtn.disabled = prevDisabled;
+    if (nextBtn) nextBtn.disabled = nextDisabled;
 
     // Update mobile edge navigation
-    if (prevEdge && nextEdge) {
-        prevEdge.classList.toggle('disabled', prevDisabled);
-        nextEdge.classList.toggle('disabled', nextDisabled);
-    }
+    if (prevEdge) prevEdge.classList.toggle('disabled', prevDisabled);
+    if (nextEdge) nextEdge.classList.toggle('disabled', nextDisabled);
+
+    // Update the phone footer links, which recipe-display re-creates on every render
+    document.querySelectorAll('.footer-prev').forEach(btn => { btn.disabled = prevDisabled; });
+    document.querySelectorAll('.footer-next').forEach(btn => { btn.disabled = nextDisabled; });
 }
 
 export async function loadNextRecipe() {
@@ -121,19 +123,35 @@ export async function showIndex() {
     state.viewMode = 'index';
     state.currentRecipeId = null;
     state.currentRecipeTitle = null;
+    // The contents page is page 1
+    setNotePageNumber(null);
     const list = await state.fetchRecipeList(true);
     state.renderIndex(list, { currentRecipeId: state.lastRecipeId });
     updateNavigationState();
 }
 
-export function switchTab(tab) {
-    const container = document.querySelector('.app-container');
-    if (!container) return;
+// Guard so initFooterNav can be called more than once without stacking listeners
+let footerBound = false;
 
-    container.setAttribute('data-active-tab', tab);
+/**
+ * Binds one delegated click listener for the phone footer links
+ * (.footer-prev / .footer-next), which recipe-display re-creates on every
+ * render. Clicks on a disabled link are ignored; loadPrevRecipe /
+ * loadNextRecipe already bail while a page turn or crossfade is running.
+ */
+export function initFooterNav() {
+    if (footerBound) return;
+    footerBound = true;
 
-    // Update active state of buttons
-    document.querySelectorAll('.mobile-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.id === `tab-${tab}`);
+    document.addEventListener('click', (e) => {
+        const prev = e.target.closest('.footer-prev');
+        if (prev) {
+            if (!prev.disabled) loadPrevRecipe();
+            return;
+        }
+        const next = e.target.closest('.footer-next');
+        if (next) {
+            if (!next.disabled) loadNextRecipe();
+        }
     });
 }

@@ -239,184 +239,120 @@ body::before {
     pointer-events: none;
 }
 
-/* ==================== NOTEPAD COMPONENT ==================== */
-.notepad-container {
-    width: 100%;
-    max-width: 380px;
-    height: 100%;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.notepad {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    position: relative;
-}
-
-.notepad-paper {
-    flex: 1;
-    min-height: 0;
-    background: linear-gradient(180deg,
-        var(--color-paper-aged-light) 0%,
-        var(--color-paper-aged) 20%,
-        var(--color-paper-aged-medium) 50%,
-        #e5d9bc 80%,
-        var(--color-paper-aged-dark) 100%
-    );
-    border-radius: var(--radius-md);
-    box-shadow:
-        var(--shadow-medium),
-        0 0 30px rgba(0,0,0,0.2);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
-}
-
-/* Paper texture */
-.notepad-paper::before {
-    content: '';
+/* ==================== NOTE INPUT ==================== */
+/* The single chat surface. Desktop/tablet: a cream slip absolutely positioned
+   over the foot of the right page, so it never scrolls away with the recipe.
+   Phone: a static cream bar beneath the book - see the 600px block. */
+.note-input {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paper)' opacity='0.03'/%3E%3C/svg%3E");
-    pointer-events: none;
-}
-
-.notepad-header {
-    padding: 16px 20px 12px 28px;
-    border-bottom: 2px solid var(--color-border);
-}
-
-.notepad-header h2 {
-    font-family: var(--font-handwritten);
-    font-size: 18px;
-    color: var(--color-ink-dark);
-    font-weight: 400;
-    letter-spacing: 0.5px;
-}
-
-.notepad-content {
-    flex: 1;
-    padding: 16px 20px 16px 28px;
-    overflow-y: auto;
-}
-
-/* Custom scrollbar for notepad */
-.notepad-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.notepad-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.notepad-content::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 4px;
-}
-
-.notepad-content::-webkit-scrollbar-thumb:hover {
-    background: var(--color-ink-muted);
-}
-
-/* Chat messages */
-.message {
-    margin-bottom: var(--space-md);
-    animation: fadeSlideIn 0.25s ease-out;
-}
-
-@keyframes fadeSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.message-content {
-    font-family: var(--font-handwritten);
-    font-size: 15px;
-    line-height: 1.6;
-    color: var(--color-ink-dark);
-}
-
-.message-content strong {
-    font-weight: 700;
-}
-
-.message.tool-use .message-content {
-    color: var(--color-ink-light);
-    font-style: italic;
-    font-size: 14px;
-}
-
-.message.error .message-content {
-    color: var(--color-leather);
-}
-
-.message.streaming {
-    opacity: 0.8;
-}
-
-/* Markdown in messages */
-.message-content h1,
-.message-content h2,
-.message-content h3 {
-    margin: 0.5rem 0;
-    font-weight: 400;
-}
-
-.message-content ul,
-.message-content ol {
-    margin: 0.5rem 0;
-    padding-left: 1.2rem;
-}
-
-.message-content p {
-    margin: 0.4rem 0;
-}
-
-.message-content p:first-child {
-    margin-top: 0;
-}
-
-/* Notepad input */
-.notepad-input {
-    padding: 12px 20px 16px 28px;
-    margin-top: auto;
-}
-
-.input-controls {
-    position: relative;
+    left: calc(50% + 10px); /* just right of the spine */
+    right: 10px;
+    bottom: 10px;
+    z-index: 6; /* above .pages-container (1), below .page-turn-overlay (10) */
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--color-paper-cream);
+    border-top: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    font-family: var(--font-handwritten);
+}
+
+.note-input-row {
+    display: flex;
+    align-items: flex-end;
     gap: 8px;
 }
 
-.text-input {
+/* The form is a flex column with its own gap; the chips supply no extra margin */
+.note-input .paste-error,
+.note-input .image-attachment {
+    margin-bottom: 0;
+}
+
+.note-input .loading {
+    padding: 0 4px;
+}
+
+.note-pencil {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-bottom: 8px;
+    color: var(--color-ink-muted);
+}
+
+.note-textarea {
     flex: 1;
-    min-height: 48px;
-    max-height: 200px;
-    padding: 12px;
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: #fff;
+    min-width: 0;
+    min-height: 34px;
+    max-height: 140px;
+    padding: 6px 8px;
+    border: none;
+    border-bottom: 1px solid var(--color-border-light);
+    background: transparent;
     font-family: var(--font-handwritten);
-    font-size: 15px;
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--color-ink-dark);
     resize: none;
     outline: none;
     overflow-y: auto;
     transition: border-color 0.15s ease;
+}
+
+.note-textarea::placeholder {
+    color: var(--color-placeholder);
+}
+
+.note-textarea:focus {
+    border-bottom-color: var(--color-ink-medium);
+}
+
+.note-textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.note-send {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--color-leather);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.note-send:hover {
+    background: var(--color-paper-aged-light);
+    border-color: var(--color-leather);
+}
+
+.note-send:active {
+    transform: scale(0.95);
+}
+
+.note-send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.note-page-number {
+    flex-shrink: 0;
+    padding-bottom: 8px;
+    font-family: var(--font-handwritten);
+    font-size: 13px;
+    color: var(--color-ink-muted);
+    white-space: nowrap;
 }
 
 .clipboard-button {
@@ -438,7 +374,7 @@ body::before {
 .clipboard-button:hover {
     background: var(--color-paper-aged-light);
     border-color: var(--color-ink-medium);
-    color: var(--color-ink);
+    color: var(--color-ink-dark);
 }
 
 .clipboard-button:active {
@@ -447,19 +383,6 @@ body::before {
 
 .clipboard-button:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.text-input::placeholder {
-    color: var(--color-placeholder);
-}
-
-.text-input:focus {
-    border-color: var(--color-ink-medium);
-}
-
-.text-input:disabled {
-    background: var(--color-paper-aged-light);
     cursor: not-allowed;
 }
 
@@ -476,6 +399,12 @@ body::before {
     font-family: var(--font-handwritten);
     font-size: 14px;
     color: var(--color-ink-medium);
+}
+
+/* app.js toggles the attachment chip with the `hidden` attribute; the author
+   `display: flex` above would otherwise beat the UA [hidden] rule. */
+.image-attachment[hidden] {
+    display: none !important;
 }
 
 .image-icon {
@@ -546,6 +475,7 @@ body::before {
     height: 100%;
     display: flex;
     flex-direction: column;
+    position: relative; /* containing block for the absolute .note-input */
 }
 
 .recipe-book {
@@ -655,6 +585,7 @@ body::before {
 .page-right {
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     box-shadow: var(--shadow-inset-right);
+    padding-bottom: 72px; /* clear the .note-input slip pinned to the foot */
 }
 
 /* Center binding shadows */
@@ -824,16 +755,6 @@ body::before {
 }
 
 /* Recipe photo */
-.recipe-photo-container {
-    margin: 12px 0 20px 0;
-    text-align: center;
-}
-
-.recipe-photo-wrapper {
-    display: inline-block;
-    position: relative;
-}
-
 .recipe-photo {
     max-width: 100%;
     max-height: 170px;
@@ -846,40 +767,9 @@ body::before {
     cursor: pointer;
 }
 
-.photo-delete-x {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: rgba(0,0,0,0.5);
-    color: #fff;
-    border: none;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    font-size: 14px;
-    line-height: 20px;
-    text-align: center;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s;
-    padding: 0;
-}
-
-.recipe-photo-wrapper:hover .photo-delete-x {
-    opacity: 1;
-}
-
-.photo-delete-x:hover {
-    background: rgba(180,40,40,0.8);
-}
-
 @media (max-width: 600px) {
     .recipe-photo {
         max-height: 130px;
-    }
-
-    .photo-delete-x {
-        opacity: 1;
     }
 }
 
@@ -1008,6 +898,380 @@ body::before {
 .difficulty-dot.filled {
     background: var(--color-leather);
     border-color: var(--color-leather);
+}
+
+/* ==================== JOURNAL RECIPE BODY ==================== */
+/* A small polaroid pinned at the end of the title row. 96x76 including the
+   white border, so it never competes with the handwritten title. */
+.recipe-polaroid {
+    flex-shrink: 0;
+    display: block;
+    width: 96px;
+    height: 76px;
+    padding: 4px 4px 10px;
+    background: #fff;
+    box-shadow: var(--shadow-soft);
+    transform: rotate(-1.5deg);
+}
+
+/* Beats the generic .recipe-photo sizing (and its phone override) on specificity */
+.recipe-polaroid .recipe-photo {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* onerror marks the polaroid empty rather than leaving a broken image */
+.recipe-polaroid.empty {
+    display: none;
+}
+
+/* Ingredients are packed several to a line on the page and one per line on the
+   phone; the packing itself is viewport-independent (see recipe-display.js). */
+.ingredient-item {
+    display: inline;
+}
+
+.ingredient-sep {
+    color: var(--color-ink-muted);
+}
+
+/* ==================== TAB PANELS ==================== */
+/* Desktop & tablet: ingredients and method are both on the page; notes replaces them */
+.tab-panel[data-tab="notes"] {
+    display: none;
+}
+
+#page-right[data-tab="notes"] .tab-panel[data-tab="ingredients"],
+#page-right[data-tab="notes"] .tab-panel[data-tab="method"] {
+    display: none;
+}
+
+#page-right[data-tab="notes"] .tab-panel[data-tab="notes"] {
+    display: block;
+}
+
+/* ==================== NOTES THREAD ==================== */
+/* The full session thread, shown on the Notes tab. The cook's own notes are
+   pencil; the replies are biro - the same ink as the margin notes. */
+.notes-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-family: var(--font-handwritten);
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.notes-thread .thread-note {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.notes-thread .thread-note p {
+    margin: 0 0 6px 0;
+}
+
+.notes-thread .thread-note p:last-child {
+    margin-bottom: 0;
+}
+
+.thread-note[data-kind="user"] {
+    color: var(--color-ink-medium);
+    padding-left: var(--space-md);
+}
+
+.thread-note[data-kind="reply"] {
+    color: var(--color-biro);
+}
+
+.thread-note[data-kind="status"] {
+    color: var(--color-ink-muted);
+    font-size: 13px;
+    font-style: italic;
+}
+
+.thread-note[data-kind="error"] {
+    color: var(--color-leather);
+}
+
+.notes-thread-empty {
+    margin: 0;
+    color: var(--color-ink-muted);
+    font-style: italic;
+}
+
+/* ==================== EDGE TABS (desktop / tablet) ==================== */
+/* Section tabs poking out of the book's right outer edge. A child of
+   .recipe-book, so they neither scroll with the page nor join the
+   #page-right grid. Shown on the recipe page only. */
+.edge-tabs {
+    display: none;
+    position: absolute;
+    top: 76px;
+    right: -8px;
+    z-index: 9; /* below .page-nav (10) and the timer pill (11) */
+    flex-direction: column;
+    gap: 6px;
+}
+
+@media (min-width: 601px) {
+    body[data-view-mode="recipe"] .edge-tabs {
+        display: flex;
+    }
+}
+
+.edge-tab {
+    writing-mode: vertical-rl;
+    width: 26px;
+    min-height: 92px;
+    padding: 10px 4px;
+    border: none;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--color-border);
+    color: var(--color-ink-dark);
+    font-family: var(--font-handwritten);
+    font-size: 14px;
+    line-height: 1;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.25);
+    transition: background 0.2s, color 0.2s;
+}
+
+.edge-tab[data-tab="method"] {
+    background: var(--color-accent-brown);
+    color: var(--color-paper-cream);
+}
+
+.edge-tab[data-tab="notes"] {
+    background: var(--color-leather);
+    color: var(--color-paper-cream);
+}
+
+/* The active tab reads as the page itself, pulled out past the edge */
+.edge-tab.active {
+    background: var(--color-paper-cream);
+    color: var(--color-ink-dark);
+    font-weight: 700;
+    padding-right: 8px;
+}
+
+.edge-tab:focus-visible {
+    outline: 2px solid var(--color-ink-dark);
+    outline-offset: 2px;
+}
+
+/* ==================== PAGE TABS (phone) ==================== */
+/* Paper tabs on the page's top edge. Hidden above 600px, where .edge-tabs
+   does the same job on the book's outer edge. */
+.page-tabs {
+    display: none;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    flex: 0 0 auto;
+    gap: 4px;
+    align-items: flex-end;
+    padding-top: 4px;
+    margin-bottom: 10px;
+    background: var(--color-paper-cream);
+}
+
+.page-tab {
+    flex: 1;
+    min-height: 44px;
+    padding: 8px 4px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--color-paper-aged-dark);
+    color: var(--color-accent-brown);
+    font-family: var(--font-handwritten);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+/* The active tab is the page: cream face, no seam along the bottom */
+.page-tab.active {
+    background: var(--color-paper-cream);
+    color: var(--color-ink-dark);
+    font-weight: 700;
+    border-bottom-color: transparent;
+    margin-bottom: -1px;
+    padding-bottom: 9px;
+}
+
+.page-tab:focus-visible {
+    outline: 2px solid var(--color-ink-dark);
+    outline-offset: -2px;
+}
+
+/* ==================== PHONE FOOTER ==================== */
+/* Emitted on every viewport by renderRecipe; only the phone shows it. */
+.phone-footer {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: var(--space-lg);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border-light);
+    font-family: var(--font-handwritten);
+}
+
+.footer-prev,
+.footer-next {
+    min-height: 44px;
+    padding: 8px 6px;
+    border: none;
+    background: none;
+    font-family: var(--font-handwritten);
+    font-size: 15px;
+    color: var(--color-accent-brown);
+    cursor: pointer;
+}
+
+.footer-page {
+    font-size: 14px;
+    color: var(--color-ink-muted);
+    white-space: nowrap;
+}
+
+.phone-footer button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* ==================== MEAL PLAN PANEL ==================== */
+.meal-plan-panel {
+    font-family: var(--font-serif);
+    color: var(--color-ink-dark);
+}
+
+.meal-plan-header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.meal-plan-title {
+    font-family: var(--font-handwritten);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--color-ink-dark);
+}
+
+.meal-plan-guest-badge {
+    font-family: var(--font-handwritten);
+    font-size: 14px;
+    color: var(--color-ink-medium);
+    background: var(--color-paper-aged);
+    border-radius: var(--radius-pill);
+    padding: 2px 10px;
+}
+
+.meal-plan-recipes {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.meal-plan-recipe-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--color-border-light);
+}
+
+.meal-plan-role-badge {
+    flex-shrink: 0;
+    padding: 4px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--color-border);
+    color: var(--color-ink-dark);
+    font-family: var(--font-handwritten);
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.meal-plan-role-centrepiece {
+    background: var(--color-leather);
+    color: var(--color-paper-cream);
+}
+
+.meal-plan-role-side {
+    background: var(--color-border);
+    color: var(--color-ink-dark);
+}
+
+.meal-plan-role-vegetarian-alternative {
+    background: var(--color-accent-brown);
+    color: var(--color-paper-cream);
+}
+
+.meal-plan-recipe-link {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: left;
+    font-family: var(--font-serif);
+    font-size: 15px;
+    color: var(--color-ink-dark);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.meal-plan-recipe-link:hover {
+    color: var(--color-leather);
+}
+
+.meal-plan-empty {
+    font-style: italic;
+    color: var(--color-ink-muted);
+}
+
+.meal-plan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: var(--space-lg);
+}
+
+.meal-plan-action-btn {
+    min-height: 44px;
+    padding: 6px 14px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-paper-cream);
+    color: var(--color-ink-dark);
+    font-family: var(--font-handwritten);
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.meal-plan-action-btn:hover {
+    background: var(--color-paper-aged-light);
+    border-color: var(--color-ink-medium);
+}
+
+.meal-plan-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* ==================== PLACEHOLDER STATE ==================== */
@@ -1333,69 +1597,6 @@ body::before {
     border-top: 1px solid var(--color-border-light);
 }
 
-/* Mobile Tab Bar */
-.mobile-tab-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 52px;
-    display: none; /* Shown only on mobile via media query */
-    background: var(--color-paper-aged);
-    border-top: 2px solid var(--color-border);
-    z-index: 1000;
-}
-
-.mobile-tab {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font-handwritten);
-    color: var(--color-ink-medium);
-    padding: 4px 0;
-    transition: all 0.2s ease;
-}
-
-.mobile-tab .tab-icon {
-    font-size: 20px;
-    line-height: 1;
-}
-
-.mobile-tab .tab-text {
-    font-size: 12px;
-}
-
-.mobile-tab.active {
-    color: var(--color-leather);
-    background: rgba(139, 45, 26, 0.05);
-}
-
-.mobile-tab.active .tab-text {
-    font-weight: 700;
-}
-
-.mobile-tab.active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    width: 40%;
-    height: 3px;
-    background: var(--color-leather);
-    border-radius: 3px 3px 0 0;
-}
-
-@media (max-width: 600px) {
-    .mobile-tab-bar {
-        display: flex;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-    }
-}
-
 /* User info and Logout */
 .user-info {
     position: fixed;
@@ -1444,7 +1645,8 @@ body::before {
 }
 
 /* Recipe view: the right page becomes content + a 150px margin column */
-body[data-view-mode="recipe"] #page-right {
+body[data-view-mode="recipe"] #page-right,
+body[data-view-mode="meal"] #page-right {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 150px;
     align-items: start;
@@ -1529,33 +1731,12 @@ body[data-view-mode="index"] #page-margin {
 }
 
 /* ==================== RESPONSIVE ==================== */
+/* Tablet: the book keeps its two-page spread and simply fills the width. The
+   margin column collapses beneath the right page content; the edge tabs and the
+   absolutely positioned note input behave exactly as on desktop. */
 @media (max-width: 1024px) {
     body {
         padding: 20px;
-    }
-
-    .app-container {
-        flex-direction: column !important;
-        height: auto;
-        gap: 24px;
-    }
-
-    .book-container {
-        order: -1;
-        width: 100% !important;
-        height: 55vh !important;
-        flex: none;
-    }
-
-    .notepad-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        height: 40vh !important;
-        flex: none;
-    }
-
-    .notepad-container .section-label {
-        display: none;
     }
 
     .user-info {
@@ -1583,18 +1764,22 @@ body[data-view-mode="index"] #page-margin {
     }
 
     /* Collapse the margin column: notes render beneath the right page content */
-    body[data-view-mode="recipe"] #page-right {
+    body[data-view-mode="recipe"] #page-right,
+    body[data-view-mode="meal"] #page-right {
         display: flex;
+        flex-direction: column;
     }
 
     /* The content block sizes to its content so the margin follows it directly
        instead of being pushed below a full-height box */
-    body[data-view-mode="recipe"] #page-right-content {
+    body[data-view-mode="recipe"] #page-right-content,
+    body[data-view-mode="meal"] #page-right-content {
         height: auto;
         flex: 0 0 auto;
     }
 
-    body[data-view-mode="recipe"] #page-margin {
+    body[data-view-mode="recipe"] #page-margin,
+    body[data-view-mode="meal"] #page-margin {
         width: 100%;
         padding-top: 12px;
     }
@@ -1604,7 +1789,6 @@ body[data-view-mode="index"] #page-margin {
 @media (max-width: 600px) {
     body {
         padding: 0;
-        padding-bottom: 52px; /* Reserve space for fixed tab bar */
         background-image: linear-gradient(90deg,
             var(--color-wood-dark) 0%,
             var(--color-wood-medium) 15%,
@@ -1638,56 +1822,32 @@ body[data-view-mode="index"] #page-margin {
         display: none;
     }
 
-    .book-container,
-    .notepad-container {
-        height: 100% !important;
+    .book-container {
+        height: 100%;
         width: 100%;
         max-width: 100%;
-        display: none; /* Hidden by default, shown by data-active-tab */
+        min-height: 0;
     }
 
-    /* Tab Switching Logic */
-    .app-container[data-active-tab="book"] .book-container {
-        display: flex;
-    }
-
-    .app-container[data-active-tab="chat"] .notepad-container {
-        display: flex;
-    }
-
-    /* Defaults if no attribute present (server-side default) */
-    .app-container:not([data-active-tab]) .book-container {
-        display: flex;
-    }
-
-    .notepad-paper {
-        border-radius: 0;
-        box-shadow: none;
-    }
-
-    .notepad-paper::before {
-        display: none; /* Remove paper texture noise */
-    }
-
-    .notepad-header {
-        padding: 12px 16px 10px 16px;
-    }
-
-    .notepad-content {
-        padding: 12px 16px;
-    }
-
-    .notepad-input {
-        padding: 10px 16px 62px 16px; /* Extra bottom padding to clear fixed tab bar */
-    }
-
-    .input-controls {
-        gap: 6px;
+    /* Tapping the book label is the documented way back to the contents, so it
+       survives the generic .section-label hide above - pinned to the top-left of
+       the leather strip, opposite the timer pill. */
+    #recipe-book-header {
+        display: block;
+        position: absolute;
+        top: 12px;
+        left: 14px;
+        z-index: 11; /* level with the timer pill */
+        margin: 0;
+        font-size: 16px;
+        line-height: 1;
+        letter-spacing: 0;
+        text-align: left;
     }
 
     .clipboard-button {
-        width: 36px;
-        height: 36px;
+        width: 44px;
+        height: 44px;
     }
 
     /* Compact pill. .app-container clips overflow at this breakpoint and the
@@ -1731,16 +1891,144 @@ body[data-view-mode="index"] #page-margin {
         font-size: 12px;
     }
 
-    /* Single Page Book View */
+    /* Single Page Book View - body[data-view-mode] picks the visible page */
+    .page-left,
     .page-right {
-        display: none !important;
-    }
-
-    .page-left {
         width: 100% !important;
         border-radius: 0;
         box-shadow: none;
         padding: 16px;
+    }
+
+    .page-right::before {
+        display: none;
+    }
+
+    body[data-view-mode="recipe"] .page-left,
+    body[data-view-mode="meal"] .page-left {
+        display: none;
+    }
+
+    body[data-view-mode="recipe"] #page-right,
+    body[data-view-mode="meal"] #page-right {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Contents page: the left page is the page. The right page survives with
+       zero height solely to host #page-margin beneath the contents (the sticky
+       reply); .page-margin:empty keeps it invisible when there is no note. */
+    body[data-view-mode="index"] .pages-container {
+        flex-direction: column;
+    }
+
+    body[data-view-mode="index"] .page-left {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    body[data-view-mode="index"] .page-right {
+        display: flex;
+        flex: 0 0 auto;
+        min-height: 0;
+        padding: 0;
+    }
+
+    body[data-view-mode="index"] .page-right > .page-content {
+        display: none;
+    }
+
+    body[data-view-mode="index"] .page-right > .page-tabs {
+        display: none;
+    }
+
+    body[data-view-mode="index"] #page-margin {
+        position: static; /* undo the desktop pinned sticky note */
+        width: 100%;
+        padding: 8px 16px;
+    }
+
+    /* Paper tabs ride the page's top edge, on the recipe page only */
+    body[data-view-mode="recipe"] .page-tabs {
+        display: flex;
+    }
+
+    /* One panel at a time */
+    #page-right .tab-panel {
+        display: none;
+    }
+
+    #page-right[data-tab="ingredients"] .tab-panel[data-tab="ingredients"],
+    #page-right[data-tab="method"] .tab-panel[data-tab="method"],
+    #page-right[data-tab="notes"] .tab-panel[data-tab="notes"] {
+        display: block;
+    }
+
+    /* The margin's last-three notes must not double up with the full thread.
+       Scoped to the recipe page: #page-right[data-tab] is not reset when the
+       user goes back to the contents, and the contents page renders its sticky
+       reply into #page-margin. */
+    body[data-view-mode="recipe"] #page-right[data-tab="notes"] #page-margin {
+        display: none;
+    }
+
+    /* One ingredient per line, at reading size */
+    .ingredient-item {
+        display: block;
+    }
+
+    .ingredient-sep {
+        display: none;
+    }
+
+    .ingredients-list,
+    .prep-step .step-text {
+        font-size: 16px;
+    }
+
+    .phone-footer {
+        display: flex;
+    }
+
+    .recipe-polaroid {
+        width: 84px;
+        height: 66px;
+    }
+
+    /* The note input leaves the page and becomes a cream bar under the book */
+    .note-input {
+        position: static;
+        width: 100%;
+        flex: 0 0 auto;
+        gap: 4px;
+        padding: 8px 12px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        border-radius: 0;
+        border-top: 1px solid var(--color-border);
+        box-shadow: none;
+    }
+
+    .note-pencil {
+        display: none; /* decorative; the bar needs the width for 44px targets */
+    }
+
+    .note-textarea {
+        min-height: 44px;
+        font-size: 16px; /* keeps iOS from zooming on focus */
+    }
+
+    .note-send {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        background: var(--color-leather);
+        border-color: var(--color-leather);
+        color: var(--color-paper-cream);
+    }
+
+    .note-page-number {
+        font-size: 12px;
     }
 
     .page-left::after {
@@ -1764,17 +2052,16 @@ body[data-view-mode="index"] #page-margin {
         display: none; /* Hide spine shadow */
     }
 
+    /* A 40px leather strip above the paper carries the book label (left) and
+       the timer pill (right), so neither overlaps the page or the paper tabs.
+       View Transitions API: the spread is the phone slide transition target. */
     .pages-container {
-        margin: 4px;
+        margin: 40px 4px 4px;
+        view-transition-name: page-content;
     }
 
     .page-content {
         padding-top: 10px;
-    }
-
-    /* View Transitions API: tag the content element for mobile slide transitions */
-    #page-left-content {
-        view-transition-name: page-content;
     }
 
     .page-nav {
@@ -1864,8 +2151,18 @@ body[data-view-mode="index"] #page-margin {
 }
 
 @media (max-width: 600px) {
+    /* The overlay spans the whole book and sits above .pages-container's
+       stacking context, so it must start below the leather strip - and below
+       the paper tabs in recipe view - or it swallows their taps. Its chevrons
+       then land on the paper, where they read. */
     .mobile-edge-nav {
         display: flex;
+        padding-top: 48px;
+    }
+
+    body[data-view-mode="recipe"] .mobile-edge-nav {
+        top: 108px; /* 40 strip + 4 margin + 16 padding + 48 tabs */
+        padding-top: 8px;
     }
 }
 

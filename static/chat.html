@@ -8,8 +8,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css?v={{asset_version}}">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -20,46 +18,7 @@
     </div>
 
     <div class="app-container">
-        <!-- Notepad Section -->
-        <div class="notepad-container">
-            <div class="section-label">Notepad</div>
-            <div class="notepad">
-                <div class="notepad-paper">
-                    <div class="notepad-header">
-                        <h2>Recipe Development & Search</h2>
-                    </div>
-                    <div class="notepad-content" id="messages">
-                        <div class="message">
-                            <div class="message-content">
-                                <strong>AI:</strong> Hello! I'm your cooking assistant. I can help you manage your recipes - list them, get details, create new ones, or update existing recipes. I can also guide you through cooking with step-by-step instructions, ingredient scaling, and timers. What would you like to do?
-                            </div>
-                        </div>
-                    </div>
-                    <div id="loading" class="loading">
-                        <div class="spinner"></div>
-                        <span id="loading-text">Thinking...</span>
-                    </div>
-                    <div class="notepad-input">
-                        <div id="image-attachment" class="image-attachment" style="display: none;">
-                            <span class="image-icon">🖼️</span>
-                            <span class="image-text">Image attached</span>
-                            <button class="remove-image" onclick="removeImage()" type="button">✕</button>
-                        </div>
-                        <div class="input-controls">
-                            <textarea class="text-input" id="message-input" placeholder="Type your message..." onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
-                            <input type="file" id="image-upload" accept="image/*" style="display: none;">
-                            <button class="clipboard-button" id="clipboard-button" type="button" title="Attach image from clipboard or upload" aria-label="Attach image from clipboard or upload">
-                                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
-                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recipe Book Section -->
+        <!-- Recipe Book Section (the only column) -->
         <div class="book-container">
             <div class="section-label clickable" id="recipe-book-header">Recipe Book</div>
             <div class="recipe-book">
@@ -78,6 +37,7 @@
                     <span class="timer-text" id="timer-text">Timer: 00:00</span>
                     <button class="timer-cancel" onclick="cancelTimer()" type="button" title="Cancel timer" aria-label="Cancel timer">✕</button>
                 </div>
+
                 <button id="page-prev" class="page-nav prev" aria-label="Previous recipe" disabled>&lt;</button>
                 <button id="page-next" class="page-nav next" aria-label="Next recipe" disabled>&gt;</button>
 
@@ -93,8 +53,17 @@
                     </svg>
                 </div>
 
+                <!-- Desktop / tablet edge tabs, on the right outer edge of the book.
+                     Sibling of .pages-container so they neither scroll with the page
+                     nor take part in the #page-right grid. -->
+                <div class="edge-tabs" role="tablist" aria-label="Recipe sections">
+                    <button type="button" class="edge-tab active" role="tab" data-tab="ingredients" aria-selected="true" aria-controls="page-right-content">Ingredients</button>
+                    <button type="button" class="edge-tab" role="tab" data-tab="method" aria-selected="false" aria-controls="page-right-content">Method</button>
+                    <button type="button" class="edge-tab" role="tab" data-tab="notes" aria-selected="false" aria-controls="page-right-content">Notes</button>
+                </div>
+
                 <div class="pages-container">
-                    <!-- Left Page - Ingredients -->
+                    <!-- Left Page — contents -->
                     <div class="page page-left" id="page-left">
                         <div class="page-content" id="page-left-content">
                             <div class="recipe-placeholder">
@@ -112,39 +81,60 @@
                         </div>
                     </div>
 
-                    <!-- Right Page - Preparation -->
-                    <div class="page page-right" id="page-right">
-                        <div class="page-content" id="page-right-content">
-                            <div class="recipe-placeholder">
-                                <div class="recipe-placeholder-icon">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M12 2a4 4 0 00-4 4v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2h-2V6a4 4 0 00-4-4z"/>
-                                        <path d="M10 14h4"/>
-                                        <path d="M12 12v4"/>
-                                    </svg>
-                                </div>
-                                <div class="recipe-placeholder-text">
-                                    Your preparation steps will appear on this page.
-                                </div>
-                            </div>
+                    <!-- Right Page — the recipe (or the meal plan, or the second
+                         half of the contents in index mode) -->
+                    <div class="page page-right" id="page-right" data-tab="ingredients">
+                        <!-- Phone paper tabs, on the page's top edge -->
+                        <div class="page-tabs" role="tablist" aria-label="Recipe sections">
+                            <button type="button" class="page-tab active" role="tab" data-tab="ingredients" aria-selected="true" aria-controls="page-right-content">Ingredients</button>
+                            <button type="button" class="page-tab" role="tab" data-tab="method" aria-selected="false" aria-controls="page-right-content">Method</button>
+                            <button type="button" class="page-tab" role="tab" data-tab="notes" aria-selected="false" aria-controls="page-right-content">Notes</button>
                         </div>
+                        <div class="page-content" id="page-right-content"></div>
                         <aside id="page-margin" class="page-margin" aria-live="polite"></aside>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Mobile Tab Bar -->
-    <div class="mobile-tab-bar">
-        <button class="mobile-tab" id="tab-book" onclick="switchTab('book')">
-            <span class="tab-icon">📖</span>
-            <span class="tab-text">Book</span>
-        </button>
-        <button class="mobile-tab" id="tab-chat" onclick="switchTab('chat')">
-            <span class="tab-icon">💬</span>
-            <span class="tab-text">Chat</span>
-        </button>
+            <!-- The single chat surface. Desktop/tablet: absolutely positioned over
+                 the foot of the right page. Phone: a cream bar beneath the book. -->
+            <form class="note-input" id="note-input" autocomplete="off">
+                <div id="image-attachment" class="image-attachment" hidden>
+                    <span class="image-icon">🖼️</span>
+                    <span class="image-text">Image attached</span>
+                    <button class="remove-image" onclick="removeImage()" type="button" aria-label="Remove attached image">✕</button>
+                </div>
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <span id="loading-text">Thinking...</span>
+                </div>
+                <div class="note-input-row">
+                    <span class="note-pencil" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.6" fill="none">
+                            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                            <path d="M2 2l7.586 7.586"/>
+                        </svg>
+                    </span>
+                    <textarea id="message-input" class="note-textarea" rows="1"
+                              placeholder="Write a note to the cook…"
+                              aria-label="Write a note to the cook"></textarea>
+                    <input type="file" id="image-upload" accept="image/*" hidden>
+                    <button class="clipboard-button" id="clipboard-button" type="button" title="Attach image from clipboard or upload" aria-label="Attach image from clipboard or upload">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        </svg>
+                    </button>
+                    <button class="note-send" id="send-button" type="submit" aria-label="Send note">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                    <span class="note-page-number" id="note-page-number">p. 1</span>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Photo Preview Overlay -->

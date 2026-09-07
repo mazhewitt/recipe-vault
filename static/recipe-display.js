@@ -6,6 +6,7 @@
 import { escapeHtml } from './utils.js';
 import { getCachedRecipe, prefetchAdjacent, animatePageTurn } from './page-transitions.js';
 import { applyStepHighlight } from './timer.js';
+import { setActiveTab } from './page-tabs.js';
 
 // Import global state accessors (these will be set by app.js)
 export let state = null;
@@ -18,37 +19,25 @@ export function isMobile() {
     return window.matchMedia('(max-width: 600px)').matches;
 }
 
+// The recipe lives on the right page; the left page holds the contents and is
+// never cleared by the loading or error states.
 export function showRecipeLoading() {
-    const leftContent = document.getElementById('page-left-content');
     const rightContent = document.getElementById('page-right-content');
 
     // SAFE: Static HTML, no user data
-    leftContent.innerHTML = `
+    rightContent.innerHTML = `
         <div class="skeleton skeleton-title"></div>
         <div class="skeleton skeleton-line"></div>
         <div class="skeleton skeleton-line"></div>
         <div class="skeleton skeleton-line"></div>
-        <div class="skeleton skeleton-short"></div>
+        <div class="skeleton skeleton-line"></div>
     `;
-
-    if (!isMobile()) {
-        // SAFE: Static HTML, no user data
-        rightContent.innerHTML = `
-            <div class="skeleton skeleton-title"></div>
-            <div class="skeleton skeleton-line"></div>
-            <div class="skeleton skeleton-line"></div>
-            <div class="skeleton skeleton-line"></div>
-            <div class="skeleton skeleton-line"></div>
-        `;
-    } else {
-        rightContent.innerHTML = '';
-    }
 }
 
 export function showRecipeError(message) {
-    const leftContent = document.getElementById('page-left-content');
+    const rightContent = document.getElementById('page-right-content');
     // SANITIZED: Error message could contain user input
-    leftContent.innerHTML = `
+    rightContent.innerHTML = `
         <div class="recipe-placeholder">
             <div class="recipe-placeholder-text" style="color: var(--color-leather);">
                 ${escapeHtml(message)}
@@ -75,7 +64,7 @@ async function fetchRecipeFromApi(recipeId) {
     return response.json();
 }
 
-async function refreshDifficultyIfPending(recipe) {
+async function refreshDifficultyIfPending(recipe, pageNumber) {
     if (!recipe || recipe.difficulty != null || !recipe.id) return;
 
     for (const waitMs of [3000, 7000, 12000]) {
@@ -88,7 +77,7 @@ async function refreshDifficultyIfPending(recipe) {
         try {
             const refreshed = await fetchRecipeFromApi(recipe.id);
             if (refreshed.difficulty != null) {
-                renderRecipe(refreshed);
+                renderRecipe(refreshed, { pageNumber });
                 await state.fetchRecipeList(true);
                 state.updateNavigationState();
                 prefetchAdjacent(refreshed.id);
@@ -129,6 +118,18 @@ export function pageNumberFor(index) {
     return 2 * index + 3;
 }
 
+/**
+ * Writes the cosmetic page number into the note input. Sole writer of
+ * #note-page-number.
+ *
+ * @param {number|null} pageNumber - pageNumberFor(index), or null for the contents page
+ */
+export function setNotePageNumber(pageNumber) {
+    const text = pageNumber == null ? 'p. 1' : `p. ${pageNumber}`;
+    const el = document.getElementById('note-page-number');
+    if (el) el.textContent = text;
+}
+
 export function getTotalTimeMinutes(recipe) {
     const prepTime = getMinutesField(recipe, 'prep_time') ?? NaN;
     const cookTime = getMinutesField(recipe, 'cook_time') ?? NaN;
@@ -151,11 +152,22 @@ export function getTotalTimeMinutes(recipe) {
     return stepTotal > 0 ? stepTotal : null;
 }
 
+/**
+ * Renders the contents.
+ *
+ * @param {Array} recipes
+ * @param {{currentRecipeId?: string|null, singleColumn?: boolean}} [options]
+ *        singleColumn - render every letter group into #page-left-content and
+ *        leave #page-right-content completely untouched (it holds the open
+ *        recipe). Without it the contents keep the two-page split on wide
+ *        viewports.
+ */
 export function renderIndex(recipes, options = {}) {
     const leftContent = document.getElementById('page-left-content');
     const rightContent = document.getElementById('page-right-content');
     const alphabetLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     const currentRecipeId = options.currentRecipeId != null ? String(options.currentRecipeId) : null;
+    const singleColumn = options.singleColumn === true;
     const photoEpoch = state?.photoEpoch ?? 0;
 
     if (recipes.length === 0) {
@@ -167,7 +179,7 @@ export function renderIndex(recipes, options = {}) {
                 </div>
             </div>
         `;
-        rightContent.innerHTML = '';
+        if (!singleColumn) rightContent.innerHTML = '';
         return;
     }
 
@@ -243,7 +255,7 @@ export function renderIndex(recipes, options = {}) {
         }).join('');
     }
 
-    if (isMobile()) {
+    if (isMobile() || singleColumn) {
         const lettersToPage = {};
         sortedLetters.forEach(letter => {
             if (activeAlphabet.has(letter)) lettersToPage[letter] = 'left';
@@ -256,7 +268,7 @@ export function renderIndex(recipes, options = {}) {
             ${renderGroup(sortedLetters, 'left')}
             ${renderFooter(recipes.length, false)}
         `;
-        rightContent.innerHTML = '';
+        if (!singleColumn) rightContent.innerHTML = '';
     } else {
         // Split groups across pages based on recipe count
         const totalRecipes = recipes.length;
@@ -314,11 +326,13 @@ export function renderIndex(recipes, options = {}) {
     // Reset scroll, then bring the last-viewed recipe into view if present.
     // The scrollable container is .page (parent of .page-content).
     const leftPage = document.getElementById('page-left');
-    const rightPage = document.getElementById('page-right');
     if (leftPage) leftPage.scrollTop = 0;
-    if (rightPage) rightPage.scrollTop = 0;
     leftContent.scrollTop = 0;
-    rightContent.scrollTop = 0;
+    if (!singleColumn) {
+        const rightPage = document.getElementById('page-right');
+        if (rightPage) rightPage.scrollTop = 0;
+        rightContent.scrollTop = 0;
+    }
 
     const currentRow = currentRecipeId !== null
         ? document.querySelector('.index-recipe-item.current')
@@ -402,18 +416,71 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-export function renderRecipe(recipe) {
-    const leftContent = document.getElementById('page-left-content');
+/** Longest plain-text ingredient that may share a line with other ingredients. */
+const INGREDIENT_PACK_CHARS = 24;
+/** Most ingredients packed onto a single .ingredient-line. */
+const INGREDIENT_PACK_MAX = 3;
+
+/**
+ * Builds the .ingredients-list markup.
+ *
+ * Every ingredient always keeps its own .ingredient-item span; consecutive
+ * short items (plain text of at most INGREDIENT_PACK_CHARS characters) are
+ * packed up to INGREDIENT_PACK_MAX per .ingredient-line, separated by a
+ * .ingredient-sep dot. Packing is viewport-independent - the one-item-per-line
+ * phone layout is CSS only, so a resize never leaves stale markup behind.
+ */
+function renderIngredients(ingredients) {
+    const lines = [];
+    let openLine = null;
+
+    ingredients.forEach(ing => {
+        // SANITIZED: quantity, unit, name and notes are user input
+        const qtyText = [ing.quantity, ing.unit]
+            .filter(v => v !== null && v !== undefined && v !== '')
+            .map(v => String(v))
+            .join(' ');
+        const name = ing.name == null ? '' : String(ing.name);
+        const noteText = ing.notes ? ` (${ing.notes})` : '';
+        const plainText = `${qtyText ? `${qtyText} ` : ''}${name}${noteText}`;
+
+        const qty = qtyText ? `<span class="ingredient-qty">${escapeHtml(qtyText)}</span> ` : '';
+        const notes = ing.notes ? ` <span class="step-note">(${escapeHtml(ing.notes)})</span>` : '';
+        const item = `<span class="ingredient-item">${qty}${escapeHtml(name)}${notes}</span>`;
+
+        const packable = plainText.length <= INGREDIENT_PACK_CHARS;
+        if (packable && openLine && openLine.length < INGREDIENT_PACK_MAX) {
+            openLine.push(item);
+            return;
+        }
+        // A long ingredient takes a line of its own and closes any open group.
+        openLine = packable ? [item] : null;
+        lines.push(packable ? openLine : [item]);
+    });
+
+    if (lines.length === 0) {
+        return '<div class="ingredient-line"><span class="ingredient-item">No ingredients listed</span></div>';
+    }
+
+    return lines
+        .map(items => `<div class="ingredient-line">${items.join('<span class="ingredient-sep"> · </span>')}</div>`)
+        .join('');
+}
+
+/**
+ * Renders the whole recipe into #page-right-content. Never touches
+ * #page-left-content - the contents column lives there now.
+ *
+ * @param {object} recipe
+ * @param {{pageNumber?: number|null}} [options]
+ *        pageNumber - cosmetic page number for the phone footer.
+ */
+export function renderRecipe(recipe, options = {}) {
     const rightContent = document.getElementById('page-right-content');
+    const pageNumber = options.pageNumber ?? null;
 
     // Build ingredients list
-    const ingredientsList = (recipe.ingredients || []).map(ing => {
-        // SANITIZED: quantity, unit, name and notes are user input
-        const qtyText = [ing.quantity, ing.unit].filter(v => v !== null && v !== undefined && v !== '').map(v => escapeHtml(String(v))).join(' ');
-        const qty = qtyText ? `<span class="ingredient-qty">${qtyText}</span> ` : '';
-        const notes = ing.notes ? ` <span class="step-note">(${escapeHtml(ing.notes)})</span>` : '';
-        return `<div class="ingredient-line">${qty}${escapeHtml(ing.name)}${notes}</div>`;
-    }).join('');
+    const ingredientsList = renderIngredients(recipe.ingredients || []);
 
     // Build difficulty dots
     const difficulty = recipe.difficulty;
@@ -500,65 +567,81 @@ export function renderRecipe(recipe) {
         </button>`;
     const photoHtml = hasPhoto
         // SANITIZED: recipe.title used in alt attribute
-        ? `<div class="recipe-photo-container">
-            <div class="recipe-photo-wrapper">
-                <img src="/api/recipes/${recipe.id}/photo?t=${Date.now()}"
-                     alt="${escapeHtml(recipe.title)} photo"
-                     class="recipe-photo"
-                     id="recipe-photo-img"
-                     data-preview-url="/api/recipes/${recipe.id}/photo"
-                     onerror="this.closest('.recipe-photo-container').style.display='none';">
-            </div>
-           </div>`
+        ? `<span class="recipe-polaroid">
+            <img src="/api/recipes/${recipe.id}/photo?t=${Date.now()}"
+                 alt="${escapeHtml(recipe.title)} photo"
+                 class="recipe-photo"
+                 id="recipe-photo-img"
+                 data-preview-url="/api/recipes/${recipe.id}/photo"
+                 onerror="this.closest('.recipe-polaroid').classList.add('empty')">
+           </span>`
         : '';
 
-    // SANITIZED: recipe.title is user input
-    const ingredientsHtml = `
+    // The phone footer is emitted on every viewport and hidden by CSS above
+    // 600px, so a resize across the breakpoint needs no re-render.
+    const footerPage = pageNumber == null ? '' : `p. ${pageNumber}`;
+
+    // SANITIZED: every recipe-derived string above went through escapeHtml
+    rightContent.innerHTML = `
         <div class="recipe-title-row">
             <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
             ${shareIcon}
             ${addPhotoIcon}
+            ${photoHtml}
         </div>
         ${metaLine}
-        ${photoHtml}
 
-        <div class="section-header">ingredients:</div>
-        <div class="ingredients-list">
-            ${ingredientsList || '<div class="ingredient-line">No ingredients listed</div>'}
+        <section class="tab-panel" data-tab="ingredients">
+            <div class="section-header">ingredients:</div>
+            <div class="ingredients-list">
+                ${ingredientsList}
+            </div>
+        </section>
+
+        <section class="tab-panel" data-tab="method">
+            <div class="section-header">method:</div>
+
+            <div class="prep-list">
+                ${stepsList || '<div class="prep-step">No preparation steps listed</div>'}
+            </div>
+
+            ${recipe.notes ? `<div class="recipe-note">Note: ${escapeHtml(recipe.notes)}</div>` : ''}
+            ${recipe.description ? `<div class="recipe-note">${escapeHtml(recipe.description)}</div>` : ''}
+            ${authorship}
+        </section>
+
+        <section class="tab-panel" data-tab="notes">
+            <div class="notes-thread"></div>
+        </section>
+
+        <div class="phone-footer">
+            <button type="button" class="footer-prev">‹ previous recipe</button>
+            <span class="footer-page">${footerPage}</span>
+            <button type="button" class="footer-next">next recipe ›</button>
         </div>
     `;
-
-    // SANITIZED: recipe.notes and recipe.description are user input
-    const preparationHtml = `
-        <div class="section-header">method:</div>
-
-        <div class="prep-list">
-            ${stepsList || '<div class="prep-step">No preparation steps listed</div>'}
-        </div>
-
-        ${recipe.notes ? `<div class="recipe-note">Note: ${escapeHtml(recipe.notes)}</div>` : ''}
-        ${recipe.description ? `<div class="recipe-note">${escapeHtml(recipe.description)}</div>` : ''}
-        ${authorship}
-    `;
-
-    if (isMobile()) {
-        leftContent.innerHTML = ingredientsHtml + '<div style="margin-top: 30px;"></div>' + preparationHtml;
-        rightContent.innerHTML = '';
-    } else {
-        leftContent.innerHTML = ingredientsHtml;
-        rightContent.innerHTML = preparationHtml;
-    }
 
     // Re-apply any running timer's step highlight for this recipe
     applyStepHighlight(recipe.id);
+
+    // Re-assert the active tab so a re-render (difficulty refresh, photo
+    // upload, update_recipe) keeps the user's tab and re-fills .notes-thread.
+    const pageRight = document.getElementById('page-right');
+    setActiveTab(pageRight?.dataset.tab || 'ingredients', { force: true });
 }
 
 export async function fetchAndDisplayRecipe(recipeId) {
-    showRecipeLoading();
+    // Opening a *different* recipe starts on Ingredients; a refresh of the
+    // recipe already on the page (photo upload, an AI update_recipe, the
+    // difficulty backfill) must not yank the reader off Method or Notes.
+    const isRefresh = state.viewMode === 'recipe'
+        && state.currentRecipeId != null
+        && String(state.currentRecipeId) === String(recipeId);
     state.viewMode = 'recipe';
     // Record the id before any await so a timer_start arriving in the same
     // SSE turn as the recipe_artifact binds to this recipe, not the last one.
     state.currentRecipeId = recipeId;
+    showRecipeLoading();
     try {
         // Check prefetch cache first
         const cached = getCachedRecipe(recipeId);
@@ -589,16 +672,29 @@ export async function fetchAndDisplayRecipe(recipeId) {
                 return;
             }
         }
-        renderRecipe(recipe);
+
+        // Cosmetic page number: the recipe's position in the alphabetical list.
+        const list = await state.fetchRecipeList();
+        const idx = list.findIndex(r => String(r.id) === String(recipe.id ?? recipeId));
+        const pageNumber = idx >= 0 ? pageNumberFor(idx) : null;
+
+        renderRecipe(recipe, { pageNumber });
+        // Opening a recipe always starts on Ingredients (renderRecipe has
+        // already re-asserted the current tab, which is what a refresh keeps).
+        if (!isRefresh) setActiveTab('ingredients', { force: true });
+        setNotePageNumber(pageNumber);
+
         state.currentRecipeId = recipe.id || recipe.recipe?.id || state.currentRecipeId;
         state.lastRecipeId = state.currentRecipeId;
         state.currentRecipeTitle = recipe.title || recipe.recipe?.title || state.currentRecipeTitle;
-        // Refresh recipe list to include newly created recipes
-        await state.fetchRecipeList(true);
+        // Refresh recipe list to include newly created recipes, and keep the
+        // contents column on the left page in step with it.
+        const fresh = await state.fetchRecipeList(true);
+        renderIndex(fresh, { currentRecipeId: state.currentRecipeId, singleColumn: true });
         state.updateNavigationState();
         // Prefetch adjacent recipes for instant navigation
         prefetchAdjacent(state.currentRecipeId);
-        refreshDifficultyIfPending(recipe);
+        refreshDifficultyIfPending(recipe, pageNumber);
     } catch (error) {
         console.error('Error fetching recipe:', error);
         showRecipeError('Failed to load recipe');

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe, waitForRecipeList } from './helpers';
+import { authenticate, createRecipe, openRecipe } from './helpers';
 
 test.describe('Recipe Display', () => {
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -29,32 +29,25 @@ test.describe('Recipe Display', () => {
       servings: 4,
     });
 
-    // Display the recipe by calling fetchAndDisplayRecipe directly
-    await page.evaluate((id) => {
-      // @ts-ignore - fetchAndDisplayRecipe is defined in app.js
-      fetchAndDisplayRecipe(id);
-    }, recipeId);
+    await openRecipe(page, recipeId);
 
-    // Wait for recipe to render
-    await page.waitForTimeout(500);
+    // The whole recipe lives on the right page now, at every width
+    const rightContent = page.locator('#page-right-content');
+    await expect(rightContent.locator('.recipe-title')).toHaveText(title);
 
-    // Verify title in the book interface
-    await expect(page.locator('.recipe-title')).toHaveText(title);
-
-    // Verify ingredients section exists and contains items
-    const ingredientsSection = page.locator('.ingredients-list');
+    const ingredientsSection = rightContent.locator('.ingredients-list');
     await expect(ingredientsSection).toBeVisible();
     await expect(ingredientsSection).toContainText('1 cup flour');
     await expect(ingredientsSection).toContainText('2 eggs');
     await expect(ingredientsSection).toContainText('0.5 cup milk');
 
-    // Verify preparation steps exist in right page
-    const isMobile = await page.viewportSize()!.width <= 600;
-    const rightContent = page.locator(isMobile ? '#page-left-content' : '#page-right-content');
-    await expect(rightContent).toBeVisible();
     await expect(rightContent).toContainText('Mix flour and eggs');
     await expect(rightContent).toContainText('Add milk');
     await expect(rightContent).toContainText('Bake for 20 minutes');
+    // ...and never on the left page, which holds the contents
+    await expect(page.locator('#page-left-content')).not.toContainText('Mix flour and eggs');
+    await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
+    await expect(page.locator('#page-left-content .index-recipe-item.current')).toContainText(title);
   });
 
   test('long recipe content scrolls', async ({ page }) => {
@@ -77,38 +70,24 @@ test.describe('Recipe Display', () => {
       steps: manySteps,
     });
 
-    // Display the recipe
-    await page.evaluate((id) => {
-      // @ts-ignore - fetchAndDisplayRecipe is defined in app.js
-      fetchAndDisplayRecipe(id);
-    }, recipeId);
+    await openRecipe(page, recipeId);
 
-    // Wait for recipe to render
-    await page.waitForTimeout(500);
+    // The recipe scrolls inside the right page
+    const rightPage = page.locator('#page-right');
+    await expect(rightPage).toBeVisible();
 
-    // Verify left page (ingredients) is scrollable
-    const leftPage = page.locator('#page-left');
-    await expect(leftPage).toBeVisible();
-
-    // Check that overflow is set to allow scrolling
-    const overflowY = await leftPage.evaluate(el => {
-      const styles = window.getComputedStyle(el);
-      return styles.overflowY;
-    });
-
-    // Should be 'auto' or 'scroll'
+    const overflowY = await rightPage.evaluate(el => window.getComputedStyle(el).overflowY);
     expect(['auto', 'scroll']).toContain(overflowY);
 
-    // Verify we can see the first ingredient
-    await expect(page.locator('.ingredients-list')).toContainText('Ingredient 1');
+    // It really is longer than the page, otherwise there is nothing to scroll
+    const overflow = await rightPage.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(overflow).toBeGreaterThan(50);
 
-    // Scroll down within the left page
-    await leftPage.evaluate(el => el.scrollTop = el.scrollHeight);
+    await expect(page.locator('#page-right-content .ingredients-list')).toContainText('Ingredient 1');
 
-    // Wait a bit for scroll to complete
-    await page.waitForTimeout(200);
+    await rightPage.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await expect.poll(() => rightPage.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
 
-    // Verify we can see later ingredients after scrolling
-    await expect(page.locator('.ingredients-list')).toContainText('Ingredient 30');
+    await expect(page.locator('#page-right-content .ingredients-list')).toContainText('Ingredient 30');
   });
 });

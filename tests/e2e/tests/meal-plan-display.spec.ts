@@ -1,12 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
-import { authenticate, seedRecipes } from './helpers';
-
-// Switch to the book/recipe panel on mobile (Pixel 5, width ≤ 600px)
-async function switchToBookOnMobile(page: Page): Promise<void> {
-  if (page.viewportSize()!.width <= 600) {
-    await page.click('#tab-book');
-  }
-}
+import { test, expect } from '@playwright/test';
+import { authenticate, seedRecipes, sendNote } from './helpers';
 
 test.describe('Meal Plan Panel', () => {
   test.beforeEach(async ({ page }) => {
@@ -27,8 +20,6 @@ test.describe('Meal Plan Panel', () => {
       });
     });
 
-    await switchToBookOnMobile(page);
-
     await expect(page.locator('.meal-plan-panel')).toBeVisible();
     await expect(page.locator('.meal-plan-title')).toHaveText('Test Dinner');
   });
@@ -47,8 +38,6 @@ test.describe('Meal Plan Panel', () => {
         ],
       });
     });
-
-    await switchToBookOnMobile(page);
 
     const rows = page.locator('.meal-plan-recipe-row');
     await expect(rows.nth(0)).toContainText('centrepiece');
@@ -70,8 +59,6 @@ test.describe('Meal Plan Panel', () => {
       });
     });
 
-    await switchToBookOnMobile(page);
-
     await expect(page.locator('.meal-plan-guest-badge')).toBeVisible();
     await expect(page.locator('.meal-plan-guest-badge')).toContainText('For 6 people');
   });
@@ -86,8 +73,6 @@ test.describe('Meal Plan Panel', () => {
         recipes: [{ recipe_id: 'id-1', title: 'Pasta', role: 'centrepiece' }],
       });
     });
-
-    await switchToBookOnMobile(page);
 
     await expect(page.locator('.meal-plan-guest-badge')).not.toBeVisible();
   });
@@ -104,8 +89,6 @@ test.describe('Meal Plan Panel', () => {
         recipes: [{ recipe_id: id, title: 'Chicken Curry', role: 'centrepiece' }],
       });
     }, recipeId);
-
-    await switchToBookOnMobile(page);
 
     // Click the recipe link button
     await page.locator('.meal-plan-recipe-link').first().click();
@@ -124,8 +107,6 @@ test.describe('Meal Plan Panel', () => {
         recipes: [{ recipe_id: 'id-1', title: 'Some Dish', role: 'centrepiece' }],
       });
     });
-
-    await switchToBookOnMobile(page);
 
     await expect(page.locator('.meal-plan-action-btn').filter({ hasText: 'Shopping List' })).toBeDisabled();
     await expect(page.locator('.meal-plan-action-btn').filter({ hasText: 'Cooking Timeline' })).toBeDisabled();
@@ -146,7 +127,6 @@ test.describe('Meal Plan Panel', () => {
       });
     });
 
-    await switchToBookOnMobile(page);
     await expect(page.locator('.meal-plan-panel')).toBeVisible();
 
     // Display a recipe (overwrites #page-right-content)
@@ -184,8 +164,6 @@ test.describe('Meal Plan Panel', () => {
       });
     });
 
-    await switchToBookOnMobile(page);
-
     // Meal plan panel should now appear in the right panel
     await expect(page.locator('.meal-plan-panel')).toBeVisible();
     await expect(page.locator('.meal-plan-title')).toHaveText('Replacing Recipe');
@@ -196,24 +174,11 @@ test.describe('Meal Plan Panel', () => {
     // Seed 2 recipes so the mock can build a centrepiece + side meal plan
     await seedRecipes(page, 2);
 
-    // On mobile, switch to chat tab to send a message
-    if (page.viewportSize()!.width <= 600) {
-      await page.click('#tab-chat');
-    }
+    await sendNote(page, 'create a meal plan');
 
-    await page.locator('#message-input').fill('create a meal plan');
-    await page.locator('#message-input').press('Enter');
-
-    // Wait for user message to appear in the chat log
-    await expect(page.locator('#messages')).toContainText('User: create a meal plan', {
-      timeout: 5000,
-    });
-
-    // Wait for the AI to respond (mock completes the two-step flow)
-    await expect(page.locator('#messages')).toContainText('AI:', { timeout: 15000 });
-
-    // Switch to book tab on mobile to see the panel
-    await switchToBookOnMobile(page);
+    // The reply lands in the margin (the mock completes the two-step flow)
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
+      .toContainText('meal plan', { timeout: 15000 });
 
     // The meal plan panel should have been rendered by the meal_artifact SSE event
     await expect(page.locator('.meal-plan-panel')).toBeVisible({ timeout: 10000 });

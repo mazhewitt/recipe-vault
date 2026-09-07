@@ -80,3 +80,4 @@ Frontend only. Deploy normally, purge the Cloudflare cache per CLAUDE.md. The `r
 
 - Whether the desktop Notes edge tab should open the thread in place of the recipe (chosen) or as an overlay sticky (README option 4). Revisit after use.
 - Tablet (601–1024px): the book is full width with the margin collapsed under the content and the desktop edge tabs shown; not mocked, verify on an iPad in the e2e `ipad` project.
+- The e2e `ipad` project runs the iPad viewport in Chromium, not WebKit: `make e2e-setup` and the CI workflow install chromium only, so the WebKit descriptor could not run in either place. The tablet CSS this change adds is therefore verified at tablet width but not on Safari's engine; installing webkit in `e2e-setup` and CI would close that gap and is out of scope here.

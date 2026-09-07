@@ -11,13 +11,14 @@ import * as Navigation from './navigation.js';
 import * as PageTransitions from './page-transitions.js';
 import * as MealPlanDisplay from './meal-plan-display.js';
 import * as MarginNotes from './margin-notes.js';
+import * as PageTabs from './page-tabs.js';
 
 // Global state
 let conversationId = null;
 let currentRecipeId = null;
 let currentRecipeTitle = null;
 let recipeListCache = null;
-let viewMode = 'index'; // 'index' | 'recipe'
+let viewMode = 'index'; // 'index' | 'recipe' | 'meal'
 let attachedImage = null; // Stores pasted image data
 let lastRecipeId = null; // Last recipe displayed this session (for contents highlight)
 let photoEpoch = 0; // Bumped after photo uploads to bust thumbnail cache
@@ -84,6 +85,7 @@ Navigation.initializeState(sharedState);
 PageTransitions.initializeState(sharedState);
 MealPlanDisplay.initializeState(sharedState);
 MarginNotes.initializeState(sharedState);
+PageTabs.initializeState(sharedState);
 
 // Seed the body attribute with the initial view mode
 document.body.dataset.viewMode = viewMode;
@@ -103,7 +105,7 @@ function showImageAttached(size) {
     const indicator = document.getElementById('image-attachment');
     if (indicator) {
         indicator.querySelector('.image-text').textContent = `Image attached (${sizeMB}MB)`;
-        indicator.style.display = 'flex';
+        indicator.hidden = false;
     }
 }
 
@@ -111,7 +113,7 @@ function removeImage() {
     attachedImage = null;
     const indicator = document.getElementById('image-attachment');
     if (indicator) {
-        indicator.style.display = 'none';
+        indicator.hidden = true;
     }
 }
 
@@ -120,9 +122,9 @@ function showError(message) {
     errorDiv.className = 'paste-error';
     errorDiv.textContent = message;
 
-    const notepadInput = document.querySelector('.notepad-input');
-    if (notepadInput) {
-        notepadInput.insertBefore(errorDiv, notepadInput.firstChild);
+    const host = document.querySelector('.note-input');
+    if (host) {
+        host.insertBefore(errorDiv, host.firstChild);
         setTimeout(() => errorDiv.remove(), 3000);
     }
 }
@@ -153,7 +155,6 @@ async function handleImageFile(imageFile) {
 
 // Global functions for HTML onclick handlers and Playwright tests
 window.sendMessage = Chat.sendMessage;
-window.switchTab = Navigation.switchTab;
 window.startTimer = Timer.startTimer;
 window.cancelTimer = Timer.cancelTimer;
 window.removeImage = removeImage;
@@ -164,6 +165,7 @@ window.loadNextRecipe = Navigation.loadNextRecipe;
 window.loadPrevRecipe = Navigation.loadPrevRecipe;
 window.updateNavigationState = Navigation.updateNavigationState;
 window.getMarginThread = MarginNotes.getThread;
+window.setActiveTab = PageTabs.setActiveTab;
 
 // Setup functions
 async function setupImagePasteHandler() {
@@ -214,6 +216,22 @@ function setupTextareaAutoResize() {
         this.style.height = 'auto';
         this.style.height = (this.scrollHeight) + 'px';
     });
+}
+
+function setupNoteInput() {
+    const form = document.getElementById('note-input');
+    const input = document.getElementById('message-input');
+
+    if (form) {
+        form.addEventListener('submit', (e) => { e.preventDefault(); Chat.sendMessage(); });
+    }
+
+    // Enter sends, Shift+Enter inserts a newline
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); Chat.sendMessage(); }
+        });
+    }
 }
 
 function setupNavigationButtons() {
@@ -397,6 +415,10 @@ function setupOrientationChangeHandler() {
         if (viewMode === 'index') {
             const list = await fetchRecipeList(true); // Force refresh to get latest recipes
             RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId });
+        } else if (viewMode === 'recipe' && currentRecipeId) {
+            // The contents column on the left page follows the open recipe
+            const list = await fetchRecipeList(true);
+            RecipeDisplay.renderIndex(list, { currentRecipeId, singleColumn: true });
         }
     });
 }
@@ -407,11 +429,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupImagePasteHandler();
     setupClipboardButton();
     setupTextareaAutoResize();
+    setupNoteInput();
     setupNavigationButtons();
     setupMobileEdgeNavigation();
     setupRecipePhotoUpload();
     setupShareButton();
     setupOrientationChangeHandler();
+    PageTabs.initPageTabs();
+    Navigation.initFooterNav();
 
     // Initialize swipe gestures for mobile page-turn navigation
     const pagesContainer = document.querySelector('.pages-container');
@@ -421,12 +446,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const list = await fetchRecipeList();
     RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId });
     Navigation.updateNavigationState();
-
-    // Initialize mobile tab state (default to book tab)
-    const isMobile = window.matchMedia('(max-width: 600px)').matches;
-    if (isMobile) {
-        Navigation.switchTab('book');
-    }
 
     // Request notification permission for timers
     if ('Notification' in window && Notification.permission === 'default') {

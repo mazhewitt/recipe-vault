@@ -1,12 +1,13 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe } from './helpers';
+import { authenticate, createRecipe, threadEntries } from './helpers';
 
 /**
- * Margin notes render on the right page, which is hidden below 600px until the
- * book-only layout ships, so these tests only run on the wider projects.
+ * These cover the margin column of the wide layout: the phone stacks the margin
+ * under the active panel and hides it entirely on the Notes tab, so the geometry
+ * and the sticky-note projection are asserted on the wider projects only.
  */
 function skipOnPhone(page: Page) {
-  test.skip(page.viewportSize()!.width <= 600, 'right page (and margin) is hidden on phones');
+  test.skip(page.viewportSize()!.width <= 600, 'the margin is a column only above 600px');
 }
 
 async function openRecipe(page: Page, recipeId: string) {
@@ -58,7 +59,10 @@ test.describe('Margin notes', () => {
     for (let i = 1; i <= 4; i++) {
       await send(page, `hello number ${i}`);
       // Each turn's reply must land before the next message is sent
-      await expect(page.locator('#messages .message.assistant')).toHaveCount(i, { timeout: 10000 });
+      await expect
+        .poll(async () => (await threadEntries(page)).filter(n => n.kind === 'reply').length,
+              { timeout: 10000 })
+        .toBe(i);
     }
 
     // The margin shows only the three most recent notes...
@@ -103,7 +107,8 @@ test.describe('Margin notes', () => {
 
     // "list" makes the mock call a tool first, so the two notes differ in text
     await send(page, 'list all recipes');
-    await expect(page.locator('#messages .message.assistant')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
+      .toHaveCount(1, { timeout: 10000 });
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(2);
     const noteTexts = async () =>
       (await page.locator('#page-margin .margin-note').allTextContents()).map((t) => t.trim());
@@ -168,16 +173,15 @@ test.describe('Margin notes', () => {
     await send(page, 'hello tablet');
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
 
-    const lastChildBottom = await page.evaluate(() => {
-      const content = document.getElementById('page-right-content')!;
-      const last = content.lastElementChild as HTMLElement;
-      const r = last.getBoundingClientRect();
-      return r.bottom;
-    });
+    // The content box itself, not its last child: the last child is the phone
+    // footer, which renderRecipe emits at every width and CSS hides above 600px
+    const contentBottom = await page.locator('#page-right-content').evaluate(
+      el => el.getBoundingClientRect().bottom
+    );
     const margin = (await page.locator('#page-margin').boundingBox())!;
     // Directly beneath the content: neither overlapping it nor pushed to the page bottom
-    expect(margin.y).toBeGreaterThanOrEqual(lastChildBottom - 1);
-    expect(margin.y).toBeLessThanOrEqual(lastChildBottom + 60);
+    expect(margin.y).toBeGreaterThanOrEqual(contentBottom - 1);
+    expect(margin.y).toBeLessThanOrEqual(contentBottom + 60);
   });
 
   // One chunk and then end of stream, with no `done` event: what the browser
@@ -419,23 +423,5 @@ test.describe('Margin notes', () => {
     expect(rects.marginWidth).toBeGreaterThan(0);
     // The overlay carries only the page content, so it must stop before the margin
     expect(rects.overlayRight).toBeLessThanOrEqual(rects.marginLeft + 1);
-  });
-
-  test('classic flag disables margin rendering but not the notepad', async ({ page }) => {
-    skipOnPhone(page);
-    const recipeId = await createRecipe(page, {
-      title: `Classic Recipe ${Date.now()}`,
-      ingredients: [],
-      steps: [],
-    });
-    await page.addInitScript(() => localStorage.setItem('rv-ui', 'classic'));
-    await page.reload();
-    await openRecipe(page, recipeId);
-
-    await send(page, 'hello classic');
-
-    await expect(page.locator('#messages')).toContainText('User: hello classic');
-    await expect(page.locator('#messages')).toContainText('mock assistant', { timeout: 10000 });
-    await expect(page.locator('#page-margin')).toBeEmpty();
   });
 });
