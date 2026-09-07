@@ -206,11 +206,17 @@ impl LlmProvider {
         match self.provider_type {
             LlmProviderType::Anthropic => self.complete_anthropic(messages, tools, system_prompt).await,
             LlmProviderType::Gemini => self.complete_gemini(messages, tools, system_prompt).await,
-            LlmProviderType::Mock => Ok(self.complete_mock(messages)),
+            LlmProviderType::Mock => Ok(self.complete_mock(messages, system_prompt)),
         }
     }
 
-    fn complete_mock(&self, messages: &[Message]) -> LlmResponse {
+    fn complete_mock(&self, messages: &[Message], system_prompt: Option<&str>) -> LlmResponse {
+        // Tag assessment is identified by its own system prompt so the deterministic
+        // tag answer can never be confused with the chat or difficulty branches below.
+        if system_prompt == Some(crate::ai::tag_assessment::TAG_ASSESSMENT_SYSTEM_PROMPT) {
+            return LlmResponse::Text(r#"["main", "curry"]"#.to_string());
+        }
+
         // If the last message is a tool result, return a text-only response.
         // This simulates the real LLM producing final text after seeing tool results,
         // which is how the agent loop works: TextWithToolUse -> execute tools -> Text.

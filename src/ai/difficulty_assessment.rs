@@ -194,6 +194,7 @@ mod tests {
             updated_at: "2024-01-01T00:00:00Z".to_string(),
             created_by: Some("test@example.com".to_string()),
             updated_by: Some("test@example.com".to_string()),
+            tags: vec![],
         };
 
         let ingredients = vec![

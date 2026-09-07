@@ -882,6 +882,24 @@ body::before {
     margin-left: 4px;
 }
 
+/* Display-only tag chips at the end of the meta line (at most three) */
+.recipe-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.recipe-tag {
+    font-family: var(--font-handwritten);
+    font-size: 12px;
+    line-height: 1;
+    color: var(--color-ink-light);
+    background: var(--color-paper-aged);
+    border-radius: var(--radius-sm);
+    padding: 3px 7px;
+}
+
 .difficulty-dots {
     display: inline-flex;
     gap: 3px;
@@ -1109,6 +1127,77 @@ body::before {
 .page-tab:focus-visible {
     outline: 2px solid var(--color-ink-dark);
     outline-offset: -2px;
+}
+
+/* ==================== CONTENTS FILTER TABS ==================== */
+/* All / Mains / Sweets (+ the gated Meals) on the left page's outer edge.
+   Static markup in chat.html, a sibling of #page-left-content so a contents
+   re-render never destroys it. The strip is sticky and takes no height, so the
+   contents still start at the top of the page and the tabs stay put while it
+   scrolls; the negative margin seats them in the page's own left padding, which
+   keeps them clear of the entries without overflowing the scroll container. */
+.contents-tabs {
+    position: sticky;
+    top: 20px;
+    z-index: 4;
+    align-self: flex-start;
+    height: 0;
+    margin-left: -28px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contents-tab {
+    writing-mode: vertical-rl;
+    width: 26px;
+    min-height: 76px;
+    padding: 10px 4px;
+    border: none;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    background: var(--color-leather);
+    color: var(--color-paper-cream);
+    font-family: var(--font-handwritten);
+    font-size: 14px;
+    line-height: 1;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    opacity: 0.72;
+    box-shadow: -2px 2px 5px rgba(0,0,0,0.25);
+    transition: opacity 0.2s, padding 0.2s;
+}
+
+/* Tan needs dark ink to stay readable; the other three carry cream text */
+.contents-tab-mains {
+    background: var(--color-border);
+    color: var(--color-ink-dark);
+}
+
+.contents-tab-sweets {
+    background: var(--color-accent-brown);
+}
+
+.contents-tab-meals {
+    background: var(--color-ink-medium);
+    display: none;
+}
+
+/* Meal plans are not persisted yet (RV-107); the tab is styled but gated */
+body[data-feature-meals] .contents-tab-meals {
+    display: inline-flex;
+}
+
+/* The active tab reads as pulled out past the page's edge */
+.contents-tab.is-active {
+    opacity: 1;
+    font-weight: 700;
+    padding-left: 8px;
+    box-shadow: -3px 2px 6px rgba(0,0,0,0.3);
+}
+
+.contents-tab:focus-visible {
+    outline: 2px solid var(--color-ink-dark);
+    outline-offset: 2px;
 }
 
 /* ==================== PHONE FOOTER ==================== */
@@ -1585,6 +1674,16 @@ body::before {
     height: 100%;
     box-sizing: border-box;
     border: 1px dashed var(--color-border);
+}
+
+/* Shown in place of the letter groups when the active filter matches nothing */
+.index-empty {
+    font-family: var(--font-handwritten);
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-ink-light);
+    text-align: center;
+    padding: var(--space-xl) var(--space-md);
 }
 
 .index-footer {
@@ -2095,6 +2194,53 @@ body[data-view-mode="index"] #page-margin {
         font-size: 13px;
         min-width: 20px;
         padding: 2px 3px;
+    }
+
+    /* The edge strip becomes a chip row directly under the "~ Contents ~"
+       title. #page-left-content dissolves into the left page's flex column so
+       the static tab strip can be ordered between the title and the alphabet
+       nav without being moved out of #page-left. */
+    body[data-view-mode="index"] #page-left-content {
+        display: contents;
+    }
+
+    body[data-view-mode="index"] #page-left-content > * {
+        order: 3;
+    }
+
+    body[data-view-mode="index"] #page-left-content > .index-title {
+        order: 1;
+        padding-top: 10px; /* the padding .page-content no longer contributes */
+    }
+
+    body[data-view-mode="index"] .contents-tabs {
+        order: 2;
+    }
+
+    .contents-tabs {
+        position: static;
+        height: auto;
+        align-self: stretch;
+        margin: 0 0 var(--space-sm);
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .contents-tab {
+        writing-mode: horizontal-tb;
+        width: auto;
+        min-width: 66px;
+        min-height: 44px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        font-size: 15px;
+        box-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .contents-tab.is-active {
+        padding: 10px 14px;
+        box-shadow: 1px 2px 5px rgba(0,0,0,0.3);
     }
 
     /* Keep add-photo icon clear of the mobile edge nav overlay */

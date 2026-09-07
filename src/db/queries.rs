@@ -1,10 +1,12 @@
-use sqlx::SqlitePool;
+use std::collections::HashMap;
+
+use sqlx::{Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
 
 use crate::{
     error::{ApiError, ApiResult},
     models::{
-        recipe::{CreateRecipeInput, UpdateRecipeInput},
+        recipe::{normalize_tags, CreateRecipeInput, UpdateRecipeInput},
         RecipeIngredient, Recipe, RecipeWithDetails, ShareLink, Step,
     },
 };
@@ -22,8 +24,9 @@ pub async fn create_recipe(
     input: CreateRecipeInput,
     user_email: Option<String>,
 ) -> ApiResult<RecipeWithDetails> {
-    // Validate input
+    // Validate input (including tags, so a bad tag fails before any write)
     input.validate()?;
+    let tags = normalize_tags(&input.tags)?;
 
     let recipe_id = Recipe::new_id();
 
@@ -95,6 +98,11 @@ pub async fn create_recipe(
         .await?;
     }
 
+    // Insert tags
+    if !tags.is_empty() {
+        set_recipe_tags(&mut tx, &recipe_id, &tags).await?;
+    }
+
     tx.commit().await?;
 
     // Fetch and return the complete recipe (no family filter needed — user just created it)
@@ -129,7 +137,11 @@ pub async fn get_recipe(
         }
     };
 
-    let recipe = recipe.ok_or_else(|| ApiError::NotFound(recipe_id.to_string()))?;
+    let mut recipe = recipe.ok_or_else(|| ApiError::NotFound(recipe_id.to_string()))?;
+
+    // Fetch tags
+    let mut tags_by_recipe = load_tags_for(pool, std::slice::from_ref(&recipe.id)).await?;
+    recipe.tags = tags_by_recipe.remove(&recipe.id).unwrap_or_default();
 
     // Fetch ingredients
     let ingredients: Vec<RecipeIngredient> = sqlx::query_as(
@@ -161,7 +173,7 @@ pub async fn list_recipes(
     pool: &SqlitePool,
     family_members: Option<&[String]>,
 ) -> ApiResult<Vec<Recipe>> {
-    let recipes = match family_members {
+    let mut recipes: Vec<Recipe> = match family_members {
         Some(members) if !members.is_empty() => {
             let filter = family_filter_clause(members);
             let sql = format!("SELECT * FROM recipes WHERE {} ORDER BY LOWER(title)", filter);
@@ -179,6 +191,13 @@ pub async fn list_recipes(
         }
     };
 
+    // Load every recipe's tags in one query
+    let ids: Vec<String> = recipes.iter().map(|r| r.id.clone()).collect();
+    let mut tags_by_recipe = load_tags_for(pool, &ids).await?;
+    for recipe in &mut recipes {
+        recipe.tags = tags_by_recipe.remove(&recipe.id).unwrap_or_default();
+    }
+
     Ok(recipes)
 }
 
@@ -192,6 +211,12 @@ pub async fn update_recipe(
     user_email: Option<String>,
     family_members: Option<&[String]>,
 ) -> ApiResult<RecipeWithDetails> {
+    // Normalise tags before anything is written so an invalid tag changes nothing
+    let tags = match &input.tags {
+        Some(tags) => Some(normalize_tags(tags)?),
+        None => None,
+    };
+
     let mut tx = pool.begin().await?;
 
     // Check if recipe exists (with family filtering)
@@ -365,10 +390,113 @@ pub async fn update_recipe(
         }
     }
 
+    // Replace tags if provided (Some(vec![]) clears them)
+    if let Some(tags) = tags {
+        set_recipe_tags(&mut tx, recipe_id, &tags).await?;
+
+        // Update the recipe's updated_by and updated_at when tags change
+        sqlx::query("UPDATE recipes SET updated_at = datetime('now'), updated_by = ? WHERE id = ?")
+            .bind(&user_email)
+            .bind(recipe_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
     tx.commit().await?;
 
     // Fetch and return updated recipe (no family filter needed — already verified access)
     get_recipe(pool, recipe_id, None).await
+}
+
+/// Replace a recipe's tag links with the given normalised tag names.
+/// Creates missing `tags` rows (case-insensitive), removes links that are no
+/// longer wanted and inserts the missing ones. Runs inside the caller's transaction.
+pub async fn set_recipe_tags(
+    tx: &mut Transaction<'_, Sqlite>,
+    recipe_id: &str,
+    tags: &[String],
+) -> ApiResult<()> {
+    // Resolve every tag name to a tag id, creating the row if the name is new
+    let mut tag_ids: Vec<String> = Vec::with_capacity(tags.len());
+    for name in tags {
+        sqlx::query("INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)")
+            .bind(Uuid::new_v4().to_string())
+            .bind(name)
+            .execute(&mut **tx)
+            .await?;
+
+        let (tag_id,): (String,) = sqlx::query_as("SELECT id FROM tags WHERE LOWER(name) = LOWER(?)")
+            .bind(name)
+            .fetch_one(&mut **tx)
+            .await?;
+
+        if !tag_ids.contains(&tag_id) {
+            tag_ids.push(tag_id);
+        }
+    }
+
+    // Remove links that are no longer in the set
+    if tag_ids.is_empty() {
+        sqlx::query("DELETE FROM recipe_tags WHERE recipe_id = ?")
+            .bind(recipe_id)
+            .execute(&mut **tx)
+            .await?;
+    } else {
+        let placeholders: Vec<&str> = tag_ids.iter().map(|_| "?").collect();
+        let sql = format!(
+            "DELETE FROM recipe_tags WHERE recipe_id = ? AND tag_id NOT IN ({})",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query(&sql).bind(recipe_id);
+        for tag_id in &tag_ids {
+            query = query.bind(tag_id);
+        }
+        query.execute(&mut **tx).await?;
+    }
+
+    // Insert the links that are missing
+    for tag_id in &tag_ids {
+        sqlx::query("INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)")
+            .bind(recipe_id)
+            .bind(tag_id)
+            .execute(&mut **tx)
+            .await?;
+    }
+
+    Ok(())
+}
+
+/// Load the tags of several recipes in a single query.
+/// Recipes without tags are absent from the map; each list is sorted alphabetically.
+pub async fn load_tags_for(
+    pool: &SqlitePool,
+    recipe_ids: &[String],
+) -> ApiResult<HashMap<String, Vec<String>>> {
+    let mut tags_by_recipe: HashMap<String, Vec<String>> = HashMap::new();
+    if recipe_ids.is_empty() {
+        return Ok(tags_by_recipe);
+    }
+
+    let placeholders: Vec<&str> = recipe_ids.iter().map(|_| "?").collect();
+    let sql = format!(
+        "SELECT rt.recipe_id, t.name FROM recipe_tags rt
+         JOIN tags t ON t.id = rt.tag_id
+         WHERE rt.recipe_id IN ({})
+         ORDER BY rt.recipe_id, LOWER(t.name)",
+        placeholders.join(", ")
+    );
+
+    let mut query = sqlx::query_as(&sql);
+    for recipe_id in recipe_ids {
+        query = query.bind(recipe_id);
+    }
+    let rows: Vec<(String, String)> = query.fetch_all(pool).await?;
+
+    for (recipe_id, name) in rows {
+        tags_by_recipe.entry(recipe_id).or_default().push(name);
+    }
+
+    Ok(tags_by_recipe)
 }
 
 /// Delete a recipe (cascade deletes ingredients and steps).
@@ -468,4 +596,224 @@ pub async fn get_recipe_by_share_token(
     // Fetch recipe without family filtering (share links bypass tenancy)
     let recipe = get_recipe(pool, &link.recipe_id, None).await?;
     Ok(Some(recipe))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::recipe::CreateRecipeInput;
+
+    async fn test_pool() -> SqlitePool {
+        let pool = SqlitePool::connect(":memory:")
+            .await
+            .expect("Failed to create test database");
+        sqlx::migrate!()
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
+        pool
+    }
+
+    fn recipe_input(title: &str, tags: &[&str]) -> CreateRecipeInput {
+        CreateRecipeInput {
+            title: title.to_string(),
+            description: None,
+            prep_time_minutes: None,
+            cook_time_minutes: None,
+            servings: None,
+            difficulty: None,
+            ingredients: vec![],
+            steps: vec![],
+            tags: tags.iter().map(|t| t.to_string()).collect(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_recipe_stores_normalised_sorted_tags() {
+        let pool = test_pool().await;
+
+        let created = create_recipe(&pool, recipe_input("Thai Curry", &["Main", " main ", "THAI"]), None)
+            .await
+            .expect("Failed to create recipe");
+
+        assert_eq!(created.recipe.tags, vec!["main".to_string(), "thai".to_string()]);
+
+        // A single tags row per name, shared by every recipe using it
+        let second = create_recipe(&pool, recipe_input("Green Curry", &["main"]), None)
+            .await
+            .expect("Failed to create recipe");
+        assert_eq!(second.recipe.tags, vec!["main".to_string()]);
+
+        let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tags WHERE LOWER(name) = 'main'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_update_recipe_replaces_and_clears_tags() {
+        let pool = test_pool().await;
+        let created = create_recipe(&pool, recipe_input("Trifle", &["dessert"]), None)
+            .await
+            .unwrap();
+        let recipe_id = created.recipe.id.clone();
+
+        // Omitting tags leaves them alone
+        let untouched = update_recipe(
+            &pool,
+            &recipe_id,
+            UpdateRecipeInput {
+                title: None,
+                description: Some("Layered".to_string()),
+                prep_time_minutes: None,
+                cook_time_minutes: None,
+                servings: None,
+                difficulty: None,
+                ingredients: None,
+                steps: None,
+                tags: None,
+            },
+            Some("cook@example.com".to_string()),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(untouched.recipe.tags, vec!["dessert".to_string()]);
+
+        // Some(tags) replaces the set and bumps updated_by
+        let replaced = update_recipe(
+            &pool,
+            &recipe_id,
+            UpdateRecipeInput {
+                title: None,
+                description: None,
+                prep_time_minutes: None,
+                cook_time_minutes: None,
+                servings: None,
+                difficulty: None,
+                ingredients: None,
+                steps: None,
+                tags: Some(vec!["Main".to_string(), "thai".to_string()]),
+            },
+            Some("tagger@example.com".to_string()),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(replaced.recipe.tags, vec!["main".to_string(), "thai".to_string()]);
+        assert_eq!(replaced.recipe.updated_by, Some("tagger@example.com".to_string()));
+
+        // Some(vec![]) clears them
+        let cleared = update_recipe(
+            &pool,
+            &recipe_id,
+            UpdateRecipeInput {
+                title: None,
+                description: None,
+                prep_time_minutes: None,
+                cook_time_minutes: None,
+                servings: None,
+                difficulty: None,
+                ingredients: None,
+                steps: None,
+                tags: Some(vec![]),
+            },
+            Some("tagger@example.com".to_string()),
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(cleared.recipe.tags.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_invalid_tags_are_rejected_before_any_write() {
+        let pool = test_pool().await;
+
+        let result = create_recipe(&pool, recipe_input("Bad Tags", &["main!"]), None).await;
+        assert!(matches!(result, Err(ApiError::Validation(_))));
+
+        let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM recipes")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0, "no recipe should have been written");
+    }
+
+    #[tokio::test]
+    async fn test_list_recipes_populates_tags_in_one_query() {
+        let pool = test_pool().await;
+        create_recipe(&pool, recipe_input("Apple Pie", &["dessert"]), None)
+            .await
+            .unwrap();
+        create_recipe(&pool, recipe_input("Beef Stew", &[]), None)
+            .await
+            .unwrap();
+
+        let recipes = list_recipes(&pool, None).await.unwrap();
+        assert_eq!(recipes.len(), 2);
+        assert_eq!(recipes[0].tags, vec!["dessert".to_string()]);
+        assert!(recipes[1].tags.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_share_token_lookup_includes_tags() {
+        let pool = test_pool().await;
+        let created = create_recipe(&pool, recipe_input("Shared Pie", &["dessert", "english"]), None)
+            .await
+            .unwrap();
+
+        create_share_link(
+            &pool,
+            "share-token-abc",
+            &created.recipe.id,
+            "cook@example.com",
+            "2999-01-01 00:00:00",
+        )
+        .await
+        .unwrap();
+
+        let shared = get_recipe_by_share_token(&pool, "share-token-abc")
+            .await
+            .unwrap()
+            .expect("share token should resolve to a recipe");
+        assert_eq!(
+            shared.recipe.tags,
+            vec!["dessert".to_string(), "english".to_string()],
+            "a recipe fetched through its share token carries its tags"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_recipe_removes_tag_links() {
+        let pool = test_pool().await;
+        let created = create_recipe(&pool, recipe_input("To Delete", &["main", "thai"]), None)
+            .await
+            .unwrap();
+        let recipe_id = created.recipe.id.clone();
+
+        let (links,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM recipe_tags WHERE recipe_id = ?")
+            .bind(&recipe_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(links, 2);
+
+        delete_recipe(&pool, &recipe_id, None).await.unwrap();
+
+        let (links,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM recipe_tags WHERE recipe_id = ?")
+            .bind(&recipe_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(links, 0, "recipe_tags rows should cascade away");
+
+        // The tag vocabulary itself survives for other recipes
+        let (tags,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tags")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(tags, 2);
+    }
 }

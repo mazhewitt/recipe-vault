@@ -188,3 +188,252 @@ async fn test_mcp_recipe_creation_without_author_email() {
 
     println!("Manual test - verify MCP without DEFAULT_AUTHOR_EMAIL creates null authorship");
 }
+
+// ==== Tag support in the MCP tools ====
+//
+// These run in-process: the REST API is served on a loopback port and the tool
+// handlers talk to it through the real blocking `ApiClient`, so they exercise
+// the whole MCP -> HTTP -> handler -> database path with the mock LLM.
+
+mod common;
+
+use recipe_vault::mcp::http_client::ApiClient;
+use recipe_vault::mcp::tools;
+use serde_json::json;
+use serde_json::Value;
+
+/// Serve the test API on a random loopback port and return its base URL
+async fn spawn_test_api() -> String {
+    spawn_test_api_with_pool().await.0
+}
+
+/// As `spawn_test_api`, but also hands back the pool so a test can seed rows
+/// directly, bypassing the create handler's background auto-tagging
+async fn spawn_test_api_with_pool() -> (String, sqlx::SqlitePool) {
+    let pool = common::create_test_db().await;
+    let app = common::create_test_app(pool.clone());
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.ok();
+    });
+
+    (format!("http://{}", addr), pool)
+}
+
+/// Run a tool handler on a blocking thread (the MCP client is blocking reqwest)
+async fn call_tool<F>(base_url: &str, handler: F) -> Result<Value, recipe_vault::mcp::protocol::JsonRpcError>
+where
+    F: FnOnce(&ApiClient) -> Result<Value, recipe_vault::mcp::protocol::JsonRpcError> + Send + 'static,
+{
+    let base_url = base_url.to_string();
+    tokio::task::spawn_blocking(move || {
+        let client = ApiClient::new(
+            base_url,
+            Some("test-api-key".to_string()),
+            Some("test@example.com".to_string()),
+        )
+        .unwrap();
+        handler(&client)
+    })
+    .await
+    .unwrap()
+}
+
+fn tag_list(value: &Value) -> Vec<String> {
+    value["tags"]
+        .as_array()
+        .expect("tags array")
+        .iter()
+        .map(|t| t.as_str().unwrap().to_string())
+        .collect()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_mcp_create_recipe_with_tags() {
+    let base_url = spawn_test_api().await;
+
+    let created = call_tool(&base_url, |client| {
+        tools::handle_create_recipe(
+            client,
+            json!({
+                "title": "Tarte Tatin",
+                "description": "Upside-down apple tart",
+                "tags": ["Dessert", " french "]
+            }),
+        )
+    })
+    .await
+    .expect("create should succeed");
+
+    // Stored normalised, returned sorted
+    assert_eq!(tag_list(&created), vec!["dessert", "french"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_mcp_create_recipe_with_invalid_tags_is_rejected() {
+    let base_url = spawn_test_api().await;
+
+    let error = call_tool(&base_url, |client| {
+        tools::handle_create_recipe(
+            client,
+            json!({
+                "title": "Bad Tags",
+                "description": "Should not be created",
+                "tags": ["main!"]
+            }),
+        )
+    })
+    .await
+    .expect_err("invalid tags should fail");
+
+    assert_eq!(error.code, -32602, "tag validation should be invalid params");
+    assert!(error.message.contains("main!"), "error should name the tag: {}", error.message);
+
+    // Nothing was created
+    let listed = call_tool(&base_url, |client| tools::handle_list_recipes(client, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(listed["recipes"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_mcp_update_recipe_replaces_tags() {
+    let base_url = spawn_test_api().await;
+
+    let created = call_tool(&base_url, |client| {
+        tools::handle_create_recipe(
+            client,
+            json!({
+                "title": "Apple Pie",
+                "description": "A classic",
+                "tags": ["main", "english"]
+            }),
+        )
+    })
+    .await
+    .unwrap();
+    let recipe_id = created["id"].as_str().unwrap().to_string();
+
+    // Replace semantics: the whole set is swapped, not merged
+    let id = recipe_id.clone();
+    let updated = call_tool(&base_url, move |client| {
+        tools::handle_update_recipe(client, json!({"recipe_id": id, "tags": ["dessert", "french"]}))
+    })
+    .await
+    .expect("update should succeed");
+    assert_eq!(tag_list(&updated), vec!["dessert", "french"]);
+
+    // Omitting tags leaves them alone
+    let id = recipe_id.clone();
+    let untouched = call_tool(&base_url, move |client| {
+        tools::handle_update_recipe(client, json!({"recipe_id": id, "servings": 8}))
+    })
+    .await
+    .unwrap();
+    assert_eq!(tag_list(&untouched), vec!["dessert", "french"]);
+    assert_eq!(untouched["servings"], json!(8));
+
+    // An invalid tag changes nothing
+    let id = recipe_id.clone();
+    let error = call_tool(&base_url, move |client| {
+        tools::handle_update_recipe(client, json!({"recipe_id": id, "tags": ["DESSERT?"]}))
+    })
+    .await
+    .expect_err("invalid tags should fail");
+    assert_eq!(error.code, -32602);
+
+    let id = recipe_id.clone();
+    let after = call_tool(&base_url, move |client| {
+        tools::handle_get_recipe(client, json!({"recipe_id": id}))
+    })
+    .await
+    .unwrap();
+    assert_eq!(tag_list(&after), vec!["dessert", "french"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_mcp_list_recipes_includes_tags() {
+    let (base_url, pool) = spawn_test_api_with_pool().await;
+
+    call_tool(&base_url, |client| {
+        tools::handle_create_recipe(
+            client,
+            json!({"title": "Tagged", "description": "Has tags", "tags": ["dessert"]}),
+        )
+    })
+    .await
+    .unwrap();
+
+    // Seeded straight through the queries layer, so the create handler's
+    // background auto-tagger never runs and this recipe stays untagged
+    recipe_vault::db::queries::create_recipe(
+        &pool,
+        recipe_vault::models::recipe::CreateRecipeInput {
+            title: "Untagged".to_string(),
+            description: Some("No tags".to_string()),
+            prep_time_minutes: None,
+            cook_time_minutes: None,
+            servings: None,
+            difficulty: None,
+            ingredients: vec![],
+            steps: vec![],
+            tags: vec![],
+        },
+        Some("test@example.com".to_string()),
+    )
+    .await
+    .unwrap();
+
+    let listed = call_tool(&base_url, |client| tools::handle_list_recipes(client, json!({})))
+        .await
+        .unwrap();
+
+    let recipes = listed["recipes"].as_array().unwrap();
+    assert_eq!(recipes.len(), 2);
+    for recipe in recipes {
+        assert!(recipe.get("tags").is_some(), "every listed recipe carries tags");
+        assert!(recipe["tags"].is_array(), "tags should always be an array");
+    }
+    let tagged = recipes.iter().find(|r| r["title"] == "Tagged").unwrap();
+    assert_eq!(tag_list(tagged), vec!["dessert"]);
+
+    // A recipe with no tags lists an empty array, never a missing field
+    let untagged = recipes.iter().find(|r| r["title"] == "Untagged").unwrap();
+    assert_eq!(tag_list(untagged), Vec::<String>::new());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_mcp_create_without_tags_gets_them_assigned() {
+    let base_url = spawn_test_api().await;
+
+    let created = call_tool(&base_url, |client| {
+        tools::handle_create_recipe(
+            client,
+            json!({"title": "Chicken Curry", "description": "Weeknight curry"}),
+        )
+    })
+    .await
+    .unwrap();
+    let recipe_id = created["id"].as_str().unwrap().to_string();
+    assert_eq!(tag_list(&created), Vec::<String>::new(), "tags start empty");
+
+    // The background assessment uses the mock LLM, which returns ["main","curry"]
+    let mut tags = Vec::new();
+    for _ in 0..40 {
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let id = recipe_id.clone();
+        let recipe = call_tool(&base_url, move |client| {
+            tools::handle_get_recipe(client, json!({"recipe_id": id}))
+        })
+        .await
+        .unwrap();
+        tags = tag_list(&recipe);
+        if !tags.is_empty() {
+            break;
+        }
+    }
+
+    assert_eq!(tags, vec!["curry", "main"], "auto-assigned tags should be stored");
+}

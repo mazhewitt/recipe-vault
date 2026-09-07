@@ -24,6 +24,7 @@ async fn test_invalid_difficulty_validation() {
         difficulty: Some(0), // Invalid: too low
         ingredients: vec![],
         steps: vec![],
+        tags: vec![],
     };
 
     let result = queries::create_recipe(&pool, invalid_input, None).await;
@@ -40,6 +41,7 @@ async fn test_invalid_difficulty_validation() {
         difficulty: Some(6), // Invalid: too high
         ingredients: vec![],
         steps: vec![],
+        tags: vec![],
     };
 
     let result2 = queries::create_recipe(&pool, invalid_input2, None).await;
@@ -56,6 +58,7 @@ async fn test_invalid_difficulty_validation() {
             difficulty: Some(difficulty),
             ingredients: vec![],
             steps: vec![],
+            tags: vec![],
         };
 
         let result = queries::create_recipe(&pool, valid_input, None).await;
@@ -89,6 +92,7 @@ async fn test_ai_assessment_with_mock() {
         updated_at: "2024-01-01T00:00:00Z".to_string(),
         created_by: None,
         updated_by: None,
+        tags: vec![],
     };
 
     let ingredients = vec![RecipeIngredient {
@@ -149,6 +153,7 @@ async fn test_existing_recipe_crud_with_difficulty() {
             temperature_value: Some(180),
             temperature_unit: Some("Celsius".to_string()),
         }],
+        tags: vec![],
     };
 
     // Test CREATE
@@ -179,6 +184,7 @@ async fn test_existing_recipe_crud_with_difficulty() {
         difficulty: Some(5), // Change difficulty
         ingredients: None,
         steps: None,
+        tags: None,
     };
 
     let updated = queries::update_recipe(&pool, &recipe_id, update_input, None, None)
@@ -212,6 +218,7 @@ async fn test_recipe_without_difficulty() {
         difficulty: None, // No difficulty
         ingredients: vec![],
         steps: vec![],
+        tags: vec![],
     };
 
     let created = queries::create_recipe(&pool, input, None)
@@ -252,6 +259,7 @@ async fn test_user_specified_difficulty_preserved() {
             temperature_value: None,
             temperature_unit: None,
         }],
+        tags: vec![],
     };
 
     let created = queries::create_recipe(&pool, input, None)

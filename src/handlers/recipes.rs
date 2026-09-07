@@ -8,7 +8,7 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 
 use crate::{
-    ai::{assess_recipe_difficulty, LlmProvider, LlmProviderType},
+    ai::{assess_recipe_difficulty, assess_recipe_tags, LlmProvider, LlmProviderType},
     auth::UserIdentity,
     config::{Config, LlmProviderKind},
     db::queries,
@@ -59,6 +59,32 @@ pub async fn create_recipe(
                 }
                 Err(e) => {
                     tracing::warn!("Failed to auto-assign difficulty to recipe {}: {}", recipe_id, e);
+                }
+            }
+        });
+    }
+
+    // Check if tags were not supplied - if so, auto-assign using AI
+    if recipe.recipe.tags.is_empty() {
+        let recipe_id = recipe.recipe.id.clone();
+        let pool = state.pool.clone();
+        let config = state.config.clone();
+        let http_client = state.http_client.clone();
+
+        tracing::info!("Recipe {} created without tags, spawning auto-tagging task", recipe_id);
+
+        // Spawn async task to assess and store tags (non-blocking)
+        tokio::spawn(async move {
+            // Same settle delay as the difficulty task so the CREATE transaction
+            // has committed before we read the recipe back
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+            match auto_assign_tags(&pool, &config, &recipe_id, http_client).await {
+                Ok(tags) => {
+                    tracing::info!("Auto-assigned tags {:?} to recipe {}", tags, recipe_id);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to auto-assign tags to recipe {}: {}", recipe_id, e);
                 }
             }
         });
@@ -344,6 +370,76 @@ fn validate_file_extension(extension: &str) -> ApiResult<()> {
     }
 }
 
+/// Build the LLM provider used by the background assessment tasks
+///
+/// Uses the cheap model configured for difficulty assessment
+/// (`difficulty_provider` / `difficulty_model`) and the shared HTTP client;
+/// tag assessment reuses it, so no extra configuration keys are needed.
+pub fn build_assessment_provider(
+    config: &Config,
+    http_client: reqwest::Client,
+) -> Result<LlmProvider, Box<dyn std::error::Error + Send + Sync>> {
+    if config.mock_llm {
+        return Ok(LlmProvider::mock(config.mock_recipe_id.clone()));
+    }
+
+    let (provider_type, api_key) = match config.difficulty_provider {
+        LlmProviderKind::Anthropic => (
+            LlmProviderType::Anthropic,
+            config.anthropic_api_key.clone(),
+        ),
+        LlmProviderKind::Gemini => (
+            LlmProviderType::Gemini,
+            config.gemini_api_key.clone(),
+        ),
+    };
+    let api_key = api_key.ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Configured difficulty LLM provider API key missing",
+        )
+    })?;
+
+    Ok(LlmProvider::new(
+        provider_type,
+        api_key,
+        config.difficulty_model.clone(),
+        Some(http_client),
+    ))
+}
+
+/// Auto-assign tags to a recipe using AI assessment
+///
+/// Writes the assessed tags in its own transaction without touching
+/// `updated_by`: the recipe was just created by the requesting user.
+async fn auto_assign_tags(
+    pool: &SqlitePool,
+    config: &Config,
+    recipe_id: &str,
+    http_client: reqwest::Client,
+) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+    // Fetch the full recipe with ingredients and steps (no family filtering for background task)
+    let recipe_details = queries::get_recipe(pool, recipe_id, None).await?;
+
+    let llm = build_assessment_provider(config, http_client)?;
+
+    // Assess tags using AI
+    let tags = assess_recipe_tags(
+        &llm,
+        &recipe_details.recipe,
+        &recipe_details.ingredients,
+        &recipe_details.steps,
+    )
+    .await?;
+
+    // Store the tags directly, leaving updated_at / updated_by alone
+    let mut tx = pool.begin().await?;
+    queries::set_recipe_tags(&mut tx, recipe_id, &tags).await?;
+    tx.commit().await?;
+
+    Ok(tags)
+}
+
 /// Auto-assign difficulty to a recipe using AI assessment
 async fn auto_assign_difficulty(
     pool: &SqlitePool,
@@ -354,33 +450,7 @@ async fn auto_assign_difficulty(
     // Fetch the full recipe with ingredients and steps (no family filtering for background task)
     let recipe_details = queries::get_recipe(pool, recipe_id, None).await?;
 
-    // Create LLM provider using the haiku model (simple structured task) and shared HTTP client
-    let llm = if config.mock_llm {
-        LlmProvider::mock(config.mock_recipe_id.clone())
-    } else {
-        let (provider_type, api_key) = match config.difficulty_provider {
-            LlmProviderKind::Anthropic => (
-                LlmProviderType::Anthropic,
-                config.anthropic_api_key.clone(),
-            ),
-            LlmProviderKind::Gemini => (
-                LlmProviderType::Gemini,
-                config.gemini_api_key.clone(),
-            ),
-        };
-        let api_key = api_key.ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Configured difficulty LLM provider API key missing",
-            )
-        })?;
-        LlmProvider::new(
-            provider_type,
-            api_key,
-            config.difficulty_model.clone(),
-            Some(http_client),
-        )
-    };
+    let llm = build_assessment_provider(config, http_client)?;
 
     // Assess difficulty using AI
     let difficulty = assess_recipe_difficulty(
@@ -401,6 +471,7 @@ async fn auto_assign_difficulty(
         difficulty: Some(difficulty as i32),
         ingredients: None,
         steps: None,
+        tags: None,
     };
 
     queries::update_recipe(pool, recipe_id, update_input, None, None).await?;

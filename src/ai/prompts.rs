@@ -57,6 +57,7 @@ You MUST call the right tool for each user intent:
 - **`get_recipe`** returns data for YOUR internal use only. It does NOT display anything to the user.
 - **Current recipe context**: If `current_recipe` is provided, treat it as the active recipe. Use `get_recipe` with its recipe_id when you need full details (e.g., scaling or substitutions).
 - **Updating recipe difficulty** ("make this recipe harder", "set difficulty to 3", "this should be easy"): Use `update_recipe` with the recipe_id and difficulty parameter (1-5 scale: 1=Easy, 2=Medium-Easy, 3=Medium, 4=Medium-Hard, 5=Hard). If difficulty is not specified when creating a recipe, the AI will automatically assess and assign it.
+- **Changing a recipe's tags** ("tag this as dessert", "mark it vegetarian", "this is a main"): Use `update_recipe` with the recipe_id and the full `tags` array. See ## Tags below.
 
 ## Rules
 - NEVER output full ingredient lists or step-by-step instructions in chat. The side panel shows those.
@@ -80,6 +81,26 @@ Response: "I've saved your Banana Bread recipe and opened it in the side panel!"
 User: "Make the Apple Pie recipe difficulty 4" (assuming current_recipe is Apple Pie)
 Action: Call update_recipe(recipe_id=<id from current_recipe>, difficulty=4)
 Response: "I've updated the Apple Pie difficulty to 4 (Medium-Hard). This rating reflects the advanced techniques required."
+
+## Tags
+
+Recipes carry a list of short tags. Tags are always lowercase, 1-30 characters of letters, numbers, spaces or hyphens, and a recipe has at most 10.
+
+- **Course** (exactly one per recipe, from this fixed list): `main`, `side`, `dessert`, `breakfast`, `snack`, `drink`, `sauce`, `bread`. `main` and `dessert` are what drive the Mains and Sweets tabs on the contents page, so a main course must be tagged `main` and anything sweet `dessert`.
+- **Cuisine** (optional, one): e.g. `italian`, `thai`, `goan`.
+- **Diet** (optional): `vegetarian`, `vegan`, `gluten-free`.
+
+Recipes created without tags are tagged automatically in the background, so do not pass `tags` to `create_recipe` unless the user named them.
+
+`update_recipe` **replaces the whole tag set** — it does not add to it. Always read the recipe's current tags first (with `get_recipe` or `list_recipes` — the current recipe context carries only the id and title, not the tags) and send them back together with the change, or the other tags are lost.
+
+User: "Tag this as a dessert" (current recipe is tagged `main`, `french`)
+Action: Call update_recipe(recipe_id=<id from current_recipe>, tags=["dessert", "french"])
+Response: "Filed under desserts now — it'll show up on the Sweets tab."
+
+User: "Mark it vegetarian" (current recipe is tagged `main`, `indian`)
+Action: Call update_recipe(recipe_id=<id from current_recipe>, tags=["main", "indian", "vegetarian"])
+Response: "Tagged vegetarian, keeping its main and indian tags."
 
 ## Guided Cooking Mode
 
@@ -170,6 +191,50 @@ You: "Great! Here's the Sunday Roast for 6: Beef Wellington (centrepiece), Roast
 #[cfg(test)]
 mod tests {
     use super::CHAT_SYSTEM_PROMPT;
+
+    #[test]
+    fn system_prompt_describes_the_tag_vocabulary() {
+        // web-chat: "a '## Tags' section states ... the fixed course names"
+        assert!(CHAT_SYSTEM_PROMPT.contains("## Tags"), "system prompt should have a Tags section");
+        for course in [
+            "`main`", "`side`", "`dessert`", "`breakfast`", "`snack`", "`drink`", "`sauce`", "`bread`",
+        ] {
+            assert!(
+                CHAT_SYSTEM_PROMPT.contains(course),
+                "system prompt should name the course tag {}",
+                course
+            );
+        }
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains("Tags are always lowercase"),
+            "system prompt should say tags are lowercase"
+        );
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains("Mains and Sweets tabs"),
+            "system prompt should link main/dessert to the contents tabs"
+        );
+    }
+
+    #[test]
+    fn system_prompt_explains_tag_replacement_semantics() {
+        // web-chat: update_recipe replaces the whole set, so read the current tags first
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains("replaces the whole tag set"),
+            "system prompt should state replace semantics"
+        );
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains("read the recipe's current tags first"),
+            "system prompt should tell the model to read current tags first"
+        );
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains(r#"tags=["dessert", "french"]"#),
+            "system prompt should show the 'tag this as dessert' example"
+        );
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains(r#"tags=["main", "indian", "vegetarian"]"#),
+            "system prompt should show the 'mark it vegetarian' example"
+        );
+    }
 
     #[test]
     fn system_prompt_includes_a_numbered_recipe_list_example() {

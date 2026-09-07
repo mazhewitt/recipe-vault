@@ -65,6 +65,15 @@
                 <div class="pages-container">
                     <!-- Left Page — contents -->
                     <div class="page page-left" id="page-left">
+                        <!-- Contents filter tabs, on the left page's outer edge.
+                             A sibling of #page-left-content, so the contents
+                             re-render never destroys them. -->
+                        <nav class="contents-tabs" aria-label="Contents filter">
+                            <button type="button" class="contents-tab contents-tab-all is-active" data-filter="all" aria-pressed="true">All</button>
+                            <button type="button" class="contents-tab contents-tab-mains" data-filter="main" aria-pressed="false">Mains</button>
+                            <button type="button" class="contents-tab contents-tab-sweets" data-filter="dessert" aria-pressed="false">Sweets</button>
+                            <button type="button" class="contents-tab contents-tab-meals" data-filter="meals" aria-pressed="false" hidden>Meals</button>
+                        </nav>
                         <div class="page-content" id="page-left-content">
                             <div class="recipe-placeholder">
                                 <div class="recipe-placeholder-icon">

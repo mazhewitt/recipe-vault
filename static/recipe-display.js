@@ -153,14 +153,33 @@ export function getTotalTimeMinutes(recipe) {
 }
 
 /**
+ * The contents filters. 'main' and 'dessert' are the fixed tag names the Mains
+ * and Sweets tabs stand for; 'meals' has no listing until meal plans persist.
+ */
+export const CONTENTS_FILTERS = ['all', 'main', 'dessert', 'meals'];
+
+/** Footer noun and empty-filter message per filter. */
+const FILTER_WORDING = {
+    all: { one: 'recipe', many: 'recipes', empty: 'No recipes yet.' },
+    main: { one: 'main', many: 'mains', empty: 'No mains yet. Ask me to tag a recipe as a main course.' },
+    dessert: { one: 'sweet', many: 'sweets', empty: 'No sweets yet. Ask me to tag a recipe as a dessert.' },
+    meals: { one: 'meal plan', many: 'meal plans', empty: 'No meal plans yet' },
+};
+
+/**
  * Renders the contents.
  *
- * @param {Array} recipes
- * @param {{currentRecipeId?: string|null, singleColumn?: boolean}} [options]
+ * @param {Array} recipes - the full alphabetical list, unfiltered
+ * @param {{currentRecipeId?: string|null, singleColumn?: boolean, filter?: string}} [options]
  *        singleColumn - render every letter group into #page-left-content and
  *        leave #page-right-content completely untouched (it holds the open
  *        recipe). Without it the contents keep the two-page split on wide
  *        viewports.
+ *        filter - one of CONTENTS_FILTERS; anything else is read as 'all'.
+ *        The letter groups, the A-Z strip, the footer wording and the empty
+ *        message all come from the filtered list, but page numbers keep coming
+ *        from the position in the full list so a recipe reads the same on
+ *        every tab.
  */
 export function renderIndex(recipes, options = {}) {
     const leftContent = document.getElementById('page-left-content');
@@ -168,6 +187,8 @@ export function renderIndex(recipes, options = {}) {
     const alphabetLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     const currentRecipeId = options.currentRecipeId != null ? String(options.currentRecipeId) : null;
     const singleColumn = options.singleColumn === true;
+    const filter = CONTENTS_FILTERS.includes(options.filter) ? options.filter : 'all';
+    const wording = FILTER_WORDING[filter];
     const photoEpoch = state?.photoEpoch ?? 0;
 
     if (recipes.length === 0) {
@@ -183,12 +204,21 @@ export function renderIndex(recipes, options = {}) {
         return;
     }
 
+    // Position in the full list first, so the page number survives the filter
+    const entries = recipes.map((recipe, position) => ({ recipe, position }));
+    const visible = filter === 'all'
+        ? entries
+        : filter === 'meals'
+            // No meal-plan listing exists yet (RV-107), so Meals is always empty
+            ? []
+            : entries.filter(({ recipe }) => Array.isArray(recipe.tags) && recipe.tags.includes(filter));
+
     // Group by first letter
     const groups = {};
-    recipes.forEach((recipe, position) => {
-        const letter = recipe.title[0].toUpperCase();
+    visible.forEach(entry => {
+        const letter = entry.recipe.title[0].toUpperCase();
         if (!groups[letter]) groups[letter] = [];
-        groups[letter].push({ recipe, position });
+        groups[letter].push(entry);
     });
 
     const sortedLetters = Object.keys(groups).sort();
@@ -238,7 +268,7 @@ export function renderIndex(recipes, options = {}) {
     }
 
     function renderFooter(count, continued) {
-        const noun = count === 1 ? 'recipe' : 'recipes';
+        const noun = count === 1 ? wording.one : wording.many;
         return `<div class="index-footer">${count} ${noun}${continued ? ' · continued overleaf' : ''}</div>`;
     }
 
@@ -255,6 +285,23 @@ export function renderIndex(recipes, options = {}) {
         }).join('');
     }
 
+    // The book has recipes but none carry this tag: a message in place of the
+    // letter groups, every letter in the strip disabled, a zero footer.
+    if (visible.length === 0) {
+        // SAFE: the wording table is static, renderAlphabet emits no user data
+        leftContent.innerHTML = `
+            <div class="index-title">~ Contents ~</div>
+            ${renderAlphabet({})}
+            <div class="index-empty">${wording.empty}</div>
+            ${renderFooter(0, false)}
+        `;
+        if (!singleColumn) rightContent.innerHTML = '';
+        const emptyLeftPage = document.getElementById('page-left');
+        if (emptyLeftPage) emptyLeftPage.scrollTop = 0;
+        leftContent.scrollTop = 0;
+        return;
+    }
+
     if (isMobile() || singleColumn) {
         const lettersToPage = {};
         sortedLetters.forEach(letter => {
@@ -266,12 +313,12 @@ export function renderIndex(recipes, options = {}) {
             <div class="index-title">~ Contents ~</div>
             ${renderAlphabet(lettersToPage)}
             ${renderGroup(sortedLetters, 'left')}
-            ${renderFooter(recipes.length, false)}
+            ${renderFooter(visible.length, false)}
         `;
         if (!singleColumn) rightContent.innerHTML = '';
     } else {
-        // Split groups across pages based on recipe count
-        const totalRecipes = recipes.length;
+        // Split groups across pages based on the visible recipe count
+        const totalRecipes = visible.length;
         const targetPerSide = totalRecipes / 2;
 
         let currentCount = 0;
@@ -315,11 +362,11 @@ export function renderIndex(recipes, options = {}) {
             <div class="index-title">~ Contents ~</div>
             ${renderAlphabet(lettersToPage)}
             ${renderGroup(leftLetters, 'left')}
-            ${renderFooter(recipes.length, rightHasEntries)}
+            ${renderFooter(visible.length, rightHasEntries)}
         `;
 
         rightContent.innerHTML = rightHasEntries
-            ? `${renderGroup(rightLetters, 'right')}${renderFooter(recipes.length, false)}`
+            ? `${renderGroup(rightLetters, 'right')}${renderFooter(visible.length, false)}`
             : '';
     }
 
@@ -539,6 +586,13 @@ export function renderRecipe(recipe, options = {}) {
     if (difficulty) {
         metaParts.push(`<span class="meta-difficulty" title="Difficulty ${difficulty}/5"><span class="meta-label">difficulty</span> <span class="difficulty-dots">${difficultyDots}</span></span>`);
     }
+    // Display-only tag chips, at most three, after the difficulty dots
+    const tagChips = (Array.isArray(recipe.tags) ? recipe.tags : []).slice(0, 3);
+    if (tagChips.length) {
+        // SANITIZED: tag names are user input
+        const chips = tagChips.map(tag => `<span class="recipe-tag">${escapeHtml(String(tag))}</span>`).join('');
+        metaParts.push(`<span class="recipe-tags">${chips}</span>`);
+    }
     const breakdown = [];
     if (prepMinutes) breakdown.push(`prep ${prepMinutes}`);
     if (cookMinutes) breakdown.push(`cook ${cookMinutes}`);
@@ -690,7 +744,7 @@ export async function fetchAndDisplayRecipe(recipeId) {
         // Refresh recipe list to include newly created recipes, and keep the
         // contents column on the left page in step with it.
         const fresh = await state.fetchRecipeList(true);
-        renderIndex(fresh, { currentRecipeId: state.currentRecipeId, singleColumn: true });
+        renderIndex(fresh, { currentRecipeId: state.currentRecipeId, singleColumn: true, filter: state.contentsFilter });
         state.updateNavigationState();
         // Prefetch adjacent recipes for instant navigation
         prefetchAdjacent(state.currentRecipeId);

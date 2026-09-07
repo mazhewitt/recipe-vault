@@ -23,6 +23,8 @@ export interface Recipe {
   servings?: number;
   /** Set it on creation to suppress the pending-difficulty re-render mid-test. */
   difficulty?: number;
+  /** Set it on creation to skip the mock LLM's background auto-tagging. */
+  tags?: string[];
 }
 
 export type TabName = 'ingredients' | 'method' | 'notes';
@@ -66,7 +68,8 @@ export async function createRecipe(page: Page, recipe: Recipe): Promise<string> 
 }
 
 /**
- * Create multiple test recipes
+ * Create multiple test recipes. Each carries explicit tags, which skips the
+ * mock LLM's background auto-tagging and keeps the contents filters stable.
  */
 export async function seedRecipes(page: Page, count: number = 3): Promise<string[]> {
   // Add unique suffix to avoid conflicts when tests run in parallel
@@ -100,6 +103,7 @@ export async function seedRecipes(page: Page, count: number = 3): Promise<string
       prep_time_minutes: 15,
       cook_time_minutes: 30,
       servings: 4,
+      tags: ['main', 'curry'],
     },
     {
       title: `Simple Pasta ${uniqueSuffix}`,
@@ -122,6 +126,7 @@ export async function seedRecipes(page: Page, count: number = 3): Promise<string
       prep_time_minutes: 5,
       cook_time_minutes: 15,
       servings: 4,
+      tags: ['main'],
     },
     {
       title: `Chocolate Chip Cookies ${uniqueSuffix}`,
@@ -150,6 +155,7 @@ export async function seedRecipes(page: Page, count: number = 3): Promise<string
       prep_time_minutes: 15,
       cook_time_minutes: 10,
       servings: 24,
+      tags: ['dessert'],
     },
   ];
 

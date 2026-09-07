@@ -26,6 +26,22 @@ let photoEpoch = 0; // Bumped after photo uploads to bust thumbnail cache
 // Image size limit (5MB)
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
+// Contents filter tab. sessionStorage, not localStorage: a reload keeps the
+// chosen tab but a fresh browser session opens the book on All.
+const CONTENTS_FILTER_KEY = 'rv-contents-filter';
+
+function readStoredContentsFilter() {
+    try {
+        const stored = sessionStorage.getItem(CONTENTS_FILTER_KEY);
+        return RecipeDisplay.CONTENTS_FILTERS.includes(stored) ? stored : 'all';
+    } catch {
+        // Storage can be unavailable (private mode); All is the safe default
+        return 'all';
+    }
+}
+
+let contentsFilter = readStoredContentsFilter();
+
 // Shared utility: fetchRecipeList
 async function fetchRecipeList(forceRefresh = false) {
     if (recipeListCache && !forceRefresh) return recipeListCache;
@@ -62,6 +78,16 @@ const sharedState = {
     // Bumped after a photo upload so contents thumbnails refetch
     get photoEpoch() { return photoEpoch; },
     set photoEpoch(val) { photoEpoch = val; },
+    // Active contents tab; mirrored to sessionStorage so a reload keeps it
+    get contentsFilter() { return contentsFilter; },
+    set contentsFilter(val) {
+        contentsFilter = RecipeDisplay.CONTENTS_FILTERS.includes(val) ? val : 'all';
+        try {
+            sessionStorage.setItem(CONTENTS_FILTER_KEY, contentsFilter);
+        } catch {
+            // Storage can be unavailable (private mode); the filter still applies
+        }
+    },
 
     // Shared functions
     fetchRecipeList,
@@ -409,16 +435,62 @@ function setupMobileEdgeNavigation() {
     }
 }
 
+/** Mirrors the active filter onto the tab strip. */
+function syncContentsTabs() {
+    document.querySelectorAll('.contents-tab').forEach(btn => {
+        const active = btn.dataset.filter === contentsFilter;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', String(active));
+    });
+}
+
+/** Re-renders whichever contents arrangement is on screen, with the active filter. */
+async function renderContents() {
+    const list = await fetchRecipeList(true);
+    if (viewMode === 'index') {
+        RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId, filter: contentsFilter });
+    } else {
+        // A recipe (or a meal plan) holds the right page; the contents stay on the left
+        RecipeDisplay.renderIndex(list, { currentRecipeId, singleColumn: true, filter: contentsFilter });
+    }
+}
+
+/**
+ * Wires the contents filter tabs. The strip is static markup in chat.html, so
+ * one listener on the nav survives every contents re-render. The tabs are a
+ * lens on the contents page only - navigation still walks the full list.
+ */
+function setupContentsTabs() {
+    const nav = document.querySelector('.contents-tabs');
+    if (!nav) return;
+
+    // Meal plans are not persisted yet (RV-107), so the Meals tab stays hidden
+    // until something sets the feature flag on the body.
+    if (document.body.dataset.featureMeals !== undefined) {
+        nav.querySelectorAll('.contents-tab-meals').forEach(btn => { btn.hidden = false; });
+    }
+
+    syncContentsTabs();
+
+    nav.addEventListener('click', (e) => {
+        const btn = e.target.closest('.contents-tab');
+        if (!btn) return;
+        sharedState.contentsFilter = btn.dataset.filter;
+        syncContentsTabs();
+        renderContents();
+    });
+}
+
 function setupOrientationChangeHandler() {
     // Re-render index when viewport size changes (orientation change)
     window.addEventListener('resize', async () => {
         if (viewMode === 'index') {
             const list = await fetchRecipeList(true); // Force refresh to get latest recipes
-            RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId });
+            RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId, filter: contentsFilter });
         } else if (viewMode === 'recipe' && currentRecipeId) {
             // The contents column on the left page follows the open recipe
             const list = await fetchRecipeList(true);
-            RecipeDisplay.renderIndex(list, { currentRecipeId, singleColumn: true });
+            RecipeDisplay.renderIndex(list, { currentRecipeId, singleColumn: true, filter: contentsFilter });
         }
     });
 }
@@ -434,6 +506,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupMobileEdgeNavigation();
     setupRecipePhotoUpload();
     setupShareButton();
+    setupContentsTabs();
     setupOrientationChangeHandler();
     PageTabs.initPageTabs();
     Navigation.initFooterNav();
@@ -444,7 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load initial state
     const list = await fetchRecipeList();
-    RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId });
+    RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId, filter: contentsFilter });
     Navigation.updateNavigationState();
 
     // Request notification permission for timers

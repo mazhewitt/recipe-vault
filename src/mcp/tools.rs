@@ -79,6 +79,11 @@ pub fn create_recipe_tool() -> ToolDefinition {
                     "minimum": 1,
                     "maximum": 5
                 },
+                "tags": {
+                    "type": "array",
+                    "description": "Lowercase tags. Use 'main' for main courses and 'dessert' for sweets; optionally add a cuisine (e.g. 'italian') or diet tag (e.g. 'vegetarian'). Omit on create to have tags assigned automatically.",
+                    "items": {"type": "string"}
+                },
                 "ingredients": {
                     "type": "array",
                     "description": "List of ingredients",
@@ -116,7 +121,7 @@ pub fn create_recipe_tool() -> ToolDefinition {
 pub fn update_recipe_tool() -> ToolDefinition {
     ToolDefinition::new(
         "update_recipe",
-        "Update an existing recipe. Supports partial updates (e.g., just title) or full replacements of ingredients/steps.",
+        "Update an existing recipe. Supports partial updates (e.g., just title) or full replacements of ingredients/steps/tags. Omitting tags leaves them unchanged.",
         json!({
             "type": "object",
             "properties": {
@@ -149,6 +154,11 @@ pub fn update_recipe_tool() -> ToolDefinition {
                     "description": "Recipe difficulty rating from 1 (Easy) to 5 (Hard) (optional)",
                     "minimum": 1,
                     "maximum": 5
+                },
+                "tags": {
+                    "type": "array",
+                    "description": "Lowercase tags. Use 'main' for main courses and 'dessert' for sweets; optionally add a cuisine (e.g. 'italian') or diet tag (e.g. 'vegetarian'). Omit on create to have tags assigned automatically.",
+                    "items": {"type": "string"}
                 },
                 "ingredients": {
                     "type": "array",
@@ -240,7 +250,8 @@ pub fn handle_list_recipes(client: &ApiClient, _params: JsonValue) -> Result<Jso
             "description": r.description,
             "prep_time_minutes": r.prep_time_minutes,
             "cook_time_minutes": r.cook_time_minutes,
-            "servings": r.servings
+            "servings": r.servings,
+            "tags": r.tags
         })
     }).collect();
     
@@ -289,6 +300,9 @@ pub fn handle_update_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
             return Err(JsonRpcError::invalid_params("Difficulty must be between 1 and 5"));
         }
 
+    // Parse tags if provided; omitting them leaves the recipe's tags unchanged
+    let tags = parse_tags(&params)?;
+
     let update_input = UpdateRecipeInput {
         title: params.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()),
         description: params.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
@@ -298,6 +312,7 @@ pub fn handle_update_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
         difficulty: params.get("difficulty").and_then(|v| v.as_i64()).map(|v| v as i32),
         ingredients,
         steps,
+        tags,
     };
 
     let recipe = client.update_recipe(recipe_id, update_input)?;
@@ -416,6 +431,9 @@ pub fn handle_create_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
         vec![]
     };
 
+    // Parse tags; an empty set means the AI assigns them in the background
+    let tags = parse_tags(&params)?.unwrap_or_default();
+
     let create_recipe = CreateRecipeInput {
         title,
         description: Some(description),
@@ -425,11 +443,36 @@ pub fn handle_create_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
         difficulty,
         ingredients,
         steps,
+        tags,
     };
 
     let recipe = client.create_recipe(create_recipe)?;
     serde_json::to_value(recipe)
         .map_err(|e| JsonRpcError::internal_error(format!("Serialization error: {}", e)))
+}
+
+/// Parse the optional `tags` parameter into a list of names.
+/// Returns `None` when the parameter is absent or null. Name validation
+/// (lowercase, allowed characters, limits) is done by the API.
+fn parse_tags(params: &JsonValue) -> Result<Option<Vec<String>>, JsonRpcError> {
+    let value = match params.get("tags") {
+        None | Some(JsonValue::Null) => return Ok(None),
+        Some(v) => v,
+    };
+
+    let array = value
+        .as_array()
+        .ok_or_else(|| JsonRpcError::invalid_params("tags must be an array of strings"))?;
+
+    array
+        .iter()
+        .map(|tag| {
+            tag.as_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| JsonRpcError::invalid_params("tags must be an array of strings"))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Parse ingredients from JSON array
@@ -722,6 +765,63 @@ mod tests {
                 json!({"duration_minutes": 30, "label": "Marinate chicken", "step_number": bad}),
             )
             .unwrap_err();
+            assert_eq!(err.code, -32602, "expected invalid params error");
+        }
+    }
+
+    /// Both tag-carrying tools declare the same optional array-of-strings parameter
+    #[test]
+    fn test_create_and_update_tools_declare_tags_parameter() {
+        for tool in [create_recipe_tool(), update_recipe_tool()] {
+            let tags = tool.input_schema
+                .get("properties")
+                .and_then(|p| p.get("tags"))
+                .unwrap_or_else(|| panic!("{} should have a tags property", tool.name));
+
+            assert_eq!(tags.get("type").and_then(|v| v.as_str()), Some("array"));
+            assert_eq!(
+                tags.get("items").and_then(|i| i.get("type")).and_then(|v| v.as_str()),
+                Some("string"),
+                "tags items should be strings"
+            );
+
+            let description = tags.get("description").and_then(|v| v.as_str())
+                .expect("tags should have a description");
+            assert!(description.contains("'main'"), "description should name the main course tag");
+            assert!(description.contains("'dessert'"), "description should name the dessert tag");
+            assert!(description.contains("'italian'"), "description should give a cuisine example");
+            assert!(description.contains("'vegetarian'"), "description should give a diet example");
+            assert!(
+                description.contains("Omit on create to have tags assigned automatically."),
+                "description should explain auto-assignment"
+            );
+
+            let required = tool.input_schema.get("required").and_then(|v| v.as_array()).unwrap();
+            assert!(
+                !required.iter().any(|v| v.as_str() == Some("tags")),
+                "tags must stay optional on {}",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_tags_absent_and_null() {
+        assert_eq!(parse_tags(&json!({"title": "Pie"})).unwrap(), None);
+        assert_eq!(parse_tags(&json!({"tags": null})).unwrap(), None);
+    }
+
+    #[test]
+    fn test_parse_tags_reads_array_of_strings() {
+        let parsed = parse_tags(&json!({"tags": ["dessert", "french"]})).unwrap();
+        assert_eq!(parsed, Some(vec!["dessert".to_string(), "french".to_string()]));
+        assert_eq!(parse_tags(&json!({"tags": []})).unwrap(), Some(vec![]));
+    }
+
+    #[test]
+    fn test_parse_tags_rejects_non_string_values() {
+        for bad in [json!({"tags": "dessert"}), json!({"tags": [1]})] {
+            let err = parse_tags(&bad).unwrap_err();
             assert_eq!(err.code, -32602, "expected invalid params error");
         }
     }

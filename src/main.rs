@@ -110,6 +110,31 @@ async fn main() {
     // Shared HTTP client — reuses TLS sessions and connection pool across all LLM calls
     let http_client = reqwest::Client::new();
 
+    // Trigger the one-time tags backfill if it has not completed yet (non-blocking).
+    // Skips itself when the flag is 'true' or the backfill_flags row is missing.
+    {
+        let pool_for_backfill = pool.clone();
+        let config_for_backfill = config.clone();
+        let client_for_backfill = http_client.clone();
+
+        tokio::spawn(async move {
+            match recipe_vault::backfill::run_tags_backfill(
+                &pool_for_backfill,
+                &config_for_backfill,
+                client_for_backfill,
+            )
+            .await
+            {
+                Ok(summary) => {
+                    tracing::debug!("Tags backfill task finished: {:?}", summary);
+                }
+                Err(e) => {
+                    tracing::error!("Tags backfill failed: {}", e);
+                }
+            }
+        });
+    }
+
     // Create chat state with AI agent
     let chat_state = recipe_vault::chat::ChatState::new(config.clone(), api_key_for_chat, http_client.clone());
 

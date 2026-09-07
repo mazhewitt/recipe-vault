@@ -96,6 +96,8 @@ Load via Google Fonts: `Kalam:wght@300;400;700` and `Libre+Baskerville:ital,wght
 | Method Steps | Libre Baskerville | 14px | 400 | 1.65 | ink-dark |
 | Contents Page Number / Footer | Kalam | 13–14px | 400 | 1.4 | ink-light |
 | Section Tab | Kalam | 14px (edge) / 16px (paper) | 400 | 1 | ink-dark |
+| Contents Filter Tab | Kalam | 14px (edge) / 15px (chip) | 400 | 1 | per tab (see Index View) |
+| Recipe Tag Chip | Kalam | 12px | 400 | 1 | ink-light |
 | Timer Display | Kalam | 18px | 400 | 1 | ink-dark |
 
 **Contrast rule:** on paper, nothing under 16px may be lighter than `--color-ink-light` (`#6b5a4a`). `--color-ink-muted` (`#8a7a60`) is decorative only (separators, disabled letters).
@@ -223,6 +225,7 @@ The book is the only child of `.app-container`, centred up to 1400px.
 | `.book-cover` | 0 |
 | `.pages-container` | 1 |
 | `#page-margin` (contents view) | 2 |
+| `.contents-tabs` | 4 |
 | `.page-tabs` (phone) | 5 |
 | `.note-input` | 6 |
 | `.edge-tabs` | 9 |
@@ -449,6 +452,7 @@ An open book showing two pages with a leather cover frame.
 | Spine shadow | Visible | Visible | Hidden |
 | Nav arrows | `.page-nav` 29px | `.page-nav` 36px (larger tap target) | `.page-nav` hidden; 60px `.mobile-edge-nav` zones |
 | Section tabs | `.edge-tabs`, right outer edge | Same | `.page-tabs`, page top edge |
+| Contents filters | `.contents-tabs`, left page's outer edge | Same | Chip row under the contents title |
 
 ---
 
@@ -507,6 +511,33 @@ There are no speaker prefixes anywhere in the thread; the ink is the speaker.
 ## Component: Index View
 
 The alphabetical recipe index. It is the book's default state, and on desktop and tablet it stays on the left page once a recipe is open — `renderIndex(list, { singleColumn: true })` puts every letter group in `#page-left-content` and leaves the right page to the recipe. The alphabet nav stays usable in both arrangements, and the open recipe's entry carries `.current` plus `aria-current="page"`.
+
+### Contents Filter Tabs
+
+`.contents-tabs` is a static `<nav>` in `chat.html`, a **sibling** of `#page-left-content` inside `#page-left`, so a contents re-render (which rewrites `innerHTML`) never destroys it. Its buttons carry `data-filter` (`all` / `main` / `dessert` / `meals`), `aria-pressed` and `is-active`; `app.js` owns the active filter (`contentsFilter`, mirrored to `sessionStorage['rv-contents-filter']`) and `renderIndex(list, { filter })` does the filtering. These are **not** the right page's `.edge-tabs` — those are the section tabs and carry `role="tab"` / `data-tab`; the contents tabs deliberately carry neither, so `page-tabs.js` ignores them.
+
+| Property | Desktop / Tablet | Mobile (≤ 600px) |
+|----------|------------------|------------------|
+| Arrangement | Vertical strip on the left page's outer edge: `position: sticky; top: 20px`, `height: 0` and `margin-left: -28px` so it takes no flow height and sits in the page's own left padding, clear of the entries | Horizontal chip row directly under the "~ Contents ~" title |
+| z-index | 4 — under the phone paper tabs (5) | — |
+| `.contents-tab` | `writing-mode: vertical-rl`, 26px wide, `min-height: 76px`, Kalam 14px, `border-radius: var(--radius-sm) 0 0 var(--radius-sm)`, `box-shadow: -2px 2px 5px rgba(0,0,0,0.25)` | `writing-mode: horizontal-tb`, `min-height: 44px`, `min-width: 66px`, `padding: 10px 14px`, pill radius |
+| `.contents-tab.is-active` | Full opacity, weight 700, `padding-left: 8px` so it reads as pulled out past the page's edge | Same, without the pull-out |
+| Inactive | `opacity: 0.72` — the colour stays, the tab recedes | Same |
+
+Colours, one per filter:
+
+| Tab | Face | Text | Note |
+|-----|------|------|------|
+| All | `--color-leather` | `--color-paper-cream` | — |
+| Mains | `--color-border` (`#c9a86c`) | `--color-ink-dark` | **The tan face is the one exception to cream tab text.** Cream on `#c9a86c` falls below 3:1; dark ink keeps the label readable. Any future tab on a light face follows the same rule. |
+| Sweets | `--color-accent-brown` | `--color-paper-cream` | — |
+| Meals | `--color-ink-medium` | `--color-paper-cream` | Gated |
+
+The Meals tab is styled and in the markup so the strip's shape is settled, but it depends on meal-plan persistence (RV-107): it carries the `hidden` attribute plus `.contents-tab-meals { display: none }`, and only `body[data-feature-meals] .contents-tab-meals { display: inline-flex }` reveals it (`app.js` drops the `hidden` attribute on the same condition). Selecting it renders "No meal plans yet" because there is no meal-plan listing.
+
+On the phone, `body[data-view-mode="index"] #page-left-content` becomes `display: contents` so its children join the left page's flex column; `order` then places the title (1), the chip row (2) and everything else (3), which is the only way the static strip can sit between the title and the alphabet nav without leaving `#page-left`.
+
+The filtered list drives the letter groups, the A–Z strip, the footer wording ("N mains" / "N sweets" / "N meal plans") and the `.index-empty` message. **Page numbers do not**: they stay derived from the recipe's position in the full alphabetical list, so "p. 7" means the same thing on every tab — and the nav arrows walk that same full list.
 
 ### Desktop / Tablet (contents view)
 
@@ -669,6 +700,7 @@ All interactive elements must be at least **44px x 44px** on touch devices.
 |---------|----------------------|----------------|
 | Nav arrows | `.page-nav` 29px (36px on tablet) | Hidden; 60px-wide `.mobile-edge-nav` zones |
 | Section tabs | `.edge-tab` 26 × 92px | `.page-tab` min-height 44px, `flex: 1` |
+| Contents filter tabs | `.contents-tab` 26 × 76px | `.contents-tab` min-height 44px, min-width 66px |
 | Index recipe items | `padding: 4px 8px` | `padding: 8px 10px`, `min-height: 44px` |
 | Note textarea | min-height 34px | min-height 44px |
 | Send / clipboard buttons | 40 × 40px | 44 × 44px |
@@ -770,6 +802,7 @@ Responsive styles should be added via media queries at the end of `styles.css`, 
 | Spine shadow | Yes | Yes | No |
 | Recipe nav | `.page-nav` 29px | `.page-nav` 36px | Edge zones + `.phone-footer` |
 | Section tabs | `.edge-tabs`, right outer edge | Same | `.page-tabs`, page top edge |
+| Contents filters | `.contents-tabs`, left page's outer edge | Same | Chip row under the contents title |
 | Note input | Slip pinned to the foot of the right page | Same | Bar beneath the book |
 | Margin notes | 150px column beside the recipe | Beneath the recipe body | Beneath the recipe body; hidden on the Notes tab |
 | Wood background | Full texture | Full texture | Flat gradient |

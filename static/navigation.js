@@ -126,7 +126,7 @@ export async function showIndex() {
     // The contents page is page 1
     setNotePageNumber(null);
     const list = await state.fetchRecipeList(true);
-    state.renderIndex(list, { currentRecipeId: state.lastRecipeId });
+    state.renderIndex(list, { currentRecipeId: state.lastRecipeId, filter: state.contentsFilter });
     updateNavigationState();
 }
 

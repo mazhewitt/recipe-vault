@@ -231,6 +231,50 @@ mod tests {
         assert!(client.api_key.is_none());
     }
 
+    /// Tags ride along on the create/update payloads with no special handling
+    #[test]
+    fn test_tags_serialize_onto_request_payloads() {
+        let create = CreateRecipeInput {
+            title: "Tarte Tatin".to_string(),
+            description: Some("Upside-down apple tart".to_string()),
+            prep_time_minutes: None,
+            cook_time_minutes: None,
+            servings: None,
+            difficulty: None,
+            ingredients: vec![],
+            steps: vec![],
+            tags: vec!["dessert".to_string(), "french".to_string()],
+        };
+        let body = serde_json::to_value(&create).unwrap();
+        assert_eq!(body["tags"], serde_json::json!(["dessert", "french"]));
+
+        let update = UpdateRecipeInput {
+            title: None,
+            description: None,
+            prep_time_minutes: None,
+            cook_time_minutes: None,
+            servings: None,
+            difficulty: None,
+            ingredients: None,
+            steps: None,
+            tags: Some(vec!["dessert".to_string()]),
+        };
+        let body = serde_json::to_value(&update).unwrap();
+        assert_eq!(body["tags"], serde_json::json!(["dessert"]));
+    }
+
+    /// A tag rejected by the API surfaces as invalid params, message intact
+    #[test]
+    fn test_map_status_error_tag_validation() {
+        let client = test_client();
+        let error = client.map_status_error(
+            StatusCode::BAD_REQUEST,
+            Some("{\"error\":\"Invalid tag 'main!': tags must be 1-30 characters of lowercase letters, numbers, spaces or hyphens\",\"code\":\"VALIDATION_ERROR\"}".to_string()),
+        );
+        assert_eq!(error.code, -32602);
+        assert!(error.message.contains("main!"), "offending tag should be named: {}", error.message);
+    }
+
     #[test]
     fn test_client_with_user_email() {
         let client = ApiClient::new(

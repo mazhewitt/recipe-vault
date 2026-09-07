@@ -1,0 +1,306 @@
+import { test, expect, Page } from '@playwright/test';
+import { authenticate, createRecipe, isPhone } from './helpers';
+
+const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
+
+async function clearRecipes(page: Page) {
+  const list = await page.request.get('/api/recipes', { headers: API_HEADERS });
+  for (const r of await list.json()) {
+    await page.request.delete(`/api/recipes/${r.id}`, { headers: API_HEADERS });
+  }
+}
+
+async function openBook(page: Page) {
+  await page.reload();
+  await expect(page.locator('.index-title')).toBeVisible();
+}
+
+/**
+ * Two mains and one sweet, alphabetical: Apple Crumble (dessert), Beef Stew
+ * (main), Chicken Pie (main). Tags are explicit, so the mock auto-tagger never
+ * runs and the filters are deterministic.
+ */
+async function seedTagged(page: Page, suffix: string) {
+  const apple = await createRecipe(page, { title: `Apple Crumble ${suffix}`, ingredients: [], steps: [], tags: ['dessert'] });
+  const beef = await createRecipe(page, { title: `Beef Stew ${suffix}`, ingredients: [], steps: [], tags: ['main'] });
+  const chicken = await createRecipe(page, { title: `Chicken Pie ${suffix}`, ingredients: [], steps: [], tags: ['main'] });
+  return { apple, beef, chicken };
+}
+
+function entry(page: Page, recipeId: string) {
+  return page.locator(`.index-recipe-item[data-recipe-id="${recipeId}"]`);
+}
+
+/** Selects a tab and waits for the strip to adopt it. */
+async function selectFilter(page: Page, tab: 'all' | 'mains' | 'sweets' | 'meals') {
+  await page.locator(`.contents-tab-${tab}`).click();
+  await expect(page.locator(`.contents-tab-${tab}`)).toHaveAttribute('aria-pressed', 'true');
+}
+
+test.describe('Contents filter tabs', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearRecipes(page);
+    await authenticate(page);
+  });
+
+  test('the strip renders with All active, Meals hidden and the specified colours', async ({ page }) => {
+    await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    await expect(page.locator('.contents-tabs')).toHaveAttribute('aria-label', 'Contents filter');
+    await expect(page.locator('.contents-tab')).toHaveCount(4);
+    await expect(page.locator('.contents-tab-all')).toHaveText('All');
+    await expect(page.locator('.contents-tab-mains')).toBeVisible();
+    await expect(page.locator('.contents-tab-sweets')).toBeVisible();
+
+    // Meals waits on meal-plan persistence (RV-107)
+    await expect(page.locator('.contents-tab-meals')).toBeHidden();
+
+    await expect(page.locator('.contents-tab-all')).toHaveClass(/is-active/);
+    await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.contents-tab-mains')).toHaveAttribute('aria-pressed', 'false');
+
+    // Leather All, tan Mains with dark ink for contrast, accent-brown Sweets
+    const face = (selector: string) =>
+      page.locator(selector).evaluate(el => {
+        const s = getComputedStyle(el);
+        return { background: s.backgroundColor, color: s.color };
+      });
+    expect((await face('.contents-tab-all')).background).toBe('rgb(139, 45, 26)');
+    expect(await face('.contents-tab-mains')).toEqual({ background: 'rgb(201, 168, 108)', color: 'rgb(45, 36, 24)' });
+    expect((await face('.contents-tab-sweets')).background).toBe('rgb(107, 68, 35)');
+
+    // The section tabs on the right page are a different strip and untouched:
+    // three role="tab" buttons there, none of them here
+    await expect(page.locator('.edge-tabs[role="tablist"] .edge-tab[role="tab"]')).toHaveCount(3);
+    await expect(page.locator('.contents-tab[role="tab"]')).toHaveCount(0);
+  });
+
+  test('Mains lists only main-tagged recipes and counts them in the footer', async ({ page }) => {
+    const { apple, beef, chicken } = await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    await selectFilter(page, 'mains');
+    await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'false');
+
+    await expect(page.locator('.index-recipe-item')).toHaveCount(2);
+    await expect(entry(page, beef)).toHaveCount(1);
+    await expect(entry(page, chicken)).toHaveCount(1);
+    await expect(entry(page, apple)).toHaveCount(0);
+
+    await expect(page.locator('.index-footer').first()).toContainText('2 mains');
+  });
+
+  test('Sweets lists only desserts, in the singular', async ({ page }) => {
+    const { apple, beef } = await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    await selectFilter(page, 'sweets');
+
+    await expect(page.locator('.index-recipe-item')).toHaveCount(1);
+    await expect(entry(page, apple)).toHaveCount(1);
+    await expect(entry(page, beef)).toHaveCount(0);
+
+    await expect(page.locator('.index-footer').first()).toContainText('1 sweet');
+  });
+
+  test('the A-Z strip only enables letters present in the filtered list', async ({ page }) => {
+    await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    // All: A, B and C are reachable
+    for (const letter of ['A', 'B', 'C']) {
+      await expect(page.locator(`.index-alpha-letter[data-letter="${letter}"]`)).toBeEnabled();
+    }
+
+    await selectFilter(page, 'mains');
+    await expect(page.locator('.index-alpha-letter[data-letter="A"]')).toBeDisabled();
+    await expect(page.locator('.index-alpha-letter[data-letter="B"]')).toBeEnabled();
+    await expect(page.locator('.index-alpha-letter[data-letter="C"]')).toBeEnabled();
+
+    await selectFilter(page, 'sweets');
+    await expect(page.locator('.index-alpha-letter[data-letter="A"]')).toBeEnabled();
+    await expect(page.locator('.index-alpha-letter[data-letter="B"]')).toBeDisabled();
+    await expect(page.locator('.index-alpha-letter[data-letter="C"]')).toBeDisabled();
+  });
+
+  test('a filter that matches nothing shows a message, a dead strip and a zero footer', async ({ page }) => {
+    const suffix = Date.now().toString();
+    await createRecipe(page, { title: `Apple Crumble ${suffix}`, ingredients: [], steps: [], tags: ['dessert'] });
+    await openBook(page);
+
+    await selectFilter(page, 'mains');
+
+    await expect(page.locator('.index-empty')).toHaveText('No mains yet. Ask me to tag a recipe as a main course.');
+    await expect(page.locator('.index-recipe-item')).toHaveCount(0);
+    await expect(page.locator('.index-footer')).toHaveText('0 mains');
+
+    // Every letter is disabled, none is left clickable
+    await expect(page.locator('.index-alpha-letter')).toHaveCount(26);
+    await expect(page.locator('.index-alpha-letter:not([disabled])')).toHaveCount(0);
+
+    // The title survives, so the reader still knows where they are
+    await expect(page.locator('.index-title')).toBeVisible();
+  });
+
+  test('page numbers stay the same on every tab', async ({ page }) => {
+    const { apple, beef, chicken } = await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    await expect(entry(page, apple).locator('.index-page-number')).toHaveText('p. 3');
+    await expect(entry(page, beef).locator('.index-page-number')).toHaveText('p. 5');
+    await expect(entry(page, chicken).locator('.index-page-number')).toHaveText('p. 7');
+
+    // Beef and Chicken are 2nd and 3rd in the FULL list, not 1st and 2nd of the filter
+    await selectFilter(page, 'mains');
+    await expect(entry(page, beef).locator('.index-page-number')).toHaveText('p. 5');
+    await expect(entry(page, beef)).toHaveAttribute('data-page', '5');
+    await expect(entry(page, chicken).locator('.index-page-number')).toHaveText('p. 7');
+
+    await selectFilter(page, 'sweets');
+    await expect(entry(page, apple).locator('.index-page-number')).toHaveText('p. 3');
+  });
+
+  test('the forward arrow ignores the filter and opens the first recipe of the full list', async ({ page }) => {
+    const suffix = Date.now().toString();
+    await seedTagged(page, suffix);
+    await openBook(page);
+
+    await selectFilter(page, 'mains');
+    await expect(page.locator('.index-recipe-item')).toHaveCount(2);
+
+    // Apple Crumble is a dessert and not on this tab, but it is still page 3
+    await page.locator(isPhone(page) ? '#mobile-edge-next' : '#page-next').click();
+    await expect(page.locator('.recipe-title')).toContainText(`Apple Crumble ${suffix}`);
+  });
+
+  test('the filter survives a reload but not a fresh browser session', async ({ page, browser, baseURL }) => {
+    await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    await selectFilter(page, 'sweets');
+    expect(await page.evaluate(() => sessionStorage.getItem('rv-contents-filter'))).toBe('dessert');
+
+    await openBook(page);
+    await expect(page.locator('.contents-tab-sweets')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.contents-tab-sweets')).toHaveClass(/is-active/);
+    await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.index-recipe-item')).toHaveCount(1);
+
+    // A new context is a new session: the book opens on All again
+    const context = await browser.newContext({ baseURL });
+    const fresh = await context.newPage();
+    await authenticate(fresh);
+    await expect(fresh.locator('.index-title')).toBeVisible();
+    await expect(fresh.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(fresh.locator('.index-recipe-item')).toHaveCount(3);
+    await context.close();
+  });
+
+  test('an unknown stored filter falls back to All', async ({ page }) => {
+    await seedTagged(page, Date.now().toString());
+    await page.evaluate(() => sessionStorage.setItem('rv-contents-filter', 'puddings'));
+    await openBook(page);
+
+    await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.index-recipe-item')).toHaveCount(3);
+  });
+
+  test('the filter still applies while a recipe is open', async ({ page }) => {
+    // The contents only stay on the left page beside a recipe above the phone breakpoint
+    test.skip(isPhone(page), 'the phone shows one page at a time, so the contents are replaced');
+
+    const { apple, beef } = await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    await entry(page, beef).click();
+    await expect(page.locator('.recipe-title')).toContainText('Beef Stew');
+
+    await selectFilter(page, 'mains');
+    await expect(page.locator('#page-left-content .index-recipe-item')).toHaveCount(2);
+    await expect(entry(page, apple)).toHaveCount(0);
+    await expect(page.locator('.index-recipe-item.current')).toHaveAttribute('data-recipe-id', beef);
+
+    // The open recipe is not in this filter, so no row is highlighted
+    await selectFilter(page, 'sweets');
+    await expect(page.locator('#page-left-content .index-recipe-item')).toHaveCount(1);
+    await expect(page.locator('.index-recipe-item.current')).toHaveCount(0);
+  });
+
+  test('the phone renders the filters as a chip row under the contents title', async ({ page }) => {
+    test.skip(!isPhone(page), 'the chip row only replaces the edge tabs at 600px and below');
+
+    await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    const all = (await page.locator('.contents-tab-all').boundingBox())!;
+    const mains = (await page.locator('.contents-tab-mains').boundingBox())!;
+    const title = (await page.locator('.index-title').boundingBox())!;
+    const strip = (await page.locator('.index-alphabet-nav').boundingBox())!;
+
+    // 44px tap targets, laid out as one horizontal row
+    expect(all.height).toBeGreaterThanOrEqual(44);
+    expect(mains.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(mains.y - all.y)).toBeLessThan(2);
+    expect(mains.x).toBeGreaterThan(all.x);
+
+    // Directly under the title, above the rest of the contents
+    expect(all.y).toBeGreaterThanOrEqual(title.y + title.height - 1);
+    expect(all.y).toBeLessThan(strip.y);
+  });
+
+  test('body[data-feature-meals] reveals the Meals tab, which has nothing to list', async ({ page }) => {
+    await seedTagged(page, Date.now().toString());
+    await openBook(page);
+
+    await expect(page.locator('.contents-tab-meals')).toBeHidden();
+    await page.evaluate(() => { document.body.dataset.featureMeals = ''; });
+    await expect(page.locator('.contents-tab-meals')).toBeVisible();
+
+    // It sits after Sweets in the strip
+    const order = await page.locator('.contents-tabs').evaluate(el =>
+      Array.from(el.querySelectorAll('.contents-tab')).map(b => (b as HTMLElement).dataset.filter)
+    );
+    expect(order).toEqual(['all', 'main', 'dessert', 'meals']);
+
+    await selectFilter(page, 'meals');
+    await expect(page.locator('.index-empty')).toHaveText('No meal plans yet');
+    await expect(page.locator('.index-footer')).toHaveText('0 meal plans');
+  });
+});
+
+test.describe('Recipe tag chips', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  test('the meta line shows at most three tags after the difficulty dots', async ({ page }) => {
+    const suffix = Date.now().toString();
+    const recipeId = await createRecipe(page, {
+      title: `Tagged Recipe ${suffix}`,
+      ingredients: [],
+      steps: [],
+      cook_time_minutes: 20,
+      difficulty: 2,
+      tags: ['main', 'thai', 'vegetarian', 'quick'],
+    });
+
+    await page.evaluate((id) => {
+      // @ts-ignore - fetchAndDisplayRecipe is defined in app.js
+      fetchAndDisplayRecipe(id);
+    }, recipeId);
+    await expect(page.locator('.recipe-title')).toContainText('Tagged Recipe');
+
+    const chips = page.locator('.recipe-meta-line .recipe-tag');
+    await expect(chips).toHaveCount(3);
+    await expect(chips.nth(0)).toHaveText('main');
+
+    // The chips follow the difficulty dots on the same line
+    const after = await page.locator('.recipe-meta-line').evaluate(el => {
+      const dots = el.querySelector('.meta-difficulty');
+      const tags = el.querySelector('.recipe-tags');
+      return dots && tags ? dots.compareDocumentPosition(tags) : 0;
+    });
+    expect(after & 4).toBe(4); // Node.DOCUMENT_POSITION_FOLLOWING
+  });
+});

@@ -88,15 +88,21 @@ The provider construction in `auto_assign_difficulty` (mock vs `config.difficult
 - `renderIndex(recipes, { currentRecipeId, singleColumn, filter })` where `filter` is `'all' | 'main' | 'dessert' | 'meals'`. The renderer filters `recipes` by `tags.includes(filter)` for `main` / `dessert`, then builds the A–Z strip, groups, footer and page numbers from the filtered list. Page numbers still come from position in the **full** list so a recipe keeps its page number in every tab.
 - Tab markup is static in `static/chat.html` inside `#page-left`, as a sibling of `#page-left-content` (so innerHTML rewrites never destroy it):
   ```html
-  <nav class="edge-tabs" aria-label="Contents filter">
-    <button class="edge-tab edge-tab-all is-active" data-filter="all" aria-pressed="true">All</button>
-    <button class="edge-tab edge-tab-mains" data-filter="main" aria-pressed="false">Mains</button>
-    <button class="edge-tab edge-tab-sweets" data-filter="dessert" aria-pressed="false">Sweets</button>
-    <button class="edge-tab edge-tab-meals" data-filter="meals" aria-pressed="false" hidden>Meals</button>
+  <nav class="contents-tabs" aria-label="Contents filter">
+    <button type="button" class="contents-tab contents-tab-all is-active" data-filter="all" aria-pressed="true">All</button>
+    <button type="button" class="contents-tab contents-tab-mains" data-filter="main" aria-pressed="false">Mains</button>
+    <button type="button" class="contents-tab contents-tab-sweets" data-filter="dessert" aria-pressed="false">Sweets</button>
+    <button type="button" class="contents-tab contents-tab-meals" data-filter="meals" aria-pressed="false" hidden>Meals</button>
   </nav>
   ```
+  **Class names**: `contents-tabs` / `contents-tab`, *not* `edge-tabs` / `edge-tab`. Those latter
+  names are already taken by the right page's Ingredients/Method/Notes section tabs
+  (`static/chat.html`, `static/styles.css`, and `static/page-tabs.js`, which delegates on
+  `[role="tab"][data-tab]`). The filter buttons therefore also carry no `role="tab"` and no
+  `data-tab`, so the section-tab handler never sees them.
+
   Colours: All `--color-leather` with cream text; Mains `--color-border` (`#c9a86c`) with `--color-ink-dark` text (README contrast note); Sweets `--color-accent-brown` with cream text; Meals `--color-ink-medium` with cream text. Tabs sit on the outer (left) edge of the left page, rotated 90°, and are visible whenever the left page shows the contents (index view, and recipe view after change 4). Below 600px the same buttons render as a horizontal chip row directly under the "~ Contents ~" title, 44px tall targets.
-- The Meals tab is only shown when `document.body.dataset.featureMeals` is set (CSS: `.edge-tab-meals { display: none } body[data-feature-meals] .edge-tab-meals { display: inline-flex }`, plus the `hidden` attribute removed by JS on the same condition). Nothing in this change sets the attribute; RV-107 will. If it is somehow active, selecting Meals renders the empty-filter message "No meal plans yet" because there is no meal-plan list to render.
+- The Meals tab is only shown when `document.body.dataset.featureMeals` is set (CSS: `.contents-tab-meals { display: none } body[data-feature-meals] .contents-tab-meals { display: inline-flex }`, plus the `hidden` attribute removed by JS on the same condition). Nothing in this change sets the attribute; RV-107 will. If it is somehow active, selecting Meals renders the empty-filter message "No meal plans yet" because there is no meal-plan list to render.
 - Filter state lives in shared state (`contentsFilter`) and is mirrored to `sessionStorage['rv-contents-filter']`; on load the stored value is used if it is one of the known filters, otherwise `all`. `sessionStorage` rather than `localStorage` so a new browser session starts on All.
 - Empty filter: `<div class="index-empty">No mains yet. Ask me to tag a recipe as a main course.</div>` (Sweets: "No sweets yet…"), with the A–Z strip fully disabled and the footer reading "0 mains" / "0 sweets".
 - Footer wording by filter: "N recipes" (All), "N mains", "N sweets", "N meal plans"; singular forms "1 main", "1 sweet", "1 meal plan".
