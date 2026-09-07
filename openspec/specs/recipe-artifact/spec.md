@@ -42,38 +42,37 @@ The system SHALL emit a lightweight SSE event when a recipe should be displayed.
 
 ### Requirement: Artifact Panel UI
 
-The system SHALL display a side panel for recipe artifacts.
+The system SHALL display recipe artifacts on the right page of the recipe book.
 
 #### Scenario: Panel appears with loading state
 - **WHEN** the frontend receives a `recipe_artifact` event
-- **THEN** the recipe panel becomes visible immediately
-- **AND** shows a loading skeleton while fetching recipe data
+- **THEN** the right page shows a loading skeleton immediately while fetching recipe data
 
 #### Scenario: Panel populated after fetch
 - **WHEN** the frontend successfully fetches recipe data from `/api/recipes/:id`
-- **THEN** the loading skeleton is replaced with recipe content
-- **AND** the recipe displays title, ingredients, and steps
+- **THEN** the loading skeleton is replaced with recipe content on the right page
+- **AND** the recipe displays title, meta line, ingredients, and steps
+- **AND** on viewports wider than 600px the left page shows the contents with that recipe's entry highlighted
 
 #### Scenario: Panel handles fetch error
 - **WHEN** the frontend receives a 404 from `/api/recipes/:id`
-- **THEN** the panel shows a "Recipe not found" message
-- **AND** does not crash or hide the panel
+- **THEN** the right page shows a "Recipe not found" message
+- **AND** does not crash or hide the book
 
 #### Scenario: Panel layout on desktop
-- **WHEN** viewport width is >= 768px
-- **THEN** chat occupies the left 60% of the screen
-- **AND** recipe panel occupies the right 40%
-- **AND** both are visible simultaneously
+- **WHEN** viewport width is greater than 600px
+- **THEN** the recipe occupies the right page beside a margin column, the contents occupy the left page, and the note input sits at the foot of the right page
+- **AND** all are visible simultaneously
 
 #### Scenario: Panel layout on mobile
-- **WHEN** viewport width is < 768px
-- **THEN** recipe panel slides over the chat
-- **AND** a close button allows returning to chat view
+- **WHEN** viewport width is 600px or less
+- **THEN** the recipe is the single visible page with Ingredients / Method / Notes tabs
+- **AND** there is no close button; the note input sits beneath the book
 
 #### Scenario: Panel hidden by default
 - **WHEN** no recipe has been displayed in the session
-- **THEN** the recipe panel is not visible
-- **AND** chat uses full width
+- **THEN** the book shows the contents page
+- **AND** the note input is still available
 
 ### Requirement: Recipe replaces previous
 The system SHALL replace any previously displayed content — whether a recipe or a meal plan — when a new artifact event is received (either `recipe_artifact` or `meal_artifact`).
@@ -91,24 +90,24 @@ The system SHALL replace any previously displayed content — whether a recipe o
 - **THEN** the previous meal plan content SHALL be fully replaced with the new meal plan
 
 ### Requirement: Meal Artifact Panel
-The system SHALL display a meal plan in the artifact panel when a `meal_artifact` SSE event is received, using the same `#page-right-content` container as the recipe artifact panel. Meal plan content SHALL fully replace any previously displayed content.
+The system SHALL display a meal plan on the right page of the recipe book when a `meal_artifact` SSE event is received, using the `#page-right-content` container on every viewport. Meal plan content SHALL fully replace any previously displayed content of that page.
 
 #### Scenario: Frontend handles meal_artifact SSE event
 - **WHEN** the frontend receives a `meal_artifact` SSE event
 - **THEN** it SHALL call the meal plan renderer with the event payload
-- **AND** the panel SHALL become visible immediately with the meal plan content
+- **AND** the right page SHALL show the meal plan immediately
 - **AND** no additional API fetch is required (all data is in the SSE payload)
 
 #### Scenario: Meal plan panel layout on desktop
-- **WHEN** a meal plan is displayed and viewport width is >= 768px
-- **THEN** the meal plan panel SHALL occupy the right 40% of the screen
-- **AND** chat SHALL occupy the left 60%
-- **AND** both SHALL be visible simultaneously
+- **WHEN** a meal plan is displayed and viewport width is greater than 600px
+- **THEN** the meal plan SHALL occupy the right page beside the margin column
+- **AND** the left page SHALL keep whatever it showed (contents)
+- **AND** the edge tabs SHALL be hidden
 
 #### Scenario: Meal plan panel layout on mobile
-- **WHEN** a meal plan is displayed and viewport width is < 768px
-- **THEN** the meal plan panel SHALL slide over the chat
-- **AND** a close button SHALL allow returning to chat view
+- **WHEN** a meal plan is displayed and viewport width is 600px or less
+- **THEN** the meal plan SHALL be the single visible page
+- **AND** the paper tabs SHALL be hidden and no close button is shown; tapping the book header returns to the contents
 
 ### Requirement: Post-Creation Display
 

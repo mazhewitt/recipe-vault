@@ -2,23 +2,33 @@
 
 ## Purpose
 
-This capability defines the family recipe book user interface design system - a warm, handwritten aesthetic that transforms the functional chat interface into an inviting kitchen companion. The interface presents a notepad for chat interaction alongside a leather-bound recipe book for displaying recipes, all on a wood-textured background.
+This capability defines the family recipe book user interface design system - a warm, handwritten aesthetic that transforms the functional chat interface into an inviting kitchen companion. The interface presents a leather-bound recipe book that fills the width, with a "note to the cook" input attached to it, all on a wood-textured background.
 
 ## Requirements
 
-### Requirement: Main layout displays notepad and recipe book side by side
+### Requirement: Main layout displays the recipe book alone
 
-The interface SHALL display a notepad component on the left and a recipe book component on the right, separated by a 40px gap, on a dark wood-textured background.
+The interface SHALL display the recipe book alone, filling the available width, on a dark wood-textured background, with the chat note input attached to the book.
 
 #### Scenario: Default desktop layout
 
-- **WHEN** the user loads the chat page on a viewport wider than 1000px
-- **THEN** the notepad appears on the left (380px fixed width) and the recipe book appears on the right (flexible width, min 700px)
+- **WHEN** the user loads the chat page on a viewport wider than 1024px
+- **THEN** the recipe book is centred and fills the width (up to its maximum), with no notepad panel
+- **AND** the note input sits at the foot of the right page
 
 #### Scenario: Narrow viewport stacks components
 
-- **WHEN** the user loads the chat page on a viewport narrower than 1000px
-- **THEN** the notepad appears above the recipe book, both at full width
+- **WHEN** the user loads the chat page on a viewport 1024px wide or narrower but wider than 600px
+- **THEN** the book keeps its two-page spread at full width
+- **AND** the margin column collapses so notes render beneath the right page content
+- **AND** the note input remains at the foot of the right page
+
+#### Scenario: Phone layout
+
+- **WHEN** the user loads the chat page on a viewport 600px wide or narrower
+- **THEN** a single cream page inside a thin leather frame fills the width, with the book label top-left and the timer pill top-right
+- **AND** the note input is a cream bar beneath the book with a red send button
+- **AND** there is no Book/Chat tab bar
 
 ### Requirement: Background displays wood table texture
 
@@ -29,32 +39,9 @@ The page background SHALL simulate a dark wooden table surface using gradients a
 - **WHEN** the chat page loads
 - **THEN** the background displays a dark brown wood grain pattern with subtle vertical grain lines
 
-### Requirement: Notepad component displays chat messages on aged paper
-
-The notepad SHALL render chat messages on an aged paper background with a header, scrollable content area, and text input.
-
-#### Scenario: Notepad structure renders correctly
-
-- **WHEN** the chat page loads
-- **THEN** the notepad displays with a cream-to-tan gradient background, a header reading "Recipe Development & Search", and a text input area at the bottom
-
-#### Scenario: Chat messages display with speaker labels
-
-- **WHEN** a user sends a message or receives an AI response
-- **THEN** the message appears in the notepad content area with bold "User:" or "AI:" prefix in the Kalam handwritten font
-
-### Requirement: Notepad content scrolls independently
-
-The notepad content area SHALL scroll independently when messages exceed the visible area, with styled scrollbars matching the paper aesthetic.
-
-#### Scenario: Notepad scrolls when content overflows
-
-- **WHEN** chat messages exceed the notepad's visible height
-- **THEN** the content area becomes scrollable while the header and input remain fixed
-
 ### Requirement: Recipe book displays as open two-page spread with leather cover
 
-The recipe book SHALL render as an open book with a red leather cover frame containing two cream-colored pages side by side.
+The recipe book SHALL render as an open book with a red leather cover frame containing two cream-colored pages side by side; while a recipe is open the left page shows the contents and the right page shows the recipe.
 
 #### Scenario: Book structure renders correctly
 
@@ -63,13 +50,22 @@ The recipe book SHALL render as an open book with a red leather cover frame cont
 
 #### Scenario: Left page shows ingredients
 
-- **WHEN** a recipe is displayed
-- **THEN** the left page shows the page number, recipe title, the meta line, and the ingredients list with each quantity in its own span
+- **WHEN** a recipe is displayed on a viewport wider than 600px
+- **THEN** the left page shows the contents in a single column (title, A–Z strip, letter groups) with the current recipe's entry marked `current`
+- **AND** ingredients are not on the left page
 
 #### Scenario: Right page shows preparation steps
 
-- **WHEN** a recipe is displayed
-- **THEN** the right page shows the page number, a "method:" header, and numbered steps where each step number is rendered in Kalam in the leather red and the step text in the serif
+- **WHEN** a recipe is displayed on a viewport wider than 600px
+- **THEN** the right page shows the recipe title with a 96×76 polaroid photo (or none), the meta line, an "ingredients:" header and list, a "method:" header and numbered steps where each step number is rendered in Kalam in the leather red and the step text in the serif
+- **AND** the margin column sits to the right of the recipe body
+- **AND** each ingredient line may pack up to three short items separated by " · " while every item keeps its own `.ingredient-item` span
+
+#### Scenario: Phone shows one page
+
+- **WHEN** a recipe is displayed on a viewport 600px wide or narrower
+- **THEN** only the right page is visible, showing the title, polaroid, meta line and the active tab's content one item per line at 16px
+- **AND** the footer reads "‹ previous recipe", the page number and "next recipe ›"
 
 ### Requirement: Recipe book pages scroll independently
 
@@ -77,13 +73,14 @@ Each page of the recipe book SHALL scroll independently when content exceeds the
 
 #### Scenario: Left page scrolls for long ingredient lists
 
-- **WHEN** the ingredients list exceeds the left page's visible height
+- **WHEN** the contents on the left page exceed the page's visible height
 - **THEN** the left page content becomes scrollable while the right page remains independently scrollable
 
 #### Scenario: Right page scrolls for long preparation steps
 
-- **WHEN** the preparation steps exceed the right page's visible height
+- **WHEN** the recipe on the right page exceeds the page's visible height
 - **THEN** the right page content becomes scrollable while the left page remains independently scrollable
+- **AND** the note input stays at the foot of the page and does not scroll with the content
 
 ### Requirement: Recipe metadata displays with icons
 
@@ -162,13 +159,13 @@ The timer widget SHALL render as a cream pill clipped to the top-right edge of t
 
 ### Requirement: Typography uses Kalam handwritten font
 
-Text in the notepad and recipe book SHALL use two font families with appropriate fallbacks: Kalam (handwritten) for titles, section headers, letter headers, labels, step numbers, metadata and chat messages; Libre Baskerville (serif) for ingredient lines, method step text and contents entries.
+Text in the recipe book and note input SHALL use two font families with appropriate fallbacks: Kalam (handwritten) for titles, section headers, letter headers, labels, step numbers, metadata, tabs, notes and the note input; Libre Baskerville (serif) for ingredient lines, method step text and contents entries.
 
 #### Scenario: Font loads and applies
 
 - **WHEN** the chat page loads
 - **THEN** the page requests Kalam (300/400/700) and Libre Baskerville (400/700, italic 400) from Google Fonts
-- **AND** headings, labels and metadata render in Kalam (or cursive fallback)
+- **AND** headings, labels, metadata, tabs, notes and the note input render in Kalam (or cursive fallback)
 - **AND** the ingredients list, method steps and contents entries render in Libre Baskerville (or Georgia / serif fallback)
 
 #### Scenario: Body text stays readable on paper
@@ -203,7 +200,7 @@ UI state changes SHALL use CSS transitions for smooth, pleasant animations, and 
 
 #### Scenario: New messages animate in
 
-- **WHEN** a new chat message appears in the notepad or a new note appears in the page margin
+- **WHEN** a new note appears in the page margin or the notes thread
 - **THEN** it fades in with a subtle upward slide over 200-300ms
 
 #### Scenario: Hover states transition smoothly
@@ -287,17 +284,19 @@ The recipe photo display SHALL not include a replace-image control in the recipe
 
 ### Requirement: Alphabet index navigation works across responsive layouts
 
-The recipe book index alphabet navigation SHALL be usable in both wide side-by-side and narrow stacked layouts.
+The recipe book contents alphabet navigation SHALL be usable on the contents page and in the contents column beside an open recipe.
 
 #### Scenario: Wide layout alphabet navigation
-- **WHEN** the viewport is wider than the responsive stack breakpoint
-- **THEN** the alphabet navigation is visible at the top of the index
-- **AND** selecting a letter jumps to the matching index section
+
+- **WHEN** the viewport is wider than 600px
+- **THEN** the alphabet navigation is visible beneath the contents title, on the contents page and on the left page while a recipe is open
+- **AND** selecting a letter jumps to the matching section within that page
 
 #### Scenario: Narrow layout alphabet navigation
-- **WHEN** the viewport is at or below the responsive stack breakpoint
-- **THEN** the alphabet navigation remains visible and clickable without overlapping index content
-- **AND** selecting a letter jumps to the matching index section
+
+- **WHEN** the viewport is 600px wide or narrower and the contents page is shown
+- **THEN** the alphabet navigation remains visible and clickable without overlapping contents entries
+- **AND** selecting a letter jumps to the matching section
 
 ### Requirement: Alphabet controls retain readability and affordance
 
@@ -311,3 +310,93 @@ Alphabet controls SHALL preserve readable typography and clear interactive affor
 #### Scenario: Compact styling remains operable
 - **WHEN** the alphabet controls use minimal extra padding
 - **THEN** users can still reliably select letters in desktop and touch-oriented layouts
+
+### Requirement: Note input lives in the book
+
+The chat input SHALL be a single "note to the cook" control attached to the book, replacing the notepad input.
+
+#### Scenario: Desktop note input
+
+- **WHEN** the viewport is wider than 600px
+- **THEN** a `.note-input` with a pencil icon, a textarea with placeholder "Write a note to the cook…", a paperclip attach button and the current page number sits at the foot of the right page
+
+#### Scenario: Phone note input
+
+- **WHEN** the viewport is 600px wide or narrower
+- **THEN** the `.note-input` is a cream bar beneath the book with a red send button, and every control has at least a 44px touch target
+
+#### Scenario: Existing input ids are preserved
+
+- **WHEN** the chat page loads
+- **THEN** the elements `#message-input`, `#clipboard-button`, `#image-upload`, `#image-attachment` and `#loading` exist inside `.note-input`
+- **AND** image paste, image upload and the loading indicator work as before
+
+#### Scenario: Page number follows the open page
+
+- **WHEN** a recipe at position i in the alphabetical list is open
+- **THEN** the note input shows "p. N" where N = 2 * i + 3
+- **AND** on the contents page it shows "p. 1"
+
+#### Scenario: Sending a note
+
+- **WHEN** the user presses Enter (without Shift) or taps the send button
+- **THEN** the note is sent and the textarea is cleared
+- **AND** error toasts for oversized images appear inside `.note-input`
+
+### Requirement: Phone page tabs
+
+On phones the recipe page SHALL offer three paper tabs on its top edge — Ingredients, Method, Notes — switched by tap only.
+
+#### Scenario: Tabs render on a recipe
+
+- **WHEN** a recipe is displayed on a viewport 600px wide or narrower
+- **THEN** `.page-tabs` shows three tabs; the active tab is cream and joined to the page, inactive tabs are tan and brown
+- **AND** the Ingredients tab is active when a recipe is opened
+
+#### Scenario: Tapping a tab switches content
+
+- **WHEN** the user taps Method
+- **THEN** the page crossfades over 200ms to show the method steps and hides the ingredients
+- **AND** the last three margin notes render beneath the visible content
+
+#### Scenario: Notes tab shows the full thread
+
+- **WHEN** the user taps Notes
+- **THEN** the page shows `.notes-thread` with every entry of the session's chat thread in order (user notes and replies)
+
+#### Scenario: Tabs are tap only
+
+- **WHEN** the user swipes horizontally on the recipe page
+- **THEN** the swipe navigates between recipes as before
+- **AND** the active tab does not change
+
+#### Scenario: Tabs hidden off the recipe page
+
+- **WHEN** the contents page or a meal plan is displayed
+- **THEN** `.page-tabs` is not shown
+
+### Requirement: Right page edge tabs
+
+On viewports wider than 600px the right page SHALL carry edge tabs Ingredients, Method and Notes on its outer edge.
+
+#### Scenario: Edge tabs render on a recipe
+
+- **WHEN** a recipe is displayed on a viewport wider than 600px
+- **THEN** `.edge-tabs` shows three coloured tabs on the right outer edge of the right page
+
+#### Scenario: Ingredients and Method scroll the page
+
+- **WHEN** the user clicks Ingredients or Method
+- **THEN** the right page scrolls so that section's header is at the top of the visible area
+- **AND** the clicked tab is marked active
+
+#### Scenario: Notes shows the thread
+
+- **WHEN** the user clicks Notes
+- **THEN** the right page shows `.notes-thread` in place of the recipe body until Ingredients or Method is clicked
+- **AND** the margin column and note input remain in place
+
+#### Scenario: Edge tabs hidden off the recipe page
+
+- **WHEN** the contents page or a meal plan is displayed
+- **THEN** `.edge-tabs` is not shown

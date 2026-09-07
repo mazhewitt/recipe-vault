@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change meal-planning-phase-1. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Meal Plan Document Type
 The system SHALL support a meal plan as a first-class document type rendered in the recipe book panel. A meal plan consists of a title, an optional guest count, and an ordered list of recipes each with an assigned role.
 
@@ -47,18 +49,18 @@ The system SHALL enable users to assemble a meal plan through natural language c
 - **AND** the guest count SHALL be displayed in the meal plan panel
 
 ### Requirement: Meal Plan Panel Rendering
-The system SHALL render a meal plan panel in the right-hand recipe book area when a `meal_artifact` SSE event is received.
+The system SHALL render a meal plan on the right page of the recipe book when a `meal_artifact` SSE event is received, styled in the book's palette.
 
 #### Scenario: Meal plan panel displays required fields
 - **WHEN** the meal plan panel renders
-- **THEN** it SHALL display the meal title
+- **THEN** it SHALL display the meal title in the handwritten font
 - **AND** the guest count if present (e.g. "For 4 people")
-- **AND** a list of recipes, each showing the recipe title and its role (centrepiece / side / vegetarian alternative)
+- **AND** a list of recipes, each showing the recipe title and its role (centrepiece / side / vegetarian alternative) as a coloured role badge
 
 #### Scenario: Clicking a recipe navigates to recipe view
 - **WHEN** the user clicks a recipe title in the meal plan panel
-- **THEN** the full recipe view for that recipe SHALL replace the meal plan panel in the right-hand area
-- **AND** clicking does not navigate away from the chat
+- **THEN** the full recipe view for that recipe SHALL replace the meal plan on the right page
+- **AND** the note input and margin remain in place
 
 #### Scenario: Panel action buttons present
 - **WHEN** the meal plan panel is visible
@@ -67,5 +69,14 @@ The system SHALL render a meal plan panel in the right-hand recipe book area whe
 
 #### Scenario: Meal plan replaces previous panel content
 - **WHEN** a new meal_artifact event is received
-- **THEN** the panel content SHALL be fully replaced with the new meal plan
+- **THEN** the right page content SHALL be fully replaced with the new meal plan
 - **AND** any previously displayed recipe or meal plan is no longer shown
+
+#### Scenario: Meal plan renders in one container on every viewport
+- **WHEN** a meal plan is rendered on any viewport width
+- **THEN** it is written into `#page-right-content`
+- **AND** the view mode is set to `meal` so the right page is visible and the recipe tabs are hidden
+
+#### Scenario: Meal plan panel is styled
+- **WHEN** the meal plan panel is visible
+- **THEN** `.meal-plan-panel`, `.meal-plan-title`, `.meal-plan-guest-badge`, `.meal-plan-recipe-row`, `.meal-plan-role-badge` and `.meal-plan-recipe-link` have stylesheet rules using the book's tokens (leather red for centrepiece, border tan with dark text for side, accent brown for vegetarian alternative)
