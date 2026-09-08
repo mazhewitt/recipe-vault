@@ -8,11 +8,11 @@ The Recipe Domain capability provides the core data structures and operations fo
 
 ### Requirement: Recipe Structure
 
-The system SHALL store recipes with a title, optional description, timing information, serving size, and optional difficulty rating.
+The system SHALL store recipes with a title, optional description, timing information, serving size, optional difficulty rating, and a set of tags.
 
 #### Scenario: Complete recipe creation
 - **WHEN** a user wants to add a new recipe
-- **THEN** they provide title, description, prep time, cook time, servings, and optional difficulty
+- **THEN** they provide title, description, prep time, cook time, servings, optional difficulty, and optional tags
 - **AND** the recipe is stored with all provided information
 - **AND** a unique identifier is assigned
 
@@ -22,6 +22,7 @@ The system SHALL store recipes with a title, optional description, timing inform
 - **AND** the recipe is stored with the title
 - **AND** other fields default to null/empty
 - **AND** difficulty is null (will be auto-assigned)
+- **AND** tags are empty (will be auto-assigned)
 
 #### Scenario: Create recipe with difficulty
 - **WHEN** a user creates a recipe and specifies difficulty (1-5)
@@ -32,6 +33,16 @@ The system SHALL store recipes with a title, optional description, timing inform
 - **WHEN** a user creates a recipe without specifying difficulty
 - **THEN** the recipe is stored with difficulty = NULL
 - **AND** AI assessment is triggered to assign difficulty
+
+#### Scenario: Create recipe with tags
+- **WHEN** a user creates a recipe and specifies one or more tags
+- **THEN** the tags are normalised and stored in `recipe_tags`
+- **AND** no AI tag assessment is triggered
+
+#### Scenario: Create recipe without tags
+- **WHEN** a user creates a recipe without tags
+- **THEN** the recipe is stored with no `recipe_tags` rows
+- **AND** AI tag assessment is triggered to assign tags
 
 ### Requirement: Ingredient Management
 
@@ -73,19 +84,21 @@ The system SHALL store recipe steps in order, with optional timing and temperatu
 
 ### Requirement: Recipe Retrieval
 
-The system SHALL provide methods to list all recipes and retrieve a single recipe with all its ingredients and steps, filtered by family membership.
+The system SHALL provide methods to list all recipes and retrieve a single recipe with all its ingredients, steps and tags, filtered by family membership.
 
 #### Scenario: List all recipes
 - GIVEN recipes exist in the database
 - WHEN the recipe list is requested by a user
 - THEN only recipes created by the user's family members are returned
 - AND results are ordered by title alphabetically
+- AND each recipe includes its `tags` array (empty when untagged)
 
 #### Scenario: List all recipes in god mode
 - GIVEN recipes exist in the database
 - WHEN the recipe list is requested in god mode (API key without X-User-Email)
 - THEN all recipes from all families are returned
 - AND results are ordered by title alphabetically
+- AND each recipe includes its `tags` array
 
 #### Scenario: Get recipe details in family
 - GIVEN a recipe exists with ingredients and steps
@@ -94,6 +107,7 @@ The system SHALL provide methods to list all recipes and retrieve a single recip
 - THEN the recipe is returned with all ingredients in order
 - AND all steps are included in order
 - AND timing and temperature data is included where present
+- AND the recipe's `tags` are included sorted alphabetically
 
 #### Scenario: Get recipe details outside family
 - GIVEN a recipe exists
@@ -112,16 +126,22 @@ The system SHALL provide methods to list all recipes and retrieve a single recip
 - WHEN that recipe is requested
 - THEN an appropriate not-found response is returned
 
+#### Scenario: Tags are loaded in one query for a list
+- GIVEN a list of recipes is being returned
+- WHEN their tags are loaded
+- THEN a single query joining `recipe_tags` and `tags` populates every recipe's `tags`
+- AND no per-recipe query is issued
+
 ### Requirement: Recipe Modification
 
-The system SHALL allow recipes to be updated and deleted, restricted to family members.
+The system SHALL allow recipes to be updated and deleted, restricted to family members, including replacing a recipe's tags.
 
 #### Scenario: Update recipe metadata in family
 - GIVEN an existing recipe created by a family member
 - WHEN the title, description, or timing is modified by another family member
 - THEN the changes are persisted
 - AND `updated_by` is set to the current user's email
-- AND other recipe data (ingredients, steps) remains unchanged
+- AND other recipe data (ingredients, steps, tags) remains unchanged
 
 #### Scenario: Update recipe metadata outside family
 - GIVEN an existing recipe created by a different family
@@ -161,12 +181,37 @@ The system SHALL allow recipes to be updated and deleted, restricted to family m
 - THEN a 404 Not Found response is returned
 - AND no changes are made
 
+#### Scenario: Replace tags in family
+- GIVEN an existing recipe with tags created by a family member
+- WHEN the update request includes a `tags` array from another family member
+- THEN links to tags not in the array are removed
+- AND links to new tags are created (creating `tags` rows as needed)
+- AND `updated_by` is set to the current user's email
+- AND ingredients and steps remain unchanged
+
+#### Scenario: Replace tags with an empty array
+- GIVEN an existing recipe with tags
+- WHEN the update request includes `tags: []`
+- THEN all of the recipe's tag links are removed
+
+#### Scenario: Update without tags field leaves tags unchanged
+- GIVEN an existing recipe with tags
+- WHEN the update request omits `tags`
+- THEN the recipe's tags are unchanged
+
+#### Scenario: Replace tags outside family
+- GIVEN an existing recipe created by a different family
+- WHEN a user attempts to replace its tags
+- THEN a 404 Not Found response is returned
+- AND no changes are made
+
 #### Scenario: Delete recipe in family
 - GIVEN an existing recipe created by a family member
 - WHEN the recipe is deleted by another family member
 - THEN the recipe is removed from the database
 - AND all associated ingredients are removed
 - AND all associated steps are removed
+- AND all associated `recipe_tags` rows are removed
 
 #### Scenario: Delete recipe outside family
 - GIVEN an existing recipe created by a different family
@@ -178,7 +223,7 @@ The system SHALL allow recipes to be updated and deleted, restricted to family m
 - GIVEN an existing recipe
 - WHEN the recipe is deleted in god mode
 - THEN the recipe is removed regardless of which family created it
-- AND all associated ingredients and steps are removed
+- AND all associated ingredients, steps and tag links are removed
 
 ### Requirement: Recipe Authorship Tracking
 
