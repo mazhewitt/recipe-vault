@@ -32,6 +32,10 @@ grep -rl "^Status: ready-for-agent" .scratch --include="*.md" | grep -v /archive
 - `e2e-breakpoint-guard-conventions/` — three e2e follow-ups: the guards that
   silently un-assert a test (`test.skip(isMobile, …)` and the bare `return`),
   two near-duplicate tablet tests, and `clearRecipes` living in three copies.
+- `js-unit-test-layer/` — the frontend has no unit-test tier, so pure helpers
+  (`escapeHtml`, `formatDuration`, the notes-scoping predicates) are asserted
+  through a release build and a real browser or not at all. Lists what would
+  pay, what should stay in Playwright, and the five decisions to make first.
 
 ## Waiting on a human decision (`ready-for-human` / `needs-info`)
 
