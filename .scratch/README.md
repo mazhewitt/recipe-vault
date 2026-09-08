@@ -58,9 +58,8 @@ is closed.
 
 - `e2e-ipad-project-not-tablet/` — resolved 2026-09-08. The `ipad` project runs
   at a real 810x1080, the tablet tests execute there, and
-  `tests/e2e/tests/viewport-contract.spec.ts` fails if either drifts. The fix is
-  uncommitted at the time of archiving; add the commit hash to its `Resolved:`
-  line when it lands.
+  `tests/e2e/tests/viewport-contract.spec.ts` fails if either drifts. Landed in
+  e3b0e2c.
 
 ## Conventions
 

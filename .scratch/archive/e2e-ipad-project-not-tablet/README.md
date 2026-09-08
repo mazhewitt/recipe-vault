@@ -1,7 +1,6 @@
 # Playwright `ipad` project renders at 1280x720, not as a tablet
 
-Resolved: 2026-09-08 (uncommitted — working tree on branch `book-spread-modes`;
-add the commit hash here when it lands)
+Resolved: 2026-09-08 (e3b0e2c)
 Reported: 2026-09-06
 Reporter: Claude (observed while running the e2e suite for `journal-timer-cover-pill`; not caused by that change)
 Severity: medium — the tablet breakpoint (601–1024px) has no e2e coverage while the suite claims it does
@@ -61,8 +60,8 @@ Re-confirmed independently by the fix agent during the adversarial review of
 
 ### 2026-09-08 — all four steps of the proposed fix are done; needs a human to close it
 
-Verified by the agent that owned the e2e suite for this run. Work is in the
-working tree, uncommitted.
+Verified by the agent that owned the e2e suite for this run. Landed in e3b0e2c
+on `main`.
 
 - Step 1/2 — `tests/e2e/playwright.config.ts:24-42`. The device name was already
   corrected in 5c2155c; the project now additionally pins
@@ -101,9 +100,8 @@ consecutive full runs, 270 passed / 45 skipped / 0 failed each):
 Per-project totals: chromium 92 passed / 13 skipped, mobile-chrome 84 / 21,
 ipad 94 / 11.
 
-Left as `ready-for-human` rather than archived only because the fix is
-uncommitted: once it lands, mark `Resolved:` with the commit and move this
-directory to `.scratch/archive/`.
+Left as `ready-for-human` rather than archived only because the fix was
+uncommitted at the time. It landed in e3b0e2c; archived.
 
 ### 2026-09-08 — closed and archived
 

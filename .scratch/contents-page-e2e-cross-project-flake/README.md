@@ -88,7 +88,7 @@ stress test on the e2e port to confirm. Resurrection was actively refuted:
 (`migrations/20260906120000_add_tags.sql:11-13`), and all 270 DELETEs in the
 passing run returned `rows_affected=1`.
 
-### 2026-09-08 — fix applied (tests only, uncommitted)
+### 2026-09-08 — fix applied (tests only, e3b0e2c)
 
 - `clearRecipes` in all three spec files now retries up to three times, warns
   with the HTTP status when a DELETE fails, and finishes by asserting the book

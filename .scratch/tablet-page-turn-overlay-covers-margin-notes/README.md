@@ -67,7 +67,7 @@ The same thing happens without the transient whenever a tall recipe is followed
 by a short one: the margin's resting place is then permanently above the
 overlay's bottom edge for the whole animation.
 
-## Fix applied (uncommitted, in the working tree)
+## Fix applied (e3b0e2c)
 
 `static/page-transitions.js` — new `marginIsCollapsed()`, `lockContentHeight()`
 and `unlockContentHeight()`. The turn now pins `#page-right-content`'s
