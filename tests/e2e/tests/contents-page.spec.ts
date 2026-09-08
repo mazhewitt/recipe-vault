@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { authenticate, createRecipe, isPhone, openTab } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
@@ -6,14 +6,44 @@ const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 // Minimal 1x1 red JPEG used for a photo upload
 const RED_DOT_JPEG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAFA3PEY8ED5GWEZGPDpCakJEZkBQXl1UXmZicH19f3h9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3n/2wBDAFpGPDpCakJEZkBQXl1UXmZicH19f3h9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3l9f3n/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1FVWV1hZWmNkZWZnaGlqc3R1dnd4eXqGhf8hIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD5/oooorAP/9k=', 'base64');
 
-async function clearRecipes(page: any) {
-  const list = await page.request.get('/api/recipes', { headers: API_HEADERS });
-  for (const r of await list.json()) {
-    await page.request.delete(`/api/recipes/${r.id}`, { headers: API_HEADERS });
+/**
+ * Empties the book, and proves it emptied. Page numbers are derived from a
+ * recipe's position in the FULL alphabetical list (`2 * i + 3`, see
+ * recipe-book-index spec), so a book holding only this test's recipes is a
+ * precondition of the p. 3 / p. 5 / p. 7 assertions rather than a convenience —
+ * it cannot be scoped away, only guaranteed.
+ *
+ * The DELETE fails transiently often enough to matter: the e2e server runs a
+ * 5-connection pool over one shared-cache in-memory SQLite, and every
+ * POST /api/recipes spawns background auto-tag and auto-difficulty writes that
+ * hold transactions on the row for ~50ms afterwards. So retry, and assert the
+ * result. The previous version discarded every response, and one swallowed 500
+ * anywhere in the suite left a stray recipe for a later exact count to trip on.
+ *
+ * TODO: three spec files carry a copy of this; fold them into helpers.ts.
+ */
+async function clearRecipes(page: Page) {
+  let titles: string[] = [];
+  // Three sweeps, then one final read, so the last sweep is checked too.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const list = await page.request.get('/api/recipes', { headers: API_HEADERS });
+    expect(list.ok(), `GET /api/recipes -> ${list.status()}`).toBeTruthy();
+    const remaining: Array<{ id: string; title: string }> = await list.json();
+    titles = remaining.map(r => r.title);
+    if (remaining.length === 0) return;
+    if (attempt === 3) break;
+    for (const r of remaining) {
+      const res = await page.request.delete(`/api/recipes/${r.id}`, { headers: API_HEADERS });
+      // 404 means someone else already removed it, which is still "gone"
+      if (!res.ok() && res.status() !== 404) {
+        console.warn(`DELETE /api/recipes/${r.id} (${r.title}) -> ${res.status()} ${await res.text()}`);
+      }
+    }
   }
+  expect(titles, 'clearRecipes could not empty the book').toEqual([]);
 }
 
-async function openBook(page: any) {
+async function openBook(page: Page) {
   await page.reload();
   await expect(page.locator('.index-title')).toBeVisible();
 }
@@ -26,8 +56,9 @@ test.describe('Contents page (Journal 2.0)', () => {
 
   test('title, alphabet strip, page numbers and footer render', async ({ page }) => {
     const suffix = Date.now().toString();
+    const ids: string[] = [];
     for (const t of ['Apple Pie', 'Banana Bread', 'Carrot Cake']) {
-      await createRecipe(page, { title: `${t} ${suffix}`, ingredients: [], steps: [] });
+      ids.push(await createRecipe(page, { title: `${t} ${suffix}`, ingredients: [], steps: [] }));
     }
     await openBook(page);
 
@@ -43,17 +74,24 @@ test.describe('Contents page (Journal 2.0)', () => {
 
     // Page numbers follow the alphabetical list order: 3, 5, 7
     const items = page.locator('.index-recipe-item');
+    const mine = items.filter({ hasText: suffix });
+    // Two separate failures that a single count used to conflate: the app
+    // dropping one of mine, and the sweep leaving someone else's behind.
+    await expect(mine).toHaveCount(3);
     await expect(items).toHaveCount(3);
-    await expect(items.nth(0).locator('.index-page-number')).toHaveText('p. 3');
-    await expect(items.nth(1).locator('.index-page-number')).toHaveText('p. 5');
-    await expect(items.nth(2).locator('.index-page-number')).toHaveText('p. 7');
-    await expect(items.nth(2)).toHaveAttribute('data-page', '7');
+    // Address rows by id, so a failure names the recipe instead of an index
+    await expect(page.locator(`.index-recipe-item[data-recipe-id="${ids[0]}"] .index-page-number`)).toHaveText('p. 3');
+    await expect(page.locator(`.index-recipe-item[data-recipe-id="${ids[1]}"] .index-page-number`)).toHaveText('p. 5');
+    await expect(page.locator(`.index-recipe-item[data-recipe-id="${ids[2]}"] .index-page-number`)).toHaveText('p. 7');
+    await expect(page.locator(`.index-recipe-item[data-recipe-id="${ids[2]}"]`)).toHaveAttribute('data-page', '7');
 
     // Seeded recipes have no photo, so every polaroid is the empty variant
-    await expect(page.locator('.index-polaroid.empty')).toHaveCount(3);
-    await expect(page.locator('.index-polaroid img')).toHaveCount(0);
+    await expect(mine.locator('.index-polaroid.empty')).toHaveCount(3);
+    await expect(mine.locator('.index-polaroid img')).toHaveCount(0);
 
-    // Footer shows the count; desktop left page says "continued overleaf" when the right page has entries
+    // The footer counts the whole book, so these stay absolute — clearRecipes
+    // above is what licenses them: this book holds my three recipes and nothing else.
+    // Desktop left page says "continued overleaf" when the right page has entries
     const footers = page.locator('.index-footer');
     await expect(footers.first()).toContainText('3 recipes');
     if (page.viewportSize()!.width > 600) {
@@ -81,7 +119,8 @@ test.describe('Contents page (Journal 2.0)', () => {
 
   test('returning to contents highlights the last-viewed recipe', async ({ page }) => {
     const suffix = Date.now().toString();
-    // Target is the first recipe so a single "previous" step returns to the contents page
+    // Target is the first recipe in the book — which the beforeEach sweep makes
+    // true — so a single "previous" step returns to the contents page
     const target = await createRecipe(page, { title: `Apple Pie ${suffix}`, ingredients: [], steps: [] });
     await createRecipe(page, { title: `Banana Bread ${suffix}`, ingredients: [], steps: [] });
     await openBook(page);
@@ -108,6 +147,9 @@ test.describe('Contents page (Journal 2.0)', () => {
 
 test.describe('Recipe typography and meta line (Journal 2.0)', () => {
   test.beforeEach(async ({ page }) => {
+    // Sweep even though nothing here counts rows: without it these two tests
+    // leak Meta Recipe and Slow Recipe into whichever spec file runs next.
+    await clearRecipes(page);
     await authenticate(page);
   });
 

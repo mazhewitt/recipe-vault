@@ -3,11 +3,40 @@ import { authenticate, createRecipe, isPhone } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
+/**
+ * Empties the book, and proves it emptied. Page numbers and the footer counts
+ * below are properties of the FULL list, so a book holding only this test's
+ * recipes is a precondition rather than a convenience — it cannot be scoped
+ * away, only guaranteed.
+ *
+ * The DELETE fails transiently often enough to matter: the e2e server runs a
+ * 5-connection pool over one shared-cache in-memory SQLite, and every
+ * POST /api/recipes spawns background auto-tag and auto-difficulty writes that
+ * hold transactions on the row for ~50ms afterwards. So retry, and assert the
+ * result. The previous version discarded every response, and one swallowed 500
+ * anywhere in the suite left a stray recipe for a later exact count to trip on.
+ *
+ * TODO: three spec files carry a copy of this; fold them into helpers.ts.
+ */
 async function clearRecipes(page: Page) {
-  const list = await page.request.get('/api/recipes', { headers: API_HEADERS });
-  for (const r of await list.json()) {
-    await page.request.delete(`/api/recipes/${r.id}`, { headers: API_HEADERS });
+  let titles: string[] = [];
+  // Three sweeps, then one final read, so the last sweep is checked too.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const list = await page.request.get('/api/recipes', { headers: API_HEADERS });
+    expect(list.ok(), `GET /api/recipes -> ${list.status()}`).toBeTruthy();
+    const remaining: Array<{ id: string; title: string }> = await list.json();
+    titles = remaining.map(r => r.title);
+    if (remaining.length === 0) return;
+    if (attempt === 3) break;
+    for (const r of remaining) {
+      const res = await page.request.delete(`/api/recipes/${r.id}`, { headers: API_HEADERS });
+      // 404 means someone else already removed it, which is still "gone"
+      if (!res.ok() && res.status() !== 404) {
+        console.warn(`DELETE /api/recipes/${r.id} (${r.title}) -> ${res.status()} ${await res.text()}`);
+      }
+    }
   }
+  expect(titles, 'clearRecipes could not empty the book').toEqual([]);
 }
 
 async function openBook(page: Page) {
@@ -29,6 +58,15 @@ async function seedTagged(page: Page, suffix: string) {
 
 function entry(page: Page, recipeId: string) {
   return page.locator(`.index-recipe-item[data-recipe-id="${recipeId}"]`);
+}
+
+/**
+ * The rows this test seeded, matched by the unique suffix in their titles.
+ * Scoping by it keeps the counts exact without them also standing in for
+ * "nobody else left a recipe behind" — clearRecipes says that separately.
+ */
+function seeded(page: Page, suffix: string, within = '') {
+  return page.locator(`${within} .index-recipe-item`.trim()).filter({ hasText: suffix });
 }
 
 /** Selects a tab and waits for the strip to adopt it. */
@@ -77,26 +115,32 @@ test.describe('Contents filter tabs', () => {
   });
 
   test('Mains lists only main-tagged recipes and counts them in the footer', async ({ page }) => {
-    const { apple, beef, chicken } = await seedTagged(page, Date.now().toString());
+    const suffix = Date.now().toString();
+    const { apple, beef, chicken } = await seedTagged(page, suffix);
     await openBook(page);
 
     await selectFilter(page, 'mains');
     await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'false');
 
+    await expect(seeded(page, suffix)).toHaveCount(2);
     await expect(page.locator('.index-recipe-item')).toHaveCount(2);
     await expect(entry(page, beef)).toHaveCount(1);
     await expect(entry(page, chicken)).toHaveCount(1);
     await expect(entry(page, apple)).toHaveCount(0);
 
+    // The footer counts the whole book, so it stays absolute — clearRecipes is
+    // what licenses that here and in the footer assertions below.
     await expect(page.locator('.index-footer').first()).toContainText('2 mains');
   });
 
   test('Sweets lists only desserts, in the singular', async ({ page }) => {
-    const { apple, beef } = await seedTagged(page, Date.now().toString());
+    const suffix = Date.now().toString();
+    const { apple, beef } = await seedTagged(page, suffix);
     await openBook(page);
 
     await selectFilter(page, 'sweets');
 
+    await expect(seeded(page, suffix)).toHaveCount(1);
     await expect(page.locator('.index-recipe-item')).toHaveCount(1);
     await expect(entry(page, apple)).toHaveCount(1);
     await expect(entry(page, beef)).toHaveCount(0);
@@ -132,6 +176,7 @@ test.describe('Contents filter tabs', () => {
     await selectFilter(page, 'mains');
 
     await expect(page.locator('.index-empty')).toHaveText('No mains yet. Ask me to tag a recipe as a main course.');
+    await expect(seeded(page, suffix)).toHaveCount(0);
     await expect(page.locator('.index-recipe-item')).toHaveCount(0);
     await expect(page.locator('.index-footer')).toHaveText('0 mains');
 
@@ -147,6 +192,9 @@ test.describe('Contents filter tabs', () => {
     const { apple, beef, chicken } = await seedTagged(page, Date.now().toString());
     await openBook(page);
 
+    // p. 3 / 5 / 7 are positions in the FULL alphabetical list, so they hold
+    // only while the seeded trio is the whole book — an enforced precondition
+    // (the beforeEach sweep), not luck.
     await expect(entry(page, apple).locator('.index-page-number')).toHaveText('p. 3');
     await expect(entry(page, beef).locator('.index-page-number')).toHaveText('p. 5');
     await expect(entry(page, chicken).locator('.index-page-number')).toHaveText('p. 7');
@@ -167,15 +215,18 @@ test.describe('Contents filter tabs', () => {
     await openBook(page);
 
     await selectFilter(page, 'mains');
+    await expect(seeded(page, suffix)).toHaveCount(2);
     await expect(page.locator('.index-recipe-item')).toHaveCount(2);
 
-    // Apple Crumble is a dessert and not on this tab, but it is still page 3
+    // Apple Crumble is a dessert and not on this tab, but it is still page 3 —
+    // and it is first in the book because the beforeEach sweep emptied it
     await page.locator(isPhone(page) ? '#mobile-edge-next' : '#page-next').click();
     await expect(page.locator('.recipe-title')).toContainText(`Apple Crumble ${suffix}`);
   });
 
   test('the filter survives a reload but not a fresh browser session', async ({ page, browser, baseURL }) => {
-    await seedTagged(page, Date.now().toString());
+    const suffix = Date.now().toString();
+    await seedTagged(page, suffix);
     await openBook(page);
 
     await selectFilter(page, 'sweets');
@@ -185,6 +236,7 @@ test.describe('Contents filter tabs', () => {
     await expect(page.locator('.contents-tab-sweets')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.contents-tab-sweets')).toHaveClass(/is-active/);
     await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'false');
+    await expect(seeded(page, suffix)).toHaveCount(1);
     await expect(page.locator('.index-recipe-item')).toHaveCount(1);
 
     // A new context is a new session: the book opens on All again
@@ -193,16 +245,19 @@ test.describe('Contents filter tabs', () => {
     await authenticate(fresh);
     await expect(fresh.locator('.index-title')).toBeVisible();
     await expect(fresh.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(seeded(fresh, suffix)).toHaveCount(3);
     await expect(fresh.locator('.index-recipe-item')).toHaveCount(3);
     await context.close();
   });
 
   test('an unknown stored filter falls back to All', async ({ page }) => {
-    await seedTagged(page, Date.now().toString());
+    const suffix = Date.now().toString();
+    await seedTagged(page, suffix);
     await page.evaluate(() => sessionStorage.setItem('rv-contents-filter', 'puddings'));
     await openBook(page);
 
     await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(seeded(page, suffix)).toHaveCount(3);
     await expect(page.locator('.index-recipe-item')).toHaveCount(3);
   });
 
@@ -210,19 +265,22 @@ test.describe('Contents filter tabs', () => {
     // The contents only stay on the left page beside a recipe above the phone breakpoint
     test.skip(isPhone(page), 'the phone shows one page at a time, so the contents are replaced');
 
-    const { apple, beef } = await seedTagged(page, Date.now().toString());
+    const suffix = Date.now().toString();
+    const { apple, beef } = await seedTagged(page, suffix);
     await openBook(page);
 
     await entry(page, beef).click();
     await expect(page.locator('.recipe-title')).toContainText('Beef Stew');
 
     await selectFilter(page, 'mains');
+    await expect(seeded(page, suffix, '#page-left-content')).toHaveCount(2);
     await expect(page.locator('#page-left-content .index-recipe-item')).toHaveCount(2);
     await expect(entry(page, apple)).toHaveCount(0);
     await expect(page.locator('.index-recipe-item.current')).toHaveAttribute('data-recipe-id', beef);
 
     // The open recipe is not in this filter, so no row is highlighted
     await selectFilter(page, 'sweets');
+    await expect(seeded(page, suffix, '#page-left-content')).toHaveCount(1);
     await expect(page.locator('#page-left-content .index-recipe-item')).toHaveCount(1);
     await expect(page.locator('.index-recipe-item.current')).toHaveCount(0);
   });
@@ -271,6 +329,9 @@ test.describe('Contents filter tabs', () => {
 
 test.describe('Recipe tag chips', () => {
   test.beforeEach(async ({ page }) => {
+    // Sweep even though nothing here counts rows: without it this test leaks
+    // Tagged Recipe straight into whichever spec file runs next.
+    await clearRecipes(page);
     await authenticate(page);
   });
 

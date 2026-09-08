@@ -174,6 +174,15 @@ export function isPhone(page: Page): boolean {
 }
 
 /**
+ * The tablet band the app's CSS uses: above the 600px phone breakpoint and
+ * inside `@media (max-width: 1024px)` (static/styles.css:1836).
+ */
+export function isTablet(page: Page): boolean {
+  const width = page.viewportSize()!.width;
+  return width > 600 && width <= 1024;
+}
+
+/**
  * The visible tab strip for this viewport: paper tabs on the page's top edge on
  * a phone, edge tabs on the book's outer edge everywhere else.
  */

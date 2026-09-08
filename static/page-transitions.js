@@ -97,6 +97,55 @@ function isMobile() {
 }
 
 /**
+ * True in the tablet band (601-1024px) *and* in a view mode where the collapse
+ * rules apply. `@media (max-width: 1024px)` in static/styles.css turns
+ * #page-right into a flex column - #page-right-content sizes to its own content
+ * and #page-margin sits in normal flow beneath it - but every one of those rules
+ * is scoped `body[data-view-mode="recipe"], body[data-view-mode="meal"]`
+ * (static/styles.css:1866-1882). In `index` mode none of them match, so
+ * #page-right-content keeps `.page-content { height: 100% }` and pinning a
+ * min-height would hold the margin at the bottom of a full-height box for the
+ * whole turn instead of preventing a jump.
+ */
+const COLLAPSED_MARGIN_MODES = ['recipe', 'meal'];
+
+function marginIsCollapsed() {
+    return !isMobile()
+        && window.matchMedia('(max-width: 1024px)').matches
+        && COLLAPSED_MARGIN_MODES.includes(document.body.dataset.viewMode);
+}
+
+// The element whose height is pinned for the duration of the current turn.
+let heightLockedContent = null;
+
+/**
+ * Pin #page-right-content to its current height for the duration of a turn.
+ *
+ * Only in the tablet band. There the margin notes are laid out beneath the
+ * content instead of in a column beside it, so when renderFn empties the
+ * content mid-turn the notes jump up into the area the page-turn overlay
+ * covers - the overlay is sized to the OUTGOING content - and stay hidden
+ * until the render lands. Above 1024px the margin is its own grid column and
+ * nothing can move it; below 601px there is no overlay at all.
+ */
+function lockContentHeight() {
+    if (!marginIsCollapsed()) return;
+    const content = document.getElementById('page-right-content');
+    if (!content) return;
+    const height = content.getBoundingClientRect().height;
+    if (height <= 0) return;
+    heightLockedContent = content;
+    content.style.minHeight = height + 'px';
+}
+
+/** Release the pin set by lockContentHeight(). Safe to call unconditionally. */
+function unlockContentHeight() {
+    if (!heightLockedContent) return;
+    heightLockedContent.style.minHeight = '';
+    heightLockedContent = null;
+}
+
+/**
  * Animate a page turn transition.
  * @param {'forward'|'backward'} direction
  * @param {Function} renderFn - called to render new content into the real pages
@@ -132,6 +181,9 @@ export async function animatePageTurn(direction, renderFn) {
     // Lock container height to prevent layout shift (desktop only)
     const containerHeight = pagesContainer.getBoundingClientRect().height;
     pagesContainer.style.height = containerHeight + 'px';
+    // ...and, in the tablet band, the right page content too, so the margin
+    // notes stacked beneath it do not slide under the turn overlay.
+    lockContentHeight();
 
     if (!usePageTurn()) {
         return crossfadeTransition(pagesContainer, renderFn);
@@ -183,6 +235,7 @@ function crossfadeTransition(pagesContainer, renderFn) {
                 if (pageLeft) { pageLeft.style.transition = ''; pageLeft.style.opacity = ''; }
                 if (pageRight) { pageRight.style.transition = ''; pageRight.style.opacity = ''; }
                 pagesContainer.style.height = '';
+                unlockContentHeight();
                 animating = false;
                 resolve();
             }, 75);
@@ -198,6 +251,7 @@ function pageTurnTransition(pagesContainer, direction, renderFn) {
         if (!sourcePage) {
             Promise.resolve(renderFn()).then(() => {
                 pagesContainer.style.height = '';
+                unlockContentHeight();
                 animating = false;
                 resolve();
             });
@@ -253,6 +307,7 @@ function pageTurnTransition(pagesContainer, direction, renderFn) {
         // Wait for BOTH animation and render to complete before unlocking
         Promise.all([renderPromise, animationDone]).then(() => {
             pagesContainer.style.height = '';
+            unlockContentHeight();
             animating = false;
             resolve();
         });

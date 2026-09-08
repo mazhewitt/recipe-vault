@@ -14,14 +14,35 @@ grep -rl "^Status: ready-for-agent" .scratch --include="*.md" | grep -v /archive
 
 ## Ready for an agent (`ready-for-agent`)
 
-- `e2e-ipad-project-not-tablet/` — the Playwright `ipad` project renders at
-  1280x720 because its device descriptor does not resolve, so it duplicates
-  `chromium` and nothing tests the tablet breakpoint.
+- _(nothing right now)_
+
+## Needs triage (`needs-triage`)
+
+- `recipe-create-spawns-two-racing-writers/` — `POST /api/recipes` spawns two
+  background tasks that deadlock on the same row, so recipes silently keep a
+  NULL difficulty. Product defect, ships to production. The most consequential
+  thing in this directory.
+- `e2e-sqlite-in-memory-pool-contention/` — the e2e server runs a 5-connection
+  pool over one shared-cache in-memory SQLite, which turns that race into a hard
+  `SQLITE_LOCKED`. Harness only; one-line fix or a temp-file DB.
+- `tablet-page-turn-overlay-covers-margin-notes/` — at 601-1024px the page-turn
+  overlay hid the margin notes. Fixed in `static/page-transitions.js` with tests
+  both directions; what needs a decision is whether it warrants a
+  `recipe-page-transitions` spec delta.
+- `e2e-breakpoint-guard-conventions/` — three e2e follow-ups: the guards that
+  silently un-assert a test (`test.skip(isMobile, …)` and the bare `return`),
+  two near-duplicate tablet tests, and `clearRecipes` living in three copies.
 
 ## Waiting on a human decision (`ready-for-human` / `needs-info`)
 
 - `contents-thumbnails-full-size-photos/` — contents page polaroids load the
-  full-size photo. Needs a decision on server-side resize vs. accepting it.
+  full-size photo. Decision brief appended 2026-09-08 with measured bytes and
+  the cost of each option; still needs the maintainer to pick one.
+- `contents-page-e2e-cross-project-flake/` — mitigated in the tests, not fixed
+  at the cause. The guessed cause was refuted, the replacement account was never
+  captured in a failing run, and the two mechanisms that would produce it are
+  the two `needs-triage` items above. Decide whether to close it as mitigated
+  or hold it until those land. **Do not archive on green runs alone.**
 
 ## Long-running programmes
 
@@ -35,10 +56,17 @@ grep -rl "^Status: ready-for-agent" .scratch --include="*.md" | grep -v /archive
 Closed work, kept for history. A directory moves here when every issue in it
 is closed.
 
+- `e2e-ipad-project-not-tablet/` — resolved 2026-09-08. The `ipad` project runs
+  at a real 810x1080, the tablet tests execute there, and
+  `tests/e2e/tests/viewport-contract.spec.ts` fails if either drifts. The fix is
+  uncommitted at the time of archiving; add the commit hash to its `Resolved:`
+  line when it lands.
+
 ## Conventions
 
 - One issue per directory, files numbered `NN-short-name.md` (or a lone
   `README.md`).
 - `Status:` near the top; conversation appends under `## Comments`.
+- On archiving, the `Status:` line is replaced by `Resolved: <date> (<commit>)`.
 - A recorded decision can expire. If it rests on something being impossible,
   say what would reopen it.

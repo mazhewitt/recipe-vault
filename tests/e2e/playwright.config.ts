@@ -22,12 +22,24 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] },
     },
     {
-      // Tablet width (768x1024), deliberately run in Chromium: `make e2e-setup`
-      // and CI install chromium only, so the WebKit descriptor this project
-      // used to carry could not run here. Safari-specific rendering is not
-      // covered by this suite; see the change's design.md.
+      // iPad (gen 7) portrait: 810x1080, inside the app's tablet band (601-1024px).
+      // viewport/isMobile/hasTouch are pinned rather than left to the descriptor
+      // alone: a renamed or removed device name spreads to nothing and silently
+      // drops this project back to the 1280x720 default, which is what
+      // .scratch/archive/e2e-ipad-project-not-tablet reports. viewport-contract.spec.ts
+      // fails loudly if that ever happens again.
+      // Deliberately run in Chromium: `make e2e-setup` and CI install chromium
+      // only, so the WebKit descriptor this project used to carry could not run
+      // here. Safari-specific rendering is not covered by this suite.
       name: 'ipad',
-      use: { ...devices['iPad (gen 7)'], browserName: 'chromium', defaultBrowserType: 'chromium' },
+      use: {
+        ...devices['iPad (gen 7)'],
+        viewport: { width: 810, height: 1080 },
+        isMobile: true,
+        hasTouch: true,
+        browserName: 'chromium',
+        defaultBrowserType: 'chromium',
+      },
     },
   ],
 

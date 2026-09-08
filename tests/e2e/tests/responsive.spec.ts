@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe, isPhone, Recipe } from './helpers';
+import { authenticate, createRecipe, openRecipe, isPhone, isTablet, Recipe } from './helpers';
 
 const RECIPE: Recipe = {
   title: 'Responsive Test Recipe',
@@ -123,11 +123,12 @@ test.describe('Responsive Layout (book only)', () => {
     await expect(page.locator('.page-tabs')).toBeHidden();
   });
 
-  test('tablet widths collapse the margin beneath the page content', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'viewport cannot be resized under mobile emulation');
-    // 601-1024px: book full width, margin under the content, edge tabs still shown
-    await page.setViewportSize({ width: 900, height: 1000 });
-
+  test('tablet widths collapse the margin beneath the page content', async ({ page }) => {
+    test.skip(!isTablet(page), 'the 601-1024px band; the ipad project supplies it');
+    // Runs at the project viewport (ipad: 810x1080) rather than resizing, so the
+    // tablet CSS is exercised as a real device sees it. Book full width, margin
+    // under the content, edge tabs still shown. viewport-contract.spec.ts
+    // guarantees a project is in this band, so this skip cannot go silent.
     const recipeId = await createRecipe(page, {
       title: `Tablet Layout ${Date.now()}`,
       ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],

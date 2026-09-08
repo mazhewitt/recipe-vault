@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, threadEntries } from './helpers';
+import { authenticate, createRecipe, threadEntries, isTablet } from './helpers';
 
 /**
  * These cover the margin column of the wide layout: the phone stacks the margin
@@ -153,10 +153,9 @@ test.describe('Margin notes', () => {
     await expect(sticky.first()).toContainText('Connection error');
   });
 
-  test('tablet layout renders the margin beneath the page content', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'viewport cannot be resized under mobile emulation');
-    // Inside the <=1024px collapse, above the 600px phone breakpoint
-    await page.setViewportSize({ width: 900, height: 1000 });
+  test('tablet layout renders the margin beneath the page content', async ({ page }) => {
+    test.skip(!isTablet(page), 'the <=1024px collapse, above the 600px phone breakpoint');
+    // Runs at the ipad project's own 810x1080 viewport rather than resizing
     const recipeId = await createRecipe(page, {
       title: `Tablet Recipe ${Date.now()}`,
       ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
@@ -383,8 +382,8 @@ test.describe('Margin notes', () => {
     expect(fetches).toBe(1);
   });
 
-  test('a forward page turn does not cover the margin notes', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'the page-turn overlay is the desktop path');
+  test('a forward page turn does not cover the margin notes', async ({ page }) => {
+    // page-transitions.js takes the overlay path above 600px, tablet included
     skipOnPhone(page);
     await createRecipe(page, {
       title: `Turn Recipe ${Date.now()}`,
@@ -404,7 +403,7 @@ test.describe('Margin notes', () => {
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
 
     // Measure the overlay the moment it is inserted, against the margin it must not hide
-    const rects = await page.evaluate(() => new Promise<{ overlayRight: number; marginLeft: number; marginWidth: number }>((resolve, reject) => {
+    const rects = await page.evaluate(() => new Promise<{ overlayRight: number; overlayBottom: number; marginLeft: number; marginTop: number; marginWidth: number }>((resolve, reject) => {
       const container = document.querySelector('.pages-container')!;
       const observer = new MutationObserver(() => {
         const overlay = container.querySelector('.page-turn-overlay') as HTMLElement | null;
@@ -412,7 +411,7 @@ test.describe('Margin notes', () => {
         observer.disconnect();
         const o = overlay.getBoundingClientRect();
         const m = document.getElementById('page-margin')!.getBoundingClientRect();
-        resolve({ overlayRight: o.right, marginLeft: m.left, marginWidth: m.width });
+        resolve({ overlayRight: o.right, overlayBottom: o.bottom, marginLeft: m.left, marginTop: m.top, marginWidth: m.width });
       });
       observer.observe(container, { childList: true });
       setTimeout(() => { observer.disconnect(); reject(new Error('no page-turn overlay appeared')); }, 5000);
@@ -421,7 +420,55 @@ test.describe('Margin notes', () => {
     }));
 
     expect(rects.marginWidth).toBeGreaterThan(0);
-    // The overlay carries only the page content, so it must stop before the margin
-    expect(rects.overlayRight).toBeLessThanOrEqual(rects.marginLeft + 1);
+    // The overlay carries only the page content, so it must stop before the margin.
+    // Above 1024px the margin is a column to the right of the content; at or below
+    // 1024px it collapses beneath it (static/styles.css:1836), so the claim rotates.
+    if (isTablet(page)) {
+      expect(rects.overlayBottom).toBeLessThanOrEqual(rects.marginTop + 1);
+    } else {
+      expect(rects.overlayRight).toBeLessThanOrEqual(rects.marginLeft + 1);
+    }
+  });
+
+  test('a contents-to-recipe turn does not pin the right page to a full height', async ({ page }) => {
+    // The height lock exists for the tablet band only, and the CSS it compensates
+    // for (static/styles.css:1866-1882) is scoped to the recipe/meal view modes.
+    // A turn that STARTS in index mode must therefore not lock: there
+    // #page-right-content is still `.page-content { height: 100% }`, so a pinned
+    // min-height would hold #page-margin at the bottom of a full-height box for
+    // the whole turn and then snap it up.
+    test.skip(!isTablet(page), 'the height lock only fires in the tablet band');
+    await createRecipe(page, {
+      title: `Contents Turn ${Date.now()}`,
+      ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
+      steps: [{ step_number: 1, instruction: 'Mix' }],
+      servings: 4,
+    });
+    await page.reload();
+    // Start on the contents page, not on a recipe
+    await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'index');
+    const row = page.locator('.index-recipe-item').first();
+    await expect(row).toBeVisible();
+
+    // Sample the inline min-height across the whole turn: the lock sets it on
+    // #page-right-content and clears it again on unlock, so a single read after
+    // the fact would miss it.
+    const pinned: string[] = await page.evaluate(() => new Promise<string[]>((resolve) => {
+      const content = document.getElementById('page-right-content')!;
+      const seen: string[] = [];
+      const start = performance.now();
+      const sample = () => {
+        const v = content.style.minHeight;
+        if (v && !seen.includes(v)) seen.push(v);
+        if (performance.now() - start < 1200) requestAnimationFrame(sample);
+        else resolve(seen);
+      };
+      requestAnimationFrame(sample);
+      (document.querySelector('.index-recipe-item') as HTMLElement).click();
+    }));
+
+    // The turn really happened (and landed on the recipe page)
+    await expect(page.locator('.recipe-title')).toBeVisible({ timeout: 10000 });
+    expect(pinned, 'index-mode turn must not pin #page-right-content').toEqual([]);
   });
 });
