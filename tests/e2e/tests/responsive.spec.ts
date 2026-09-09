@@ -85,7 +85,7 @@ test.describe('Responsive Layout (book only)', () => {
     await expect(page.locator('#note-page-number')).toHaveText('p. 1');
   });
 
-  test('desktop shows the edge tabs and the note input on the right page', async ({ page }) => {
+  test('desktop shows the edge tabs, and the slip sits at the foot of the left page', async ({ page }) => {
     test.skip(isPhone(page), 'wide layout only');
     await seedAndOpen(page);
     // Contents mode: the arrangement this case describes — the whole recipe on
@@ -101,20 +101,28 @@ test.describe('Responsive Layout (book only)', () => {
     await expect(page.locator('.edge-tab[data-tab="ingredients"]')).toHaveClass(/active/);
     await expect(page.locator('.page-tabs')).toBeHidden();
 
-    // The note input is a slip pinned over the foot of the right page
-    const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);
-    expect(position).toBe('absolute');
-    const input = (await page.locator('.note-input').boundingBox())!;
-    const pages = (await page.locator('.pages-container').boundingBox())!;
-    const rightPage = (await page.locator('#page-right').boundingBox())!;
-    // Right of the spine...
-    expect(input.x).toBeGreaterThan(pages.x + pages.width / 2);
-    // ...and over the page rather than below the book
-    expect(input.y).toBeLessThan(rightPage.y + rightPage.height);
+    // Contents mode carries no slip at all: the contents are for finding a
+    // recipe, and the Notes tab on the same strip is the way to write
+    await expect(page.locator('.note-input')).toBeHidden();
 
     // The recipe is on the right page and the contents stay on the left
     await expect(page.locator('#page-right-content')).toContainText('test ingredient');
     await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
+
+    // Back in cook mode the slip is a pinned absolute over the foot of the LEFT
+    // page — the one position it holds in every mode that shows it, so that
+    // clicking into it cannot move it
+    await page.locator('.spread-tab[data-mode="cook"]').click();
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+    const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);
+    expect(position).toBe('absolute');
+    const input = (await page.locator('.note-input').boundingBox())!;
+    const pages = (await page.locator('.pages-container').boundingBox())!;
+    const leftPage = (await page.locator('#page-left').boundingBox())!;
+    // Left of the spine...
+    expect(input.x + input.width).toBeLessThanOrEqual(pages.x + pages.width / 2);
+    // ...and over the page rather than below the book
+    expect(input.y).toBeLessThan(leftPage.y + leftPage.height);
   });
 
   test('desktop hides the edge tabs on the contents page', async ({ page }) => {
@@ -146,19 +154,22 @@ test.describe('Responsive Layout (book only)', () => {
       difficulty: 3,
     });
     await openRecipe(page, recipeId);
-    // The collapse is felt in contents and notes modes, the two that still have
-    // a margin column to collapse; cook mode has already hidden it
-    await useContentsMode(page);
 
     await expect(page.locator('.edge-tabs')).toBeVisible();
     await expect(page.locator('.page-tabs')).toBeHidden();
 
-    const direction = await page.locator('#page-right').evaluate(el => getComputedStyle(el).flexDirection);
-    expect(direction).toBe('column');
-
+    // The note is written in cook mode, where the slip is on the page; contents
+    // mode carries none
     await page.locator('#message-input').fill('hello tablet');
     await page.locator('#message-input').press('Enter');
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
+
+    // The collapse is felt in contents and notes modes, the two that still have
+    // a margin column to collapse; cook mode has a pinned slip instead
+    await useContentsMode(page);
+
+    const direction = await page.locator('#page-right').evaluate(el => getComputedStyle(el).flexDirection);
+    expect(direction).toBe('column');
 
     const contentBottom = await page.locator('#page-right-content').evaluate(
       el => el.getBoundingClientRect().bottom

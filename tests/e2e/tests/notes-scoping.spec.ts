@@ -160,7 +160,9 @@ test.describe('Notes scoped to their recipe', () => {
     await sendNote(page, 'a note while browsing');
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
 
-    // Reaching for the input on the contents page opens notes mode there too
+    // The Notes tab sits beside the filters on the contents page, and opens the
+    // book-level thread there
+    await page.locator('.spread-tab[data-mode="notes"]').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
     const thread = page.locator('#page-left-content .notes-thread');
     await expect(thread).toBeVisible();

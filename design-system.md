@@ -177,12 +177,13 @@ Above 600px the book is a spread, and `body[data-spread-mode]` says what the **l
 
 | Value | Left page | Right page | Left-edge strip |
 |-------|-----------|------------|-----------------|
-| `contents` | The contents — split across both pages in `index` view, one column while a recipe is open | The recipe or meal plan, or the second half of the contents | The filters in `index` view, the spread tabs otherwise |
-| `cook` | The open recipe's `ingredients:` panel, **moved** off the right page | The `method:` panel alone — no margin column, no edge tabs | Spread tabs, Cook pressed |
+| `contents` | The contents — split across both pages in `index` view, one column while a recipe is open | The recipe or meal plan, or the second half of the contents | The filters plus Notes in `index` view, the spread tabs otherwise |
+| `cook` | The open recipe's `ingredients:` panel, **moved** off the right page, with the note slip at its foot | The `method:` panel alone — no margin column, but the reply pinned to its top corner as a slip | Spread tabs, Cook pressed |
 | `notes` | The thread for the open recipe (`.notes-page > .notes-thread`), with the note slip at its foot | The whole recipe and its margin column, exactly as in contents mode; in `index` view the contents move here as one column | Spread tabs, Notes pressed |
 
 - **Cook mode is the default every time a recipe opens** — from the contents, from `display_recipe`, from the nav arrows or a swipe. It is not sticky and not remembered; the tab back to Contents is one click.
-- **Focusing the note input selects `notes`**, because a reader reaching for the input wants room to write. The one exception is a cook mid-recipe with a timer running for the recipe on the page: there the method is load-bearing and the mode does not change.
+- **Focusing the note input selects nothing.** The slip holds one position — the foot of the left page — in both modes that show it, and `contents` mode hides it rather than moving it, so a click can never shift it out from under the cursor. The Notes tab is the only way into `notes` mode. (It used to switch on focus, which is exactly the jump that removed it.)
+- **Notes is on the strip in every view**, beside the filters while browsing and beside Contents and Cook while a recipe is open — otherwise the book-level thread would have no entry point at all.
 - **Returning to the contents selects `contents`** and the strip reverts to the filters, restoring the one remembered in `sessionStorage['rv-contents-filter']`.
 - **A meal plan never cooks.** `setSpreadMode('cook')` is refused in `meal` view, not merely left off the strip.
 - **A mode change is refused while the animation lock is held**, exactly as a tab change is. The programmatic transitions that happen *inside* a page turn (opening a recipe, going back to the contents) pass `{ force: true }`; a reader's tab click never does.
@@ -399,11 +400,12 @@ The background simulates a dark wooden table surface.
 | Surface | `--color-paper-cream`, 1px `--color-border-light` top rule, `--radius-sm`, `box-shadow: 0 -2px 8px rgba(0,0,0,0.06)` |
 | Structure | Flex column, 6px gap, `padding: 8px 10px`; `.note-input-row` is a flex row, `align-items: flex-end`, 8px gap |
 | Clearance | `.page-right { padding-bottom: 72px }` keeps recipe content off the slip |
-| Notes mode | `body[data-spread-mode="notes"]` mirrors the offsets — `left: 10px`, `right: calc(50% + 10px)` — so the slip sits at the foot of the **left** page, under the conversation. The 72px clearance follows it: `.page-left` takes it and `.page-right` goes back to `.page`'s own 20px |
+| Cook and notes modes | Both mirror the offsets — `left: 10px`, `right: calc(50% + 10px)` — so the slip sits at the foot of the **left** page: under the ingredients in cook, under the conversation in notes. One position, so it never moves on a click. The 72px clearance follows it: `.page-left` takes it and `.page-right` goes back to `.page`'s own 20px |
+| Contents mode | Hidden outright (`display: none`) while a recipe or meal plan is open — the contents are for finding a recipe, and the Notes tab is on the same strip. On the contents page proper the slip keeps its right-page position, that view having no Contents tab to return from |
 
 It is absolutely positioned precisely so that it does **not** scroll away with the recipe.
 
-There is exactly one `<form class="note-input">` in the document in every mode, at every width. Notes mode moves it with CSS alone — no JS relocation, no second form — so the focus handler, the image attachment, the auto-resize and the SSE wiring are untouched by the move. Focusing it is also what *opens* notes mode (see **Spread Modes**), so the slip and the thread arrive on the left page together.
+There is exactly one `<form class="note-input">` in the document in every mode, at every width. The spread modes move it with CSS alone — no JS relocation, no second form — so the image attachment, the auto-resize and the SSE wiring are untouched by the move.
 
 ### Mobile: a Bar Beneath the Book
 
@@ -475,7 +477,7 @@ An open book showing two pages with a leather cover frame.
 | Page padding | 20px 28px (+ 72px bottom on the right page) | Same | 16px |
 | Spine shadow | Visible | Visible | Hidden |
 | Nav arrows | `.page-nav` 29px | `.page-nav` 36px (larger tap target) | `.page-nav` hidden; 60px `.mobile-edge-nav` zones |
-| Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; hidden in cook mode) | Same | `.page-tabs`, page top edge (all three) |
+| Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; on the edge in every mode) | Same | `.page-tabs`, page top edge (all three) |
 | Left-edge strip | `.contents-tabs`, left page's outer edge: the contents filters while no recipe is open, Contents / Cook / Notes while one is | Same | Chip row under the contents title; filters only |
 
 ---
@@ -833,7 +835,7 @@ Responsive styles should be added via media queries at the end of `styles.css`, 
 
 1. **`page-tabs.js`** owns `#page-right[data-tab]` and both tab surfaces, via one delegated click listener on `document` matching `[role="tab"][data-tab]`.
 2. **`app.js`** owns `body[data-view-mode]` (mirrored from `sharedState.viewMode`) and all DOM wiring, including Enter-to-send and the form `submit` handler on `#note-input`.
-3. **`spread-modes.js`** owns `body[data-spread-mode]` and the left-edge strip, via its own delegated listeners on `document` (`.spread-tab[data-mode]` clicks, and `focus` in the capture phase for the note input). It imports nothing but the animation lock: the re-render a mode change needs is a callback `app.js` registers with `registerSpreadRenderer()`, which is what keeps `recipe-display.js` → `page-tabs.js` from closing a cycle. Anything else that needs the mode reads it off the body.
+3. **`spread-modes.js`** owns `body[data-spread-mode]` and the left-edge strip, via one delegated listener on `document` for `.spread-tab[data-mode]` clicks. It imports nothing but the animation lock: the re-render a mode change needs is a callback `app.js` registers with `registerSpreadRenderer()`, which is what keeps `recipe-display.js` → `page-tabs.js` from closing a cycle. Anything else that needs the mode reads it off the body.
 4. **`recipe-display.js`** is the only writer of `#page-right-content` and `#note-page-number`; **`margin-notes.js`** is the only writer of `#page-margin` and `.notes-thread`. `app.js`'s `renderSpread` is the only writer of `#page-left-content`, and the only mover of the ingredients panel between the pages.
 5. **`page-transitions.js`** holds the single animation lock. `animatePageTurn` and `crossfadeElement` share it, so a tab tap during a page turn — and a swipe during a tab crossfade — is ignored rather than queued. A spread mode change honours the same lock.
 6. **Resize** re-renders the spread for the effective mode; the layout itself is CSS, so nothing else has to react to a breakpoint change.
@@ -857,10 +859,10 @@ Responsive styles should be added via media queries at the end of `styles.css`, 
 | Book cover | Full leather frame | Full leather frame | Flush leather, 40px top strip |
 | Spine shadow | Yes | Yes | No |
 | Recipe nav | `.page-nav` 29px | `.page-nav` 36px | Edge zones + `.phone-footer` |
-| Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; hidden in cook mode) | Same | `.page-tabs`, page top edge (all three) |
+| Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; on the edge in every mode) | Same | `.page-tabs`, page top edge (all three) |
 | Left-edge strip | `.contents-tabs`, left page's outer edge: the contents filters while no recipe is open, Contents / Cook / Notes while one is | Same | Chip row under the contents title; filters only |
 | Note input | Slip pinned to the foot of the right page, or of the left page in notes mode | Same | Bar beneath the book |
-| Margin notes | 150px column beside the recipe; hidden in cook mode | Beneath the recipe body | Beneath the recipe body; hidden on the Notes tab |
+| Margin notes | 150px column beside the recipe; a slip pinned to the page corner in cook mode | Beneath the recipe body | Beneath the recipe body; hidden on the Notes tab |
 | Wood background | Full texture | Full texture | Flat gradient |
 | Body padding | 30px 50px | 20px | 0 |
 | Book label | `.section-label` above the book | Same | `#recipe-book-header` on the leather strip |

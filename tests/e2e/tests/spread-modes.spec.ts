@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe, isPhone, spineX } from './helpers';
+import { authenticate, createRecipe, seedRecipes, openRecipe, isPhone, spineX } from './helpers';
 
 /**
  * The contextual left page. One state, body[data-spread-mode], three values:
@@ -9,8 +9,8 @@ import { authenticate, createRecipe, openRecipe, isPhone, spineX } from './helpe
  *
  * The mode is selected by the left-edge strip, which swaps its filter buttons
  * for Contents / Cook / Notes while a recipe is open, and implicitly by opening
- * a recipe (cook), focusing the note input (notes) and going back to the
- * contents (contents).
+ * a recipe (cook) and going back to the contents (contents). Focusing the note
+ * input selects nothing: the slip keeps one position so a click cannot move it.
  *
  * Below 600px there is no spread, so there is no mode: every case here is
  * either skipped on the phone or asserts that the phone is untouched.
@@ -69,9 +69,13 @@ test.describe('Spread modes', () => {
 
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'contents');
     await expect(page.locator('.contents-tab-all')).toBeVisible();
-    // The spread tabs belong to an open recipe and are not on the strip yet
-    for (const mode of ['contents', 'cook', 'notes']) {
+    // Contents and Cook belong to an open recipe and are not on the strip yet.
+    // Notes is, on every viewport: it is the only way into the book-level thread.
+    for (const mode of ['contents', 'cook']) {
       await expect(page.locator(`.spread-tab[data-mode="${mode}"]`)).toBeHidden();
+    }
+    if (!isPhone(page)) {
+      await expect(page.locator('.spread-tab[data-mode="notes"]')).toBeVisible();
     }
   });
 
@@ -128,23 +132,29 @@ test.describe('Spread modes', () => {
     expect(await scrollTop('page-left')).toBeGreaterThan(100);
   });
 
-  test('the right-edge strip is hidden in cook mode and offers no Notes tab', async ({ page }) => {
+  test('the right-edge strip stays on the edge in cook mode and offers no Notes tab', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createLongRecipe(page, 'Edge Strip');
     await openRecipe(page, recipeId);
 
-    // Both sections are already on the spread, so the strip that switches
-    // between them has nothing to say
-    await expect(page.locator('.edge-tabs')).toBeHidden();
-
-    // Notes is a left-page mode now, so it has left the right-edge strip entirely
-    await expect(page.locator('.edge-tab[data-tab="notes"]')).toHaveCount(0);
-
-    await selectMode(page, 'contents');
+    // The strip is the book's furniture and stays put in every mode
     await expect(page.locator('.edge-tabs')).toBeVisible();
     await expect(page.locator('.edge-tab')).toHaveCount(2);
     await expect(page.locator('.edge-tab[data-tab="ingredients"]')).toBeVisible();
     await expect(page.locator('.edge-tab[data-tab="method"]')).toBeVisible();
+
+    // Notes is a left-page mode now, so it has left the right-edge strip entirely
+    await expect(page.locator('.edge-tab[data-tab="notes"]')).toHaveCount(0);
+
+    // In cook mode the strip does not decide what the right page shows: the
+    // ingredients are on the LEFT page, so a tap on Ingredients must not blank
+    // the method the cook is reading
+    await page.locator('.edge-tab[data-tab="ingredients"]').click();
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="method"]')).toBeVisible();
+    await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+
+    await selectMode(page, 'contents');
+    await expect(page.locator('.edge-tabs')).toBeVisible();
   });
 
   test('cook mode does not scroll the right page to a section header', async ({ page }) => {
@@ -280,31 +290,75 @@ test.describe('Spread modes', () => {
     expect(await page.evaluate(() => document.querySelectorAll('.note-input').length)).toBe(1);
     await expect(page.locator('.note-input')).toBeVisible();
 
-    // ...and it now sits over the LEFT page, wholly left of the spine
+    // ...and it sits over the LEFT page, wholly left of the spine
     const spine = await spineX(page);
     const input = (await page.locator('.note-input').boundingBox())!;
     expect(input.x + input.width).toBeLessThanOrEqual(spine);
 
-    // Back to cook and the slip crosses the spine again
+    // Back to cook and it stays exactly where it was: the slip has one home
     await selectMode(page, 'cook');
     const back = (await page.locator('.note-input').boundingBox())!;
-    expect(back.x).toBeGreaterThanOrEqual(spine);
+    expect(back.x).toBe(input.x);
+    expect(back.y).toBe(input.y);
   });
 
-  test('focusing the note input opens notes mode', async ({ page }) => {
+  test('the slip keeps one position, so clicking it never moves it', async ({ page }) => {
     skipOnPhone(page);
-    const recipeId = await createLongRecipe(page, 'Focus Notes');
+    const recipeId = await createLongRecipe(page, 'No Jump');
     await openRecipe(page, recipeId);
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
 
-    await page.locator('#message-input').focus();
+    // Cook mode: the slip is at the foot of the LEFT page, under the ingredients
+    const spine = await spineX(page);
+    const before = (await page.locator('.note-input').boundingBox())!;
+    expect(before.x + before.width).toBeLessThanOrEqual(spine);
 
-    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
-    await expect(page.locator('#page-left-content .notes-thread')).toBeVisible();
-    await expect(page.locator('.spread-tab[data-mode="notes"]')).toHaveAttribute('aria-pressed', 'true');
+    // Clicking into it types where it stands. It used to open notes mode, which
+    // slid the slip across the spine out from under the cursor mid-click.
+    await page.locator('#message-input').click();
+    await expect(page.locator('#message-input')).toBeFocused();
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+
+    const after = (await page.locator('.note-input').boundingBox())!;
+    expect(after.x).toBe(before.x);
+    expect(after.y).toBe(before.y);
   });
 
-  test('a running timer keeps the method on the page when the input is focused', async ({ page }) => {
+  test('contents mode hides the slip, and the Notes tab brings it back', async ({ page }) => {
+    skipOnPhone(page);
+    const recipeId = await createLongRecipe(page, 'Contents Slip');
+    await openRecipe(page, recipeId);
+
+    await selectMode(page, 'contents');
+    // Nothing to write on while finding a recipe...
+    await expect(page.locator('.note-input')).toBeHidden();
+    // ...and the way back is the tab on the strip the reader is already using
+    await expect(page.locator('.spread-tab[data-mode="notes"]')).toBeVisible();
+
+    await selectMode(page, 'notes');
+    await expect(page.locator('.note-input')).toBeVisible();
+  });
+
+  test('the contents page keeps its slip and gains a Notes tab', async ({ page }) => {
+    skipOnPhone(page);
+    await seedRecipes(page, 3);
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'index');
+
+    // No recipe is open, so the strip is the filters — plus Notes, the only way
+    // into the book-level thread now that focus does not open it
+    await expect(page.locator('.contents-tab[data-filter="all"]')).toBeVisible();
+    await expect(page.locator('.spread-tab[data-mode="notes"]')).toBeVisible();
+    await expect(page.locator('.spread-tab[data-mode="cook"]')).toBeHidden();
+    await expect(page.locator('.spread-tab[data-mode="contents"]')).toBeHidden();
+
+    // The slip stays where it has always been here, and focusing it is inert
+    await expect(page.locator('.note-input')).toBeVisible();
+    await page.locator('#message-input').click();
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'contents');
+  });
+
+  test('cook mode keeps a running timer step highlighted on the method page', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createLongRecipe(page, 'Timer Cook');
     await openRecipe(page, recipeId);
@@ -316,55 +370,17 @@ test.describe('Spread modes', () => {
     });
     await expect(page.locator('#timer-widget')).toBeVisible();
 
-    // The highlighted step is on the method page and stays there: cook mode is
-    // the mode a running timer is meant to be read in
+    // The highlighted step is on the method page, and the relocation of the
+    // ingredients to the other page leaves applyStepHighlight's single target
+    // intact — exactly one highlighted step, on the right
     await expect(page.locator('#page-right-content .prep-step[data-step="2"]')).toHaveClass(/timer-active/);
     await expect(page.locator('.prep-step.timer-active')).toHaveCount(1);
 
-    await page.locator('#message-input').focus();
-    // A one-word reply must not cost the cook their method page
-    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
-    await expect(page.locator('#page-right-content .prep-step[data-step="2"]')).toHaveClass(/timer-active/);
-
-    // The Notes tab is still one click away, so nothing is unreachable...
+    // It survives a trip through the other two modes and back
     await selectMode(page, 'notes');
     await selectMode(page, 'cook');
-    // ...and the input has to be left before it can be focused again: a focus
-    // event only fires on the way in
-    await page.locator('#message-input').evaluate((el: HTMLElement) => el.blur());
-
-    // ...and once the timer is cancelled, the very same focus switches the mode,
-    // so the assertion above is about the timer and not about a dead handler
-    await page.locator('.timer-cancel').click();
-    await expect(page.locator('#timer-widget')).toBeHidden();
-    await page.locator('#message-input').focus();
-    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
-  });
-
-  test('a timer left running under another recipe does not hold the input in cook mode', async ({ page }) => {
-    skipOnPhone(page);
-    const first = await createLongRecipe(page, 'AAA Timer Owner');
-    const second = await createLongRecipe(page, 'ZZZ Timer Stranger');
-
-    await openRecipe(page, first);
-    await page.evaluate(() => {
-      // @ts-ignore - startTimer is exposed by app.js
-      startTimer(5, 'Mock timer', 2);
-    });
-    await expect(page.locator('#timer-widget')).toBeVisible();
-
-    // The widget outlives the recipe it was started under: it is still counting
-    // down for the first recipe with the second one on the page
-    await openRecipe(page, second);
-    await expect(page.locator('#page-right-content .recipe-title')).toContainText('ZZZ Timer Stranger');
-    await expect(page.locator('#timer-widget')).toBeVisible();
-    await expect(page.locator('.prep-step.timer-active')).toHaveCount(0);
-
-    // ...but no timer is running for THIS recipe, so nothing is load-bearing on
-    // its method page and the input opens notes mode as it always does
-    await page.locator('#message-input').focus();
-    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
-    await expect(page.locator('#page-left-content .notes-thread')).toBeVisible();
+    await expect(page.locator('#page-right-content .prep-step[data-step="2"]')).toHaveClass(/timer-active/);
+    await expect(page.locator('.prep-step.timer-active')).toHaveCount(1);
   });
 
   test('a contents render still in flight cannot take the ingredients off the spread', async ({ page }) => {
@@ -422,9 +438,9 @@ test.describe('Spread modes', () => {
     await page.locator('#recipe-book-header').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'contents');
 
-    // With no recipe open the strip shows the filters, so the way into notes
-    // mode is the input — the book-level thread on the left, contents on the right
-    await page.locator('#message-input').focus();
+    // With no recipe open the strip shows the filters plus Notes, which is the
+    // way in — the book-level thread on the left, the contents on the right
+    await page.locator('.spread-tab[data-mode="notes"]').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
     await expect(page.locator('#page-left-content .notes-thread')).toBeVisible();
 
@@ -454,7 +470,7 @@ test.describe('Spread modes', () => {
 
     // Notes mode on the contents page: the thread takes the left page and the
     // whole list moves across to the right
-    await page.locator('#message-input').focus();
+    await page.locator('.spread-tab[data-mode="notes"]').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
     await expect(page.locator(`#page-right-content .index-recipe-item[data-recipe-id="${main}"]`)).toHaveCount(1);
 
@@ -569,7 +585,8 @@ test.describe('Spread modes', () => {
     await expect(page.locator('.contents-tab-all')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('.spread-tab[data-mode="contents"]')).toBeHidden();
     await expect(page.locator('.spread-tab[data-mode="cook"]')).toBeHidden();
-    await expect(page.locator('.spread-tab[data-mode="notes"]')).toBeHidden();
+    // Notes stays: the book-level thread is reachable from the contents page too
+    await expect(page.locator('.spread-tab[data-mode="notes"]')).toBeVisible();
 
     // ...and the filter is applied, not merely pressed: the main this test
     // seeded is off the page while the dessert it opened is still on it

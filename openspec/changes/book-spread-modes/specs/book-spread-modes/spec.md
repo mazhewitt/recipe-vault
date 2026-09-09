@@ -8,7 +8,8 @@ On viewports wider than 600px the left page SHALL show one of three things — t
 - **WHEN** no recipe or meal plan is displayed
 - **THEN** the spread mode is `contents`
 - **AND** the left page shows the first half of the contents and the right page the second half
-- **AND** the left-edge tab strip offers the contents filters (All / Mains / Sweets, and Meals when enabled)
+- **AND** the left-edge tab strip offers the contents filters (All / Mains / Sweets, and Meals when enabled), plus Notes
+- **AND** the note input keeps its position at the foot of the right page, because no Contents tab exists here to return from
 
 #### Scenario: Recipe opened
 - **WHEN** a recipe is opened from the contents, by `display_recipe`, by the previous/next controls or by a swipe
@@ -42,9 +43,10 @@ In `cook` mode the open recipe SHALL occupy the whole book, with its ingredients
 - **WHEN** the open recipe is re-rendered after a photo upload, an `update_recipe` or a difficulty refresh
 - **THEN** the spread mode is unchanged and the ingredients remain on the left page
 
-#### Scenario: Right-edge tabs are hidden in cook mode
+#### Scenario: Right-edge tabs stay on the edge in cook mode
 - **WHEN** the spread mode is `cook` on a viewport wider than 600px
-- **THEN** the right-edge Ingredients / Method strip is not shown, because both sections are already on the spread
+- **THEN** the right-edge Ingredients / Method strip is still shown, because it is the book's furniture and an empty edge reads as a missing page
+- **AND** selecting either tab does not change what the right page shows, since the ingredients are on the left page and the method is already on the right
 
 ### Requirement: Notes mode gives the conversation a full page
 
@@ -55,18 +57,20 @@ In `notes` mode the left page SHALL show the conversation for the open recipe an
 - **THEN** the left page shows the thread for the open recipe, oldest first
 - **AND** the right page shows the recipe's ingredients and method as one scrolling page
 
-#### Scenario: Note input moves to the left page
-- **WHEN** the spread mode is `notes`
-- **THEN** the single `.note-input` form is positioned at the foot of the left page
+#### Scenario: The note input keeps one position
+- **WHEN** the spread mode is `cook` or `notes`
+- **THEN** the single `.note-input` form is positioned at the foot of the left page, the same place in both
 - **AND** no second input form exists in the document
 
-#### Scenario: Focusing the input opens notes mode
-- **WHEN** the user focuses the note input while the spread mode is `contents` or `cook`
-- **THEN** the spread mode becomes `notes`
+#### Scenario: Contents mode carries no input
+- **WHEN** the spread mode is `contents` while a recipe or meal plan is open
+- **THEN** the note input is not shown, because the contents are for finding a recipe rather than writing
+- **AND** the Notes tab on the same strip brings it back
 
-#### Scenario: Focus does not steal the method from a running timer
-- **WHEN** the user focuses the note input while the spread mode is `cook` and a timer is running for the open recipe
-- **THEN** the spread mode does not change and the input stays where it is
+#### Scenario: Focusing the input selects no mode
+- **WHEN** the user focuses or clicks the note input in any spread mode
+- **THEN** the spread mode does not change and the input does not move
+- **AND** the left-edge Notes tab is the only way into `notes` mode
 
 #### Scenario: Notes mode with no recipe open
 - **WHEN** the spread mode is `notes` and no recipe is displayed

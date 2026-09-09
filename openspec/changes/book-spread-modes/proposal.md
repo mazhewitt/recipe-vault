@@ -22,8 +22,8 @@ Separately, the Notes tab shows **every** note in the session rather than the no
 - **Cook mode** is what you get when you open a recipe. Ingredients on the left, method on the right, contents out of the way — the true cookbook spread, and no tab-switching needed on desktop because both halves are on the page at once.
 - **Notes mode** gives the conversation a full page of the book at a readable measure, and moves the note input to the foot of that page. The redundant index and the cramped slip are solved by the same move.
 - **Contents mode** preserves today's layout as the escape hatch for jumping to another recipe without leaving the one you are on.
-- Switching is mostly implicit: opening a recipe selects Cook, focusing the note input selects Notes, choosing a recipe from the contents selects Cook again. The tabs remain for explicit control.
-- The right-edge Ingredients / Method / Notes tabs apply only to the right page, so on desktop they are shown only in Contents and Notes mode (where the right page holds the whole recipe) and the Notes entry is dropped from that strip — Notes is now a left-page mode.
+- Switching is implicit where the book already knows the answer: opening a recipe selects Cook, choosing a recipe from the contents selects Cook again, returning to the contents selects Contents. Notes is reached by its tab. *(Revised — focusing the input was to have selected Notes; see design.md R1.)*
+- The Notes entry is dropped from the right-edge strip — Notes is now a left-page mode — leaving Ingredients / Method there. *(Revised — that strip was to have been hidden in Cook mode; see design.md R3.)*
 
 **Notes are scoped to a recipe.** Every thread entry records the recipe that was open when the turn started. The Notes page and the margin show only the current recipe's entries; notes written while browsing form a book-level thread shown in Notes mode when no recipe is open. The server-side conversation history (`src/chat/sessions.rs`) is untouched, so the AI still remembers everything — this is a display concern only.
 

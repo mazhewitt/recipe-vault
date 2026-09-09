@@ -32,6 +32,7 @@ The system SHALL provide a web-based chat interface in which the user writes not
 #### Scenario: Responsive layout with artifact
 - **WHEN** the viewport is wider than 1024px and a recipe is displayed in `cook` mode
 - **THEN** the left page shows the ingredients and the right page shows the method, with no margin column
+- **AND** a reply is pinned to the top corner of the method page as a single slip, so a note written while cooking still gets a visible answer
 - **WHEN** the viewport is wider than 1024px and a recipe is displayed in `contents` or `notes` mode
 - **THEN** the right page is a two-column grid with the recipe content beside a 150px margin column
 - **WHEN** the viewport is 1024px or narrower and wider than 600px

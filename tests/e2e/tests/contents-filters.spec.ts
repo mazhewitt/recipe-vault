@@ -87,13 +87,19 @@ test.describe('Contents filter tabs', () => {
 
     await expect(page.locator('.contents-tabs')).toHaveAttribute('aria-label', 'Contents filter');
     // Four filters. The strip also holds the three spread tabs, which wear the
-    // same paper-tab face but carry data-mode instead of data-filter and are on
-    // screen only while a recipe is open (see spread-modes.spec.ts).
+    // same paper-tab face but carry data-mode instead of data-filter. Contents
+    // and Cook are on screen only while a recipe is open; Notes joins the
+    // filters here, as the way into the book-level thread (spread-modes.spec.ts).
     await expect(page.locator('.contents-tab[data-filter]')).toHaveCount(4);
     await expect(page.locator('.contents-tab[data-mode]')).toHaveCount(3);
     await expect(page.locator('.spread-tab')).toHaveCount(3);
-    for (const mode of ['contents', 'cook', 'notes']) {
+    for (const mode of ['contents', 'cook']) {
       await expect(page.locator(`.spread-tab[data-mode="${mode}"]`)).toBeHidden();
+    }
+    // The whole strip is a desktop affordance: the phone has its own paper tabs
+    // and no spread to put a mode on, so .spread-tab is display:none there.
+    if (!isPhone(page)) {
+      await expect(page.locator('.spread-tab[data-mode="notes"]')).toBeVisible();
     }
     await expect(page.locator('.contents-tab-all')).toHaveText('All');
     await expect(page.locator('.contents-tab-mains')).toBeVisible();

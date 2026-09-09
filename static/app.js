@@ -127,10 +127,6 @@ const sharedState = {
     showIndex: Navigation.showIndex,
     startTimer: Timer.startTimer,
     cancelTimer: Timer.cancelTimer,
-    // spread-modes.js asks this before letting a focus on the input take the
-    // method page away; it imports nothing but the animation lock, so timer.js
-    // reaches it through the table like the rest.
-    isTimerRunningFor: Timer.isTimerRunningFor,
     removeImage: () => removeImage(),
 };
 

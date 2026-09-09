@@ -177,6 +177,10 @@ test.describe('Margin notes', () => {
     await send(page, 'hello tablet');
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
 
+    // The collapse is a property of the margin COLUMN, which contents and notes
+    // modes have and cook mode does not
+    await useContentsMode(page);
+
     // The content box itself, not its last child: the last child is the phone
     // footer, which renderRecipe emits at every width and CSS hides above 600px
     const contentBottom = await page.locator('#page-right-content').evaluate(
@@ -409,8 +413,14 @@ test.describe('Margin notes', () => {
     await page.reload();
     await openRecipe(page, recipes[0].id);
 
+    // Written in cook mode, where the slip is on the page...
     await send(page, 'hello turn');
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
+
+    // ...then read in contents mode. The claim is about the margin COLUMN,
+    // which exists in contents and notes modes. Cook mode has no column by
+    // design — the method owns its page and the reply is a pinned slip instead.
+    await useContentsMode(page);
 
     // The margin's geometry is read before the turn, not inside it: notes are
     // per recipe now, so the first thing the turn does is empty the margin of

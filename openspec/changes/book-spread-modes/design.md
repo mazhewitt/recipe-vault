@@ -61,3 +61,56 @@ Cook mode hides the contents; it does not change it. `pageNumberFor(idx)` still 
 
 - Should Cook mode be *sticky* per session, so a user who prefers Contents-on-the-left gets it on the next recipe too? Proposed: no. Cook is the default every time a recipe opens; the tab is cheap. Revisit if testing says otherwise.
 - Meal plans in Notes mode: does a meal plan get its own thread bucket keyed by plan id, or does it fall to the book thread? Proposed: the book thread, until meal plans are persisted (RV-107).
+
+## Revisions during implementation
+
+Recorded after manual testing on 2026-09-09, which found one problem and one
+consequence of fixing it. The decisions above are left as written; these
+supersede them where they conflict.
+
+### R1. The note input keeps one position; focus selects nothing (supersedes 3 and 6)
+
+Decision 6 made focusing the input select notes mode, and decision 3 gave notes
+mode a different position for the input. Together they meant a click on the
+input re-laid-out the book **underneath the cursor**: the slip sat at the foot
+of the right page, the focus put the spread into notes mode, and the slip jumped
+across the spine to the left as it was being clicked.
+
+The slip now has one position in every mode that shows it — the foot of the left
+page, in both `cook` and `notes` — and `contents` mode does not show it at all.
+Nothing moves on a click, so the focus transition has no work left to do and is
+gone, along with the running-timer exception that existed only to blunt it. The
+left-edge Notes tab is the only way into notes mode, which is explicit and
+cannot move the thing being clicked.
+
+`timer.js`'s `isTimerRunningFor` went with it; it was added for that exception
+and had no other caller.
+
+### R2. Notes joins the strip on the contents page (follows from R1)
+
+With the focus transition gone, notes mode had no entry point while browsing —
+the strip shows the filters there and the Contents/Cook/Notes set only appears
+once a recipe is open. The book-level thread would have been unreachable. The
+Notes tab is therefore on the strip in every view: beside the filters while
+browsing, beside Contents and Cook while a recipe is open. Contents and Cook
+stay hidden while browsing, having nothing to offer there.
+
+The input keeps its right-page position on the contents page proper, because
+that state has no Contents tab to come back from.
+
+### R3. The right-edge strip stays in cook mode (supersedes 5's second half)
+
+Task 3.4 hid the Ingredients / Method strip in cook mode on the grounds that
+both sections were already on the spread. In the book it read as a missing page.
+The strip stays; in cook mode it simply does not decide what the right page
+shows. A CSS guard forces the method panel visible for any tab value, because
+`ingredients` now names a panel that lives on the *left* page and would
+otherwise leave the right page empty.
+
+### R4. Cook mode shows the reply as a pinned slip
+
+Cook mode hid `#page-margin` outright. Once the input was available in cook mode
+(R1), that meant a note could be written there and its answer never seen. The
+reply is now pinned to the top corner of the method page as a single slip — the
+treatment the contents page already gives it — rather than restoring a 150px
+column that is empty most of the time.

@@ -1891,21 +1891,29 @@ body[data-view-mode="index"] #page-margin {
         flex: 0 0 auto;
     }
 
+    /* No 150px margin column in cook mode — the method owns its page — but the
+       slip is at the foot of the left page here, so a note written mid-cook has
+       to get a visible answer. The reply is pinned to the top corner of the
+       method page as a slip of its own, the same treatment the contents page
+       gives it, rather than reserving a column that is empty most of the time. */
     body[data-spread-mode="cook"] #page-margin {
-        display: none;
-    }
-
-    /* Both sections are on the spread already, so the strip that switches
-       between them has nothing left to say. */
-    body[data-spread-mode="cook"] .edge-tabs {
-        display: none;
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        width: 150px;
+        padding-top: 0;
+        z-index: 2;
     }
 
     /* Whatever tab state the right page carried into cook mode, the method is
-       what it shows. The Notes edge tab is gone from the desktop strip but
-       `notes` is still a legal tab value, and a stale one must not blank the
-       only page the cook is reading. */
-    body[data-spread-mode="cook"] #page-right[data-tab="notes"] .tab-panel[data-tab="method"] {
+       what it shows. Both other tab values would blank the only page the cook
+       is reading: `notes` is still legal though its desktop tab is gone, and
+       `ingredients` names a panel that now lives on the LEFT page, so the right
+       page would have nothing to render. The strip stays on the edge (it is the
+       book's furniture, and an empty edge reads as a missing page), but in this
+       mode it does not decide what the right page shows. */
+    body[data-spread-mode="cook"] #page-right[data-tab="notes"] .tab-panel[data-tab="method"],
+    body[data-spread-mode="cook"] #page-right[data-tab="ingredients"] .tab-panel[data-tab="method"] {
         display: block;
     }
 
@@ -1939,20 +1947,44 @@ body[data-view-mode="index"] #page-margin {
         font-size: 16px;
     }
 
-    /* The single slip follows the thread across the spine. No JS moves it and
-       no second form exists: it is the same absolutely positioned form with its
-       offsets mirrored. */
+    /* ---- Where the slip sits, across all three modes ---- */
+    /* One rule for the whole spread: while a recipe is open the slip is at the
+       foot of the LEFT page in both modes that show it, and hidden in the
+       third. It therefore never moves under the cursor — the jump that made a
+       click on the input re-lay-out the book is gone, and with it the reason
+       for the focus-selects-notes transition that caused it.
+
+       No JS moves the form and no second form exists: it is the same
+       absolutely positioned element with its offsets mirrored. */
+    body[data-spread-mode="cook"] .note-input,
     body[data-spread-mode="notes"] .note-input {
         left: 10px;
         right: calc(50% + 10px);
     }
 
-    /* The foot clearance follows the slip. The left page needs it now and the
-       right page does not, so it goes back to .page's own 20px. */
+    /* Contents mode has no slip at all. The contents are for finding a recipe,
+       not for writing, and the Notes tab is one click away on the same strip
+       the reader is already using. Hidden rather than moved, so nothing on the
+       page shifts when the mode changes.
+
+       Scoped to a recipe being open: on the contents page proper the strip
+       offers the filters, with no Notes tab to reach the thread by, so the slip
+       has to stay where it has always been. */
+    body[data-view-mode="recipe"][data-spread-mode="contents"] .note-input,
+    body[data-view-mode="meal"][data-spread-mode="contents"] .note-input {
+        display: none;
+    }
+
+    /* The foot clearance follows the slip onto the left page; the right page
+       goes back to .page's own 20px. Contents mode with a recipe open needs
+       neither, but leaving the right page's default 72px there costs nothing
+       and keeps the rule to the two modes that actually moved the slip. */
+    body[data-spread-mode="cook"] .page-left,
     body[data-spread-mode="notes"] .page-left {
         padding-bottom: 72px;
     }
 
+    body[data-spread-mode="cook"] .page-right,
     body[data-spread-mode="notes"] .page-right {
         padding-bottom: 20px;
     }

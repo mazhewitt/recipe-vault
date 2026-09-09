@@ -105,8 +105,8 @@ export function setSpreadMode(mode, options = {}) {
  * Mirrors the current view mode and spread mode onto the left-edge strip.
  *
  * The strip is one <nav> holding two button sets — the contents filters and the
- * spread tabs — and exactly one set is on screen at a time:
- *   index  → the filters (All / Mains / Sweets / Meals)
+ * spread tabs:
+ *   index  → the filters (All / Mains / Sweets / Meals), plus Notes
  *   recipe → the spread tabs (Contents / Cook / Notes)
  *   meal   → the spread tabs without Cook; a meal is the one case where several
  *            recipes at once is the point, so it never enters cook mode
@@ -131,8 +131,17 @@ export function syncStrip() {
     });
 
     nav.querySelectorAll('.spread-tab[data-mode]').forEach(btn => {
-        const cookOnAMeal = btn.dataset.mode === 'cook' && viewMode === 'meal';
-        btn.hidden = !showSpreadTabs || cookOnAMeal;
+        const tab = btn.dataset.mode;
+        // On the contents page the filters hold the strip, but Notes joins them:
+        // it is the only way into the book-level thread now that focusing the
+        // input no longer opens notes mode. Contents and Cook have nothing to
+        // offer there — contents is already what the spread is showing, and
+        // cook needs a recipe. A meal plan never offers Cook, for its own
+        // reason: several recipes at once is the point of a meal.
+        const visible = showSpreadTabs
+            ? !(tab === 'cook' && viewMode === 'meal')
+            : tab === 'notes';
+        btn.hidden = !visible;
 
         const active = btn.dataset.mode === mode;
         btn.classList.toggle('is-active', active);
@@ -140,29 +149,10 @@ export function syncStrip() {
     });
 }
 
-/**
- * True while a timer is running for the recipe on the page — the one case where
- * focusing the input must not take the method away.
- *
- * It has to be that recipe's timer. #timer-widget is no proxy for it: the
- * widget carries no recipe id and outlives the recipe it was started under (it
- * stays on screen while the reader pages on, and for three seconds after the
- * timer completes), so reading its visibility would silently refuse notes mode
- * on a recipe that has no timer at all. timer.js answers it accurately, and is
- * reached through the shared state's function table rather than an import —
- * this module imports nothing but the animation lock, and the state table is
- * how the modules that must not import each other already call one another.
- */
-function isTimerRunningForOpenRecipe() {
-    if (currentViewMode() !== 'recipe') return false;
-    if (!state || typeof state.isTimerRunningFor !== 'function') return false;
-    return state.isTimerRunningFor(state.currentRecipeId);
-}
-
 let bound = false;
 
 /**
- * Binds the two listeners the strip needs and seeds the default mode.
+ * Binds the strip's listener and seeds the default mode.
  * Call once from app.js DOMContentLoaded. Idempotent.
  *
  * One delegated click listener on `document` routes clicks on
@@ -170,10 +160,9 @@ let bound = false;
  * role="tab" and no data-tab, so page-tabs.js's delegated handler never sees
  * them and the two strips stay independent.
  *
- * Focusing the note input opens notes mode, because a reader reaching for the
- * input wants room to write. The exception is a cook mid-recipe with a timer
- * running: there the method page is load-bearing and must not be swapped out
- * from under them for a one-word reply.
+ * The tab is the only way into a mode. Nothing selects a mode implicitly except
+ * opening a recipe (cook) and returning to the contents (contents), both driven
+ * from the modules that own those transitions.
  */
 export function initSpreadModes() {
     if (bound) return;
@@ -192,13 +181,13 @@ export function initSpreadModes() {
         setSpreadMode(btn.dataset.mode);
     });
 
-    // focus does not bubble, so the delegation listens in the capture phase.
-    document.addEventListener('focus', (e) => {
-        const target = e.target;
-        if (!target || target.id !== 'message-input') return;
-        if (getSpreadMode() === 'cook' && isTimerRunningForOpenRecipe()) return;
-        setSpreadMode('notes');
-    }, true);
+    // Focusing the input deliberately does NOT select notes mode. It used to,
+    // and it made a click on the slip re-lay-out the book underneath the
+    // cursor: the input sat at the foot of the right page, the focus put the
+    // spread into notes mode, and the slip jumped across the spine to the left.
+    // The slip now keeps one position in every mode that shows it, and the tab
+    // is the only way into notes mode - explicit, and it cannot move the thing
+    // being clicked.
 
     syncStrip();
 }

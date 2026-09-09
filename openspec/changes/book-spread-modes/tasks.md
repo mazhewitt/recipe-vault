@@ -11,6 +11,9 @@
 ## 2. Left-edge tab strip (`static/chat.html`, `static/spread-modes.js`)
 
 - [x] 2.1 Give `.contents-tabs` two tab sets: the filters (All / Mains / Sweets / Meals) when no recipe is open, and Contents / Cook / Notes when one is
+
+      Amended on 2026-09-09 (design.md R2): Notes joins the filters while browsing
+      too, as the only remaining way into the book-level thread.
 - [x] 2.2 Swap the sets on view-mode change without destroying the `<nav>` (it is a sibling of `#page-left-content` precisely so a contents re-render cannot remove it)
 - [x] 2.3 Keep the buttons free of `role="tab"` and `data-tab` so `page-tabs.js`'s delegated `[role="tab"][data-tab]` handler never sees them; use `aria-pressed` as the filter tabs already do
 - [x] 2.4 Drop Cook from the strip while a meal plan is displayed
@@ -20,8 +23,16 @@
 
 - [x] 3.1 Relocate the rendered `.tab-panel[data-tab="ingredients"]` node into `#page-left-content` on entering cook mode, and back on leaving — a move, not a second render, so `applyStepHighlight` keeps its single `querySelector` target
 - [x] 3.2 Right page shows the method panel only; no margin column in cook mode
+
+      Amended on 2026-09-09 (design.md R4): still no column, but the reply is
+      pinned to the page corner as a slip — the input is available in cook mode,
+      so its answer has to be visible.
 - [x] 3.3 Independent scrolling for both pages (the `.page` overflow rule already gives this; confirm no `padding-bottom: 72px` gap now that the input is elsewhere in notes mode)
-- [x] 3.4 Hide the right-edge Ingredients / Method strip in cook mode above 600px
+- [x] 3.4 ~~Hide the right-edge Ingredients / Method strip in cook mode above 600px~~
+
+      Reversed on 2026-09-09 (design.md R3): an empty outer edge read as a missing
+      page, so the strip stays in cook mode and simply does not decide what the
+      right page shows.
 - [x] 3.5 Skip `setActiveTab`'s scroll-to-header behaviour in cook mode — there is no tab to scroll to
 - [x] 3.6 Preserve the mode across a recipe refresh (photo upload, `update_recipe`, difficulty refresh) — `renderRecipe` re-asserts the tab today and must re-assert the mode too
 
@@ -29,6 +40,9 @@
 
 - [x] 4.1 Render the open recipe's thread into the left page, oldest first, reusing `renderThread`'s markup and its XSS rules (only AI replies are markdown)
 - [x] 4.2 Reposition the single `.note-input` form to the foot of the left page with CSS only (`right: calc(50% + 10px)`), no second form and no JS move
+
+      Widened on 2026-09-09 (design.md R1): cook mode uses the same position, so
+      the slip never moves, and contents mode hides it instead.
 - [x] 4.3 Right page shows the whole recipe (ingredients and method) as one scrolling page with its margin column
 - [x] 4.4 Book-level thread on the left when no recipe is open, with the contents on the right
 - [x] 4.5 Empty-thread message when the open recipe has no notes
@@ -36,8 +50,14 @@
 ## 5. Implicit transitions (`static/spread-modes.js`, `static/chat.js`, `static/navigation.js`)
 
 - [x] 5.1 Opening a recipe (contents click, `display_recipe`, prev/next, swipe) selects `cook`
-- [x] 5.2 Focusing the note input selects `notes`
-- [x] 5.3 Suppress 5.2 while a timer is running for the open recipe and the mode is `cook` — the method page is load-bearing there
+- [ ] 5.2 ~~Focusing the note input selects `notes`~~
+
+      Removed on 2026-09-09 (design.md R1): it moved the slip out from under the
+      cursor mid-click. The Notes tab is the only way in.
+- [ ] 5.3 ~~Suppress 5.2 while a timer is running for the open recipe and the mode is `cook`~~
+
+      Moot once 5.2 was removed. `timer.js`'s `isTimerRunningFor`, added for this,
+      went with it.
 - [x] 5.4 Returning to the contents (`navigation.js:123`, the Recipe Book header) selects `contents` and reverts the strip
 - [x] 5.5 Clicking a recipe in the contents while another is open switches recipe and returns to `cook`
 
@@ -54,7 +74,9 @@
 
 - [x] 7.1 Remove Notes from the desktop right-edge strip; keep all three on the phone's `.page-tabs`
 - [x] 7.2 Keep `notes` in `VALID_TABS` — the value stays legal, only the desktop affordance goes
-- [x] 7.3 Right-edge strip hidden entirely in cook mode above 600px
+- [ ] 7.3 ~~Right-edge strip hidden entirely in cook mode above 600px~~
+
+      Reversed with 3.4; see design.md R3.
 
 ## 8. Responsive
 
@@ -86,8 +108,9 @@
       have to repeat the reverts.
 - [x] 9.6 Full `make test-e2e` and `make lint` green across chromium, mobile-chrome and ipad
 
-      Verified independently after the workflow finished: `make lint` clean,
-      `make test-e2e` 325 passed / 71 skipped across all three projects.
+      Verified independently after the workflow finished, and again after the
+      2026-09-09 revisions: `make lint` clean, `make test-e2e` 327 passed /
+      72 skipped across all three projects.
 
 ## 10. Documentation
 

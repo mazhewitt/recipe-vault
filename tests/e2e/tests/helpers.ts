@@ -262,15 +262,15 @@ export async function openNotesView(page: Page): Promise<void> {
   if (isPhone(page)) {
     await page.locator('.page-tab[data-tab="notes"]').click();
     await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'notes');
-  } else if (await page.locator('.spread-tab[data-mode="notes"]').isVisible()) {
+  } else {
+    // The Notes tab is the only way in on desktop, and it is on the strip in
+    // every view: beside the filters while browsing, beside Contents and Cook
+    // while a recipe is open. Focusing the input no longer opens notes mode.
     const tab = page.locator('.spread-tab[data-mode="notes"]');
     await expect(async () => {
       await tab.click();
       await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes', { timeout: 1000 });
     }).toPass({ timeout: 15000 });
-  } else {
-    await page.locator('#message-input').focus();
-    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
   }
   await expect(notesThread(page)).toBeVisible();
 }
