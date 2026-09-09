@@ -213,6 +213,68 @@ export async function sendNote(page: Page, text: string): Promise<void> {
   await page.locator('#message-input').press('Enter');
 }
 
+/**
+ * The x of the book's spine — the middle of the two-page spread. The note input
+ * is a slip over the right page in contents and cook modes and over the left
+ * page in notes mode, so which side of this line it falls on is the assertion.
+ */
+export async function spineX(page: Page): Promise<number> {
+  const pages = (await page.locator('.pages-container').boundingBox())!;
+  return pages.x + pages.width / 2;
+}
+
+/**
+ * The container the whole thread is rendered into on this viewport. The phone
+ * swaps it into the right page on its Notes paper tab; above 600px Notes is a
+ * spread mode and the thread takes the left page.
+ */
+export function notesThread(page: Page) {
+  return page.locator(isPhone(page)
+    ? '#page-right-content .notes-thread'
+    : '#page-left-content .notes-thread');
+}
+
+/**
+ * Puts the spread back in contents mode, where the contents share the left page
+ * with the open recipe and the right page holds the whole of it — today's
+ * layout, and what the assertions written before spread modes describe. A no-op
+ * on a phone, which has no spread and so no mode.
+ */
+export async function useContentsMode(page: Page): Promise<void> {
+  if (isPhone(page)) return;
+  const tab = page.locator('.spread-tab[data-mode="contents"]');
+  await expect(tab).toBeVisible();
+  // The strip honours the animation lock, so a tap that lands inside a page
+  // turn is ignored by design. Retry rather than sleep through the turn.
+  await expect(async () => {
+    await tab.click();
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'contents', { timeout: 1000 });
+  }).toPass({ timeout: 15000 });
+}
+
+/**
+ * Opens the whole-thread view by the route this viewport actually offers: the
+ * Notes paper tab on a phone, the left-edge Notes tab above 600px — and, while
+ * no recipe is open (where the strip shows the contents filters instead), by
+ * reaching for the note input, which is the only way into notes mode there.
+ */
+export async function openNotesView(page: Page): Promise<void> {
+  if (isPhone(page)) {
+    await page.locator('.page-tab[data-tab="notes"]').click();
+    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'notes');
+  } else if (await page.locator('.spread-tab[data-mode="notes"]').isVisible()) {
+    const tab = page.locator('.spread-tab[data-mode="notes"]');
+    await expect(async () => {
+      await tab.click();
+      await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes', { timeout: 1000 });
+    }).toPass({ timeout: 15000 });
+  } else {
+    await page.locator('#message-input').focus();
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
+  }
+  await expect(notesThread(page)).toBeVisible();
+}
+
 /** The thread entries margin-notes.js holds for this session. */
 export async function threadEntries(page: Page): Promise<Array<{ kind: string; text: string }>> {
   return page.evaluate(() =>

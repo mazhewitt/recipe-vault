@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe, openTab, sendNote } from './helpers';
+import { authenticate, createRecipe, openRecipe, openNotesView, notesThread, sendNote } from './helpers';
 
 test.describe('XSS Protection', () => {
   test.beforeEach(async ({ page }) => {
@@ -114,9 +114,9 @@ test.describe('XSS Protection', () => {
     await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
       .toHaveCount(1, { timeout: 10000 });
 
-    await openTab(page, 'notes');
+    await openNotesView(page);
 
-    const thread = page.locator('#page-right-content .notes-thread');
+    const thread = notesThread(page);
     const threadHtml = await thread.innerHTML();
 
     // The payload is present, and present only in escaped form

@@ -5,6 +5,7 @@
 
 import { animatePageTurn, isAnimating } from './page-transitions.js';
 import { setNotePageNumber } from './recipe-display.js';
+import { setSpreadMode } from './spread-modes.js';
 
 // Import global state accessors (will be set by app.js)
 export let state = null;
@@ -123,10 +124,24 @@ export async function showIndex() {
     state.viewMode = 'index';
     state.currentRecipeId = null;
     state.currentRecipeTitle = null;
+    // Back at the contents, the contents take the left page again and the strip
+    // reverts to the filters (the view-mode change above has already swapped the
+    // button sets; this presses the right one). force: showIndex is reached from
+    // the back arrow inside a page turn, and the lock exists to reject the
+    // reader's tab clicks, not this.
+    setSpreadMode('contents', { force: true });
     // The contents page is page 1
     setNotePageNumber(null);
-    const list = await state.fetchRecipeList(true);
-    state.renderIndex(list, { currentRecipeId: state.lastRecipeId, filter: state.contentsFilter });
+    // The redraw belongs to renderContents, not to this function. Rendering the
+    // index here would be a second write of both pages after an await, and an
+    // unguarded one: a reader who reaches for the note input while the recipe
+    // list is in flight is in notes mode by the time it lands, and the two-page
+    // split would drop on top of the thread the mode change had just put on the
+    // left page. renderContents stamps itself with the spread generation, so
+    // whichever call decided the pages last is the one that gets to write them.
+    // Awaited because showIndex runs inside a page turn, which must not uncover
+    // the pages before they are drawn.
+    await state.renderContents();
     updateNavigationState();
 }
 

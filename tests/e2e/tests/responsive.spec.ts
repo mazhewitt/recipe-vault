@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe, isPhone, isTablet, Recipe } from './helpers';
+import { authenticate, createRecipe, openRecipe, isPhone, isTablet, useContentsMode, Recipe } from './helpers';
 
 const RECIPE: Recipe = {
   title: 'Responsive Test Recipe',
@@ -88,10 +88,16 @@ test.describe('Responsive Layout (book only)', () => {
   test('desktop shows the edge tabs and the note input on the right page', async ({ page }) => {
     test.skip(isPhone(page), 'wide layout only');
     await seedAndOpen(page);
+    // Contents mode: the arrangement this case describes — the whole recipe on
+    // the right page, the contents on the left, the section strip on the outer
+    // edge. Cook mode splits the recipe and hides that strip
+    // (spread-modes.spec.ts).
+    await useContentsMode(page);
 
-    // Edge tabs on the book's outer edge; the phone paper tabs stay hidden
+    // Edge tabs on the book's outer edge; the phone paper tabs stay hidden.
+    // Two of them: Notes is a left-page spread mode now, not a section.
     await expect(page.locator('.edge-tabs')).toBeVisible();
-    await expect(page.locator('.edge-tab')).toHaveCount(3);
+    await expect(page.locator('.edge-tab')).toHaveCount(2);
     await expect(page.locator('.edge-tab[data-tab="ingredients"]')).toHaveClass(/active/);
     await expect(page.locator('.page-tabs')).toBeHidden();
 
@@ -114,6 +120,7 @@ test.describe('Responsive Layout (book only)', () => {
   test('desktop hides the edge tabs on the contents page', async ({ page }) => {
     test.skip(isPhone(page), 'wide layout only');
     await seedAndOpen(page);
+    await useContentsMode(page);
     await expect(page.locator('.edge-tabs')).toBeVisible();
 
     await page.locator('#recipe-book-header').click();
@@ -139,6 +146,9 @@ test.describe('Responsive Layout (book only)', () => {
       difficulty: 3,
     });
     await openRecipe(page, recipeId);
+    // The collapse is felt in contents and notes modes, the two that still have
+    // a margin column to collapse; cook mode has already hidden it
+    await useContentsMode(page);
 
     await expect(page.locator('.edge-tabs')).toBeVisible();
     await expect(page.locator('.page-tabs')).toBeHidden();

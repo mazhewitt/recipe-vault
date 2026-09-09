@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe, openTab, sendNote, isPhone, tabSelector } from './helpers';
+import { authenticate, createRecipe, openRecipe, openTab, sendNote, isPhone, tabSelector,
+         useContentsMode, openNotesView, notesThread } from './helpers';
 
 /**
  * The Ingredients / Method / Notes tabs. One state, #page-right[data-tab], two
@@ -142,6 +143,9 @@ test.describe('Page tabs', () => {
   test('a tab tap during a page turn is ignored', async ({ page }) => {
     const recipeId = await createLongRecipe(page, 'Tab Lock');
     await openRecipe(page, recipeId);
+    // The right-edge strip is hidden in cook mode (both sections are on the
+    // spread there), so the tab it controls is only tappable in contents mode
+    await useContentsMode(page);
     await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
 
     // A real page turn, held open by a slow render so the tap lands inside it
@@ -198,6 +202,10 @@ test.describe('Page tabs', () => {
     test.skip(isPhone(page), 'edge tabs are the wide layout');
     const recipeId = await createLongRecipe(page, 'Edge Scroll');
     await openRecipe(page, recipeId);
+    // Contents mode is where the right page holds the whole recipe and so has
+    // two section headers to scroll between; cook mode has one section per page
+    // and hides this strip entirely (see spread-modes.spec.ts).
+    await useContentsMode(page);
 
     const scrollTop = () => page.locator('#page-right').evaluate(el => el.scrollTop);
     // The page really does overflow, otherwise there is nothing to scroll
@@ -237,34 +245,10 @@ test.describe('Page tabs', () => {
     expect(await isAnimating(page)).toBe(false);
   });
 
-  test('desktop: Notes swaps in the thread and keeps the margin and note input', async ({ page }) => {
-    test.skip(isPhone(page), 'edge tabs are the wide layout');
-    const recipeId = await createLongRecipe(page, 'Edge Notes');
-    await openRecipe(page, recipeId);
-
-    await sendNote(page, 'hello desktop notes');
-    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
-      .toHaveCount(1, { timeout: 10000 });
-
-    await page.locator('.edge-tab[data-tab="notes"]').click();
-
-    const thread = page.locator('#page-right-content .notes-thread');
-    await expect(thread).toBeVisible();
-    await expect(thread.locator('.thread-note[data-kind="user"]')).toHaveText('hello desktop notes');
-    await expect(thread.locator('.thread-note[data-kind="reply"]')).toContainText('mock assistant');
-
-    // The recipe body is swapped out, the page furniture stays
-    await expect(page.locator('#page-right-content .ingredients-list')).toBeHidden();
-    await expect(page.locator('#page-right-content .prep-list')).toBeHidden();
-    await expect(page.locator('.recipe-title')).toBeVisible();
-    await expect(page.locator('#page-margin')).toBeVisible();
-    await expect(page.locator('.note-input')).toBeVisible();
-
-    // Back to Ingredients restores the recipe body and hides the thread
-    await page.locator('.edge-tab[data-tab="ingredients"]').click();
-    await expect(page.locator('#page-right-content .ingredients-list')).toBeVisible();
-    await expect(thread).toBeHidden();
-  });
+  // The desktop Notes edge tab is gone: Notes is a left-page spread mode above
+  // 600px, and the thread it shows is covered by spread-modes.spec.ts. The
+  // value stays legal on #page-right[data-tab] for the phone, which is what the
+  // cases below exercise.
 
   test('a re-render keeps the open tab and refills the thread', async ({ page }) => {
     const recipeId = await createLongRecipe(page, 'Tab Persist');
@@ -274,16 +258,21 @@ test.describe('Page tabs', () => {
     await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
       .toHaveCount(1, { timeout: 10000 });
 
-    await page.locator(tabSelector(page, 'notes')).click();
-    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'notes');
+    await openNotesView(page);
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
 
     // A refresh of the recipe already on the page — the path a photo upload and
-    // an AI update_recipe both take — must keep the tab and refill the thread
+    // an AI update_recipe both take — must leave the reader where they were and
+    // refill the thread: on the phone that is the Notes tab, above 600px it is
+    // notes spread mode.
     await openRecipe(page, recipeId);
 
-    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'notes');
-    const thread = page.locator('#page-right-content .notes-thread');
+    if (isPhone(page)) {
+      await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'notes');
+    } else {
+      await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'notes');
+    }
+    const thread = notesThread(page);
     await expect(thread.locator('.thread-note')).toHaveCount(2);
     await expect(thread.locator('.thread-note[data-kind="user"]')).toHaveText('hello persist');
   });
@@ -292,10 +281,10 @@ test.describe('Page tabs', () => {
     const recipeId = await createLongRecipe(page, 'Live Notes');
     await openRecipe(page, recipeId);
 
-    await openTab(page, 'notes');
+    await openNotesView(page);
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
 
-    const thread = page.locator('#page-right-content .notes-thread');
+    const thread = notesThread(page);
     await expect(thread).toBeVisible();
     await expect(thread).toHaveAttribute('data-empty', 'true');
 
@@ -305,13 +294,13 @@ test.describe('Page tabs', () => {
 
     await expect(thread.locator('.thread-note[data-kind="user"]')).toHaveText('live note', { timeout: 10000 });
     await expect(thread.locator('.thread-note[data-kind="reply"]')).toContainText('mock assistant', { timeout: 15000 });
-    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'notes');
+    await expect(thread).toBeVisible();
   });
 
   test('the contents sticky note survives a visit to the Notes tab', async ({ page }) => {
     const recipeId = await createLongRecipe(page, 'Sticky After Notes');
     await openRecipe(page, recipeId);
-    await openTab(page, 'notes');
+    await openNotesView(page);
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
 
     // #page-right[data-tab] is not reset on the way back to the contents, so
@@ -336,6 +325,8 @@ test.describe('Page tabs', () => {
     expect(other).toBeTruthy();
 
     await openRecipe(page, first);
+    // Contents mode: the strip that carries the Method tab is hidden in cook mode
+    await useContentsMode(page);
     await openTab(page, 'method');
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
 
@@ -347,7 +338,10 @@ test.describe('Page tabs', () => {
     await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
     await expect(page.locator(tabSelector(page, 'ingredients'))).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator(tabSelector(page, 'method'))).toHaveAttribute('aria-selected', 'false');
-    await expect(page.locator('#page-right-content .ingredients-list')).toBeVisible();
+    // ...and the new recipe opens in cook mode, so above 600px the ingredients
+    // are on the left page rather than the right
+    const ingredientsPage = isPhone(page) ? '#page-right-content' : '#page-left-content';
+    await expect(page.locator(`${ingredientsPage} .ingredients-list`)).toBeVisible();
   });
 
   test('phone: the tab switch crossfades without an overlay or a nav direction', async ({ page }) => {

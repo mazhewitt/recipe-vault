@@ -1041,6 +1041,13 @@ body::before {
     body[data-view-mode="recipe"] .edge-tabs {
         display: flex;
     }
+
+    /* Notes is a left-page spread mode now, not a section of the right page, so
+       the strip that controls the right page drops it. The phone keeps all
+       three on .page-tabs - it has no left page to promote anything to. */
+    .edge-tab[data-tab="notes"] {
+        display: none;
+    }
 }
 
 .edge-tab {
@@ -1198,6 +1205,30 @@ body[data-feature-meals] .contents-tab-meals {
 .contents-tab:focus-visible {
     outline: 2px solid var(--color-ink-dark);
     outline-offset: 2px;
+}
+
+/* ==================== SPREAD MODE TABS ==================== */
+/* Contents / Cook / Notes take the same strip while a recipe is open, so they
+   reuse .contents-tab wholesale - same paper-tab shape, same edge, same ink -
+   and vary only the colour, exactly as the three filters do. They are toggles
+   rather than filters, so selection reads off aria-pressed as well as the
+   .is-active class spread-modes.js keeps in step with it.
+   Contents keeps the leather of the All tab; Cook takes the tan and Sweets'
+   brown goes to Notes. */
+.spread-tab[data-mode="cook"] {
+    background: var(--color-border);
+    color: var(--color-ink-dark);
+}
+
+.spread-tab[data-mode="notes"] {
+    background: var(--color-accent-brown);
+}
+
+.spread-tab[aria-pressed="true"] {
+    opacity: 1;
+    font-weight: 700;
+    padding-left: 8px;
+    box-shadow: -3px 2px 6px rgba(0,0,0,0.3);
 }
 
 /* ==================== PHONE FOOTER ==================== */
@@ -1829,10 +1860,111 @@ body[data-view-mode="index"] #page-margin {
     }
 }
 
+/* ==================== SPREAD MODES ==================== */
+/* body[data-spread-mode] says what the left page is holding: the contents
+   (`contents`), the open recipe's ingredients (`cook`) or the conversation
+   (`notes`). spread-modes.js writes the attribute and the render callback moves
+   the one node that has to move - the ingredients panel; the rest is here.
+
+   The whole section sits inside a min-width: 601px query on purpose. Below that
+   there is no spread at all - one page at a time with its own paper tabs - so
+   the mode must be provably inert, and a max-width override further down the
+   file is not proof. Contents mode is the layout the book already had, so it
+   needs no rules; only cook and notes depart from it. */
+@media (min-width: 601px) {
+    /* ---- Cook mode: one recipe, both pages ---- */
+    /* Ingredients on the left, method on the right, nothing else on either. The
+       margin column goes with the contents: a note has nowhere to sit beside a
+       method that now owns its page, and the reader asked for the recipe, not
+       the conversation. The two pages scroll independently for free - .page
+       already carries overflow-y: auto - which is the point of the mode: a long
+       ingredient list no longer pushes the method down. */
+    body[data-spread-mode="cook"] #page-right {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Same reasoning as the tablet collapse below: the content block sizes to
+       its content so the page scrolls with it instead of clipping at 100%. */
+    body[data-spread-mode="cook"] #page-right-content {
+        height: auto;
+        flex: 0 0 auto;
+    }
+
+    body[data-spread-mode="cook"] #page-margin {
+        display: none;
+    }
+
+    /* Both sections are on the spread already, so the strip that switches
+       between them has nothing left to say. */
+    body[data-spread-mode="cook"] .edge-tabs {
+        display: none;
+    }
+
+    /* Whatever tab state the right page carried into cook mode, the method is
+       what it shows. The Notes edge tab is gone from the desktop strip but
+       `notes` is still a legal tab value, and a stale one must not blank the
+       only page the cook is reading. */
+    body[data-spread-mode="cook"] #page-right[data-tab="notes"] .tab-panel[data-tab="method"] {
+        display: block;
+    }
+
+    body[data-spread-mode="cook"] #page-right[data-tab="notes"] .tab-panel[data-tab="notes"] {
+        display: none;
+    }
+
+    /* A whole page for the ingredients buys the phone's one-per-line list: a
+       column half a spread wide wraps the packed run badly, and a cook reading
+       with their hands busy scans a list, not a paragraph. */
+    body[data-spread-mode="cook"] #page-left-content .ingredient-item {
+        display: block;
+    }
+
+    body[data-spread-mode="cook"] #page-left-content .ingredient-sep {
+        display: none;
+    }
+
+    /* ---- Notes mode: the conversation takes the left page ---- */
+    /* The right page is untouched - the whole recipe and its margin column,
+       exactly as in contents mode. Only the left page and the input move. */
+    .notes-page {
+        max-width: 62ch; /* the page is nearly this narrow already; the cap only
+                            bites on a very wide book */
+    }
+
+    /* The thread reuses .notes-thread and its .thread-note ink wholesale - the
+       Notes tab and the notes page are the same thread rendered twice - and
+       takes the reading size a full page can afford. */
+    body[data-spread-mode="notes"] #page-left-content .notes-thread {
+        font-size: 16px;
+    }
+
+    /* The single slip follows the thread across the spine. No JS moves it and
+       no second form exists: it is the same absolutely positioned form with its
+       offsets mirrored. */
+    body[data-spread-mode="notes"] .note-input {
+        left: 10px;
+        right: calc(50% + 10px);
+    }
+
+    /* The foot clearance follows the slip. The left page needs it now and the
+       right page does not, so it goes back to .page's own 20px. */
+    body[data-spread-mode="notes"] .page-left {
+        padding-bottom: 72px;
+    }
+
+    body[data-spread-mode="notes"] .page-right {
+        padding-bottom: 20px;
+    }
+}
+
 /* ==================== RESPONSIVE ==================== */
 /* Tablet: the book keeps its two-page spread and simply fills the width. The
    margin column collapses beneath the right page content; the edge tabs and the
-   absolutely positioned note input behave exactly as on desktop. */
+   absolutely positioned note input behave exactly as on desktop. Cook mode has
+   already flattened the right page and hidden its margin, so the collapse is
+   felt only in contents and notes modes - the two that still have a margin
+   column to collapse. */
 @media (max-width: 1024px) {
     body {
         padding: 20px;
@@ -2241,6 +2373,14 @@ body[data-view-mode="index"] #page-margin {
     .contents-tab.is-active {
         padding: 10px 14px;
         box-shadow: 1px 2px 5px rgba(0,0,0,0.3);
+    }
+
+    /* There is no spread here, so there are no spread tabs. The strip shows
+       its filters on the contents page, and while a recipe is open the whole
+       left page - strip and all - is hidden; this is the belt that makes the
+       phone strip provably filters-only whatever syncStrip decides. */
+    .spread-tab {
+        display: none;
     }
 
     /* Keep add-photo icon clear of the mobile edge nav overlay */

@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, seedRecipes, openRecipe, openTab, sendNote } from './helpers';
+import { authenticate, createRecipe, seedRecipes, openRecipe, sendNote, isPhone, openNotesView, notesThread } from './helpers';
 
 /**
  * The note input is the only chat surface now: a note goes into the thread,
@@ -32,9 +32,9 @@ test.describe('Notes and replies', () => {
     await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
       .toHaveCount(1, { timeout: 10000 });
 
-    await openTab(page, 'notes');
+    await openNotesView(page);
 
-    const thread = page.locator('#page-right-content .notes-thread');
+    const thread = notesThread(page);
     await expect(thread).toBeVisible();
     const userNote = thread.locator('.thread-note[data-kind="user"]');
     await expect(userNote).toHaveCount(1);
@@ -55,8 +55,8 @@ test.describe('Notes and replies', () => {
     await expect(reply.first()).toContainText('mock assistant');
     await expect(reply.first()).not.toContainText('AI:');
 
-    await openTab(page, 'notes');
-    const threadReply = page.locator('#page-right-content .notes-thread .thread-note[data-kind="reply"]');
+    await openNotesView(page);
+    const threadReply = notesThread(page).locator('.thread-note[data-kind="reply"]');
     await expect(threadReply).toHaveCount(1);
     await expect(threadReply.first()).toContainText('mock assistant');
     await expect(threadReply.first()).not.toContainText('AI:');
@@ -76,8 +76,8 @@ test.describe('Notes and replies', () => {
     await expect(reply).toHaveCount(1, { timeout: 10000 });
     await expect(reply.first()).toContainText('Chicken Curry');
 
-    await openTab(page, 'notes');
-    await expect(page.locator('#page-right-content .notes-thread')).toContainText('Chicken Curry');
+    await openNotesView(page);
+    await expect(notesThread(page)).toContainText('Chicken Curry');
   });
 
   test('a note that triggers display_recipe shows a recipe on the right page', async ({ page }) => {
@@ -92,7 +92,11 @@ test.describe('Notes and replies', () => {
     await expect(title).toBeVisible({ timeout: 10000 });
     await expect(title).not.toBeEmpty();
     await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'recipe');
-    await expect(page.locator('#page-right-content .ingredients-list')).toHaveCount(1);
+    // The recipe opens in cook mode, so above 600px its ingredients take the
+    // left page and the method the right; the phone keeps them on its one page
+    const ingredientsPage = isPhone(page) ? '#page-right-content' : '#page-left-content';
+    await expect(page.locator(`${ingredientsPage} .ingredients-list`)).toHaveCount(1);
+    await expect(page.locator('.ingredients-list')).toHaveCount(1);
   });
 
   test('sending an empty note does nothing', async ({ page }) => {
@@ -102,7 +106,7 @@ test.describe('Notes and replies', () => {
     await page.waitForTimeout(1000);
 
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(0);
-    await openTab(page, 'notes');
-    await expect(page.locator('#page-right-content .notes-thread')).toHaveAttribute('data-empty', 'true');
+    await openNotesView(page);
+    await expect(notesThread(page)).toHaveAttribute('data-empty', 'true');
   });
 });

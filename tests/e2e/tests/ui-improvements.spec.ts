@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, Recipe } from './helpers';
+import { authenticate, createRecipe, useContentsMode, Recipe } from './helpers';
 
 // Helper to create a test recipe with unique title
 async function createTestRecipe(page: Page, title: string): Promise<string> {
@@ -137,7 +137,10 @@ test.describe('UI Improvements', () => {
     const recipeId = await createTestRecipe(page, 'Header Nav Test');
     await navigateToRecipe(page, recipeId);
 
-    // While the recipe is open, the contents column marks it as the current entry
+    // While the recipe is open, the contents column marks it as the current
+    // entry — in contents mode, the one of the three spread modes that keeps
+    // the contents on the left page beside an open recipe
+    await useContentsMode(page);
     await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
 
     const header = page.locator('#recipe-book-header');

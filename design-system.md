@@ -168,8 +168,27 @@ CSS follows the same three bands: `@media (max-width: 1024px)` is tablet-and-bel
 | Value | What is on the pages |
 |-------|----------------------|
 | `index` | The contents. Desktop/tablet: split across both pages. Phone: the left page only. |
-| `recipe` | A recipe on the right page; the contents stay on the left page on desktop/tablet. Section tabs are visible in this mode only. |
-| `meal` | A meal plan on the right page. Laid out exactly like `recipe`, but with no section tabs. |
+| `recipe` | A recipe on the right page; what the left page holds is the spread mode's business (below). Section tabs are visible in this mode only. |
+| `meal` | A meal plan on the right page. Laid out exactly like `recipe`, but with no section tabs, and it never enters cook mode. |
+
+### Spread Modes
+
+Above 600px the book is a spread, and `body[data-spread-mode]` says what the **left** page is holding. `spread-modes.js` is its only writer; CSS decides what each mode means, so anything that needs the mode — a stylesheet, another module, a test — reads the attribute rather than importing anything.
+
+| Value | Left page | Right page | Left-edge strip |
+|-------|-----------|------------|-----------------|
+| `contents` | The contents — split across both pages in `index` view, one column while a recipe is open | The recipe or meal plan, or the second half of the contents | The filters in `index` view, the spread tabs otherwise |
+| `cook` | The open recipe's `ingredients:` panel, **moved** off the right page | The `method:` panel alone — no margin column, no edge tabs | Spread tabs, Cook pressed |
+| `notes` | The thread for the open recipe (`.notes-page > .notes-thread`), with the note slip at its foot | The whole recipe and its margin column, exactly as in contents mode; in `index` view the contents move here as one column | Spread tabs, Notes pressed |
+
+- **Cook mode is the default every time a recipe opens** — from the contents, from `display_recipe`, from the nav arrows or a swipe. It is not sticky and not remembered; the tab back to Contents is one click.
+- **Focusing the note input selects `notes`**, because a reader reaching for the input wants room to write. The one exception is a cook mid-recipe with a timer running for the recipe on the page: there the method is load-bearing and the mode does not change.
+- **Returning to the contents selects `contents`** and the strip reverts to the filters, restoring the one remembered in `sessionStorage['rv-contents-filter']`.
+- **A meal plan never cooks.** `setSpreadMode('cook')` is refused in `meal` view, not merely left off the strip.
+- **A mode change is refused while the animation lock is held**, exactly as a tab change is. The programmatic transitions that happen *inside* a page turn (opening a recipe, going back to the contents) pass `{ force: true }`; a reader's tab click never does.
+- **The ingredients are moved, not re-rendered.** Cook mode relocates the one `.tab-panel[data-tab="ingredients"]` node into `#page-left-content` and puts it back on leaving, so there is only ever one copy and `applyStepHighlight`, the section headers and every refresh path keep their single `querySelector` target. A recipe refresh (photo upload, `update_recipe`, difficulty backfill) re-asserts the mode.
+- **A whole page buys the phone's ingredient list.** In cook mode `#page-left-content .ingredient-item` goes back to `display: block` with `.ingredient-sep` hidden — one ingredient per line, as on the phone. A column half a spread wide wraps the packed `·`-separated run badly, and a cook with their hands busy scans a list, not a paragraph.
+- **Below 600px there is no spread, so there is no mode.** Every rule keyed off the attribute lives inside `@media (min-width: 601px)`, and `setSpreadMode` refuses to write at all on the phone — the attribute keeps its last desktop value, so the reader's mode comes back when the viewport grows again. Render decisions therefore ask for the *effective* mode (`contents` on a phone, whatever the body says above it).
 
 ### Viewport Meta
 
@@ -200,6 +219,8 @@ The book is the only child of `.app-container`, centred up to 1400px.
 └──────────────────────────────────────────────────────────────┘
 ```
 
+That is `contents` mode, the arrangement the book opens in. In `cook` mode the ingredients replace the contents on the left and the method takes the whole right page; in `notes` mode the conversation and the note slip take the left page. See **Spread Modes** above.
+
 ### Dimensions
 
 | Element | Value |
@@ -216,7 +237,7 @@ The book is the only child of `.app-container`, centred up to 1400px.
 
 ### Right Page in Recipe / Meal View
 
-`body[data-view-mode="recipe"] #page-right` (and its `"meal"` sibling) turns the right page into a grid — `grid-template-columns: minmax(0, 1fr) 150px`, `align-items: start`, `column-gap: 12px` — with `#page-right-content` in the first column and `#page-margin` in the second. In contents view there is no grid: `#page-margin` is pinned at `top: 24px; right: 24px`, 150px wide.
+`body[data-view-mode="recipe"] #page-right` (and its `"meal"` sibling) turns the right page into a grid — `grid-template-columns: minmax(0, 1fr) 150px`, `align-items: start`, `column-gap: 12px` — with `#page-right-content` in the first column and `#page-margin` in the second. In contents view there is no grid: `#page-margin` is pinned at `top: 24px; right: 24px`, 150px wide. Nor in `cook` mode: `#page-right` becomes a flex column, `#page-margin` is hidden and the method has the page to itself.
 
 ### Stacking Order
 
@@ -378,8 +399,11 @@ The background simulates a dark wooden table surface.
 | Surface | `--color-paper-cream`, 1px `--color-border-light` top rule, `--radius-sm`, `box-shadow: 0 -2px 8px rgba(0,0,0,0.06)` |
 | Structure | Flex column, 6px gap, `padding: 8px 10px`; `.note-input-row` is a flex row, `align-items: flex-end`, 8px gap |
 | Clearance | `.page-right { padding-bottom: 72px }` keeps recipe content off the slip |
+| Notes mode | `body[data-spread-mode="notes"]` mirrors the offsets — `left: 10px`, `right: calc(50% + 10px)` — so the slip sits at the foot of the **left** page, under the conversation. The 72px clearance follows it: `.page-left` takes it and `.page-right` goes back to `.page`'s own 20px |
 
 It is absolutely positioned precisely so that it does **not** scroll away with the recipe.
+
+There is exactly one `<form class="note-input">` in the document in every mode, at every width. Notes mode moves it with CSS alone — no JS relocation, no second form — so the focus handler, the image attachment, the auto-resize and the SSE wiring are untouched by the move. Focusing it is also what *opens* notes mode (see **Spread Modes**), so the slip and the thread arrive on the left page together.
 
 ### Mobile: a Bar Beneath the Book
 
@@ -451,14 +475,16 @@ An open book showing two pages with a leather cover frame.
 | Page padding | 20px 28px (+ 72px bottom on the right page) | Same | 16px |
 | Spine shadow | Visible | Visible | Hidden |
 | Nav arrows | `.page-nav` 29px | `.page-nav` 36px (larger tap target) | `.page-nav` hidden; 60px `.mobile-edge-nav` zones |
-| Section tabs | `.edge-tabs`, right outer edge | Same | `.page-tabs`, page top edge |
-| Contents filters | `.contents-tabs`, left page's outer edge | Same | Chip row under the contents title |
+| Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; hidden in cook mode) | Same | `.page-tabs`, page top edge (all three) |
+| Left-edge strip | `.contents-tabs`, left page's outer edge: the contents filters while no recipe is open, Contents / Cook / Notes while one is | Same | Chip row under the contents title; filters only |
 
 ---
 
 ## Component: Section Tabs
 
 The right page carries three panels — Ingredients, Method, Notes — emitted by `recipe-display.renderRecipe` as `.tab-panel[data-tab]`. The active one is recorded on `#page-right[data-tab]`, and `page-tabs.setActiveTab()` is its only writer. Both tab surfaces are shown under `body[data-view-mode="recipe"]` only, so the contents page and the meal plan show neither; nothing in JS hides them.
+
+The desktop strip offers only the first two. Notes is a left-page spread mode there, so `.edge-tab[data-tab="notes"]` is `display: none` above 600px; the phone's paper tabs keep all three, having no left page to promote anything to. `notes` stays a legal `#page-right[data-tab]` value in both layouts — only the desktop affordance is gone.
 
 ### Desktop / Tablet: Edge Tabs
 
@@ -470,11 +496,11 @@ The right page carries three panels — Ingredients, Method, Notes — emitted b
 | z-index | 9 — below `.page-nav` (10) and the timer pill (11) |
 | Stack | Flex column, 6px gap |
 | `.edge-tab` | `writing-mode: vertical-rl`, 26px wide, `min-height: 92px`, `padding: 10px 4px`, Kalam 14px, `border-radius: 0 var(--radius-sm) var(--radius-sm) 0`, `box-shadow: 2px 2px 5px rgba(0,0,0,0.25)` |
-| Colors | Ingredients: `--color-border` face, `--color-ink-dark` text; Method: `--color-accent-brown` face, cream text; Notes: `--color-leather` face, cream text |
+| Colors | Ingredients: `--color-border` face, `--color-ink-dark` text; Method: `--color-accent-brown` face, cream text; Notes (phone `.page-tab` only): `--color-leather` face, cream text |
 | `.edge-tab.active` | Cream face, `--color-ink-dark`, weight 700, `padding-right: 8px` so it reads as pulled out of the page |
-| Visibility | `display: none` in the base sheet; `display: flex` only inside `@media (min-width: 601px)` under `body[data-view-mode="recipe"]` |
+| Visibility | `display: none` in the base sheet; `display: flex` only inside `@media (min-width: 601px)` under `body[data-view-mode="recipe"]` — and hidden again in `cook` mode, where both sections are already open on the spread |
 
-Above 600px, Ingredients and Method are both on the page: tapping either **scrolls** `#page-right` to that panel's `.section-header` rather than swapping panels. Notes is the exception — `#page-right[data-tab="notes"]` hides the other two panels and shows the thread in their place.
+Above 600px, Ingredients and Method are both on the page: tapping either **scrolls** `#page-right` to that panel's `.section-header` rather than swapping panels. Notes is the exception — `#page-right[data-tab="notes"]` hides the other two panels and shows the thread in their place. Neither behaviour applies in `cook` mode: the two sections are on separate pages, so `setActiveTab` skips the scroll (there is no header on this page to scroll to) and the strip is not on screen to be tapped.
 
 ### Mobile: Paper Tabs
 
@@ -493,7 +519,9 @@ A phone tab tap crossfades `#page-right-content` over 200ms. It is ignored while
 
 ### Notes Panel
 
-`.notes-thread` holds the full session thread — every entry, oldest first, including the cook's own notes, which `#page-margin` filters out. `margin-notes.renderThread()` is its only writer: `page-tabs.setActiveTab()` calls it when the tab is opened, and `margin-notes.render()` calls it again on every new note while `#page-right[data-tab="notes"]`, so a note written with the Notes tab open appears there as it arrives (on a phone that panel is the only surface on screen — the margin is hidden).
+`.notes-thread` holds the thread **for the recipe on the page** — every entry written while that recipe was open, oldest first, including the cook's own notes, which `#page-margin` filters out. Entries belonging to another recipe are not shown, and notes written while the contents or a meal plan was open form a book-level thread of their own. `margin-notes.renderThread()` is its only writer: `page-tabs.setActiveTab()` calls it when the tab is opened, and `margin-notes.render()` calls it again on every new note while `#page-right[data-tab="notes"]`, so a note written with the Notes tab open appears there as it arrives (on a phone that panel is the only surface on screen — the margin is hidden).
+
+Notes spread mode puts a second `.notes-thread` on the left page, inside a `.notes-page` wrapper capped at 62ch and set 16px for the reading width a full page can afford. It is the same store rendered twice, and `render()` keeps both live.
 
 | Element | Style |
 |---------|-------|
@@ -510,7 +538,7 @@ There are no speaker prefixes anywhere in the thread; the ink is the speaker.
 
 ## Component: Index View
 
-The alphabetical recipe index. It is the book's default state, and on desktop and tablet it stays on the left page once a recipe is open — `renderIndex(list, { singleColumn: true })` puts every letter group in `#page-left-content` and leaves the right page to the recipe. The alphabet nav stays usable in both arrangements, and the open recipe's entry carries `.current` plus `aria-current="page"`.
+The alphabetical recipe index. It is the book's default state, and on desktop and tablet it is still one click away once a recipe is open: in `contents` spread mode `renderIndex(list, { singleColumn: true })` puts every letter group in `#page-left-content` and leaves the right page to the recipe. `cook` and `notes` modes take the left page for the recipe's ingredients and for the conversation instead; in `notes` mode with no recipe open the contents move across to the right page as one column (`{ singleColumn: true, page: 'right' }`) rather than being left as a severed second half. The alphabet nav stays usable in both arrangements, and the open recipe's entry carries `.current` plus `aria-current="page"`.
 
 ### Contents Filter Tabs
 
@@ -538,6 +566,30 @@ The Meals tab is styled and in the markup so the strip's shape is settled, but i
 On the phone, `body[data-view-mode="index"] #page-left-content` becomes `display: contents` so its children join the left page's flex column; `order` then places the title (1), the chip row (2) and everything else (3), which is the only way the static strip can sit between the title and the alphabet nav without leaving `#page-left`.
 
 The filtered list drives the letter groups, the A–Z strip, the footer wording ("N mains" / "N sweets" / "N meal plans") and the `.index-empty` message. **Page numbers do not**: they stay derived from the recipe's position in the full alphabetical list, so "p. 7" means the same thing on every tab — and the nav arrows walk that same full list.
+
+### Spread Mode Tabs
+
+The same `<nav class="contents-tabs">` carries a second set of buttons — `.contents-tab.spread-tab` with `data-mode` (`contents` / `cook` / `notes`) — and shows exactly one set at a time. `spread-modes.syncStrip()` is the only writer, and it swaps the sets with the `hidden` attribute rather than rebuilding the `<nav>`, which is a sibling of `#page-left-content` precisely so that a contents re-render cannot take it with it.
+
+| `body[data-view-mode]` | Buttons on the strip |
+|------------------------|----------------------|
+| `index` | The filters: All / Mains / Sweets (Meals when the flag is on) |
+| `recipe` | Contents / Cook / Notes |
+| `meal` | Contents / Notes — a meal is the one case where several recipes at once is the point, so it never cooks |
+
+- The spread tabs deliberately carry **no** `role="tab"` and **no** `data-tab`, so `page-tabs.js`'s delegated `[role="tab"][data-tab]` handler never sees them: they control the left page, not the right. For the mirror-image reason `app.js`'s filter listener matches `.contents-tab[data-filter]`, so a spread tab never resets the filter.
+- Selection is a toggle, not a tablist: it reads off `aria-pressed`, as the filter tabs do, with `.is-active` kept in step with it.
+- They reuse `.contents-tab` wholesale — same paper-tab shape, same edge, same metrics (26 × 76px; 44px minimum on the phone) — and vary only the face:
+
+| Tab | Face | Text | Note |
+|-----|------|------|------|
+| Contents | `--color-leather` | `--color-paper-cream` | The All tab's leather |
+| Cook | `--color-border` (`#c9a86c`) | `--color-ink-dark` | The tan face keeps dark ink, exactly as Mains does |
+| Notes | `--color-accent-brown` | `--color-paper-cream` | Sweets' brown |
+
+`.spread-tab[aria-pressed="true"]` takes the same pulled-out treatment as `.contents-tab.is-active`: full opacity, weight 700, `padding-left: 8px` and a deeper shadow.
+
+On the phone `.spread-tab { display: none }` — there is no spread to switch, and while a recipe is open the whole left page is hidden anyway; the rule is the belt that makes the phone strip provably filters-only whatever `syncStrip` decides.
 
 ### Desktop / Tablet (contents view)
 
@@ -622,13 +674,15 @@ The highlight is re-applied whenever the same recipe is rendered again, never sh
 
 ## Component: Margin Notes
 
-AI replies are handwritten in the margin of the open page rather than in a separate transcript. `#page-margin` is a static `<aside class="page-margin" aria-live="polite">` inside `#page-right`, a sibling of `#page-right-content`, so it survives page turns and re-renders. Layout is keyed off `body[data-view-mode]`, mirrored from the app's `viewMode` state. While a reply is streaming the aside carries `aria-busy="true"`, so a screen reader announces the completed note once instead of re-announcing it on every chunk.
+AI replies are handwritten in the margin of the open page rather than in a separate transcript. `#page-margin` is a static `<aside class="page-margin" aria-live="polite">` inside `#page-right`, a sibling of `#page-right-content`, so it survives page turns and re-renders. Layout is keyed off `body[data-view-mode]`, mirrored from the app's `viewMode` state, and the margin is hidden outright in `cook` mode — a note has nowhere to sit beside a method that now owns its page. While a reply is streaming the aside carries `aria-busy="true"`, so a screen reader announces the completed note once instead of re-announcing it on every chunk.
+
+Every thread entry records the recipe that was open when its turn began, stamped at send time rather than at render time, so a reply that lands after the reader has paged on stays with the recipe it answers. The margin and the Notes view show only the current recipe's entries; `null` is the book-level thread. This is a display concern only — the conversation sent to the LLM is still the whole session.
 
 | Property | Desktop (> 1024px) | Tablet (601–1024px) | Mobile (≤ 600px) |
 |----------|--------------------|---------------------|------------------|
 | Layout (recipe / meal view) | `#page-right` is a grid: `minmax(0, 1fr) 150px`, 12px column gap | Grid collapses; notes render beneath the page content, full width, 12px top padding | Same as tablet — a block beneath `#page-right-content`; hidden while the Notes tab is active, where the full thread replaces it |
 | Layout (contents view) | `#page-margin` absolute, `top: 24px; right: 24px`, 150px wide | Same | `position: static`, full width, `padding: 8px 16px`, in the collapsed right page beneath the contents |
-| Visible notes | Last three non-user thread entries, oldest first (latest non-user entry only in contents view) | Same | Same |
+| Visible notes | Last three non-user thread entries **for the recipe on the page**, oldest first (latest non-user entry only in contents view) | Same | Same |
 
 ### Note Styles
 
@@ -772,16 +826,17 @@ Responsive styles should be added via media queries at the end of `styles.css`, 
 
 1. **One column**: `.app-container > .book-container > (.section-label#recipe-book-header, .recipe-book, form.note-input)`. There is no second panel and no tab bar.
 2. **Tab surfaces**: `.edge-tabs` is a child of `.recipe-book` (outside the scroll container and outside the `#page-right` grid); `.page-tabs` is the first child of `#page-right`, before `.page-content`; `#page-margin` is its last child.
-3. **Two attributes drive everything**: `body[data-view-mode]` (`index` / `recipe` / `meal`) and `#page-right[data-tab]` (`ingredients` / `method` / `notes`).
+3. **Three attributes drive everything**: `body[data-view-mode]` (`index` / `recipe` / `meal`), `body[data-spread-mode]` (`contents` / `cook` / `notes`, inert at or below 600px) and `#page-right[data-tab]` (`ingredients` / `method` / `notes`).
 4. **Template tokens**: `{{user_email}}`, `/static/styles.css?v={{asset_version}}` and `/static/app.js?v={{asset_version}}` must survive verbatim in `chat.html` — a Rust unit test reads the shipped file and asserts on them.
 
 ### JS Ownership
 
 1. **`page-tabs.js`** owns `#page-right[data-tab]` and both tab surfaces, via one delegated click listener on `document` matching `[role="tab"][data-tab]`.
 2. **`app.js`** owns `body[data-view-mode]` (mirrored from `sharedState.viewMode`) and all DOM wiring, including Enter-to-send and the form `submit` handler on `#note-input`.
-3. **`recipe-display.js`** is the only writer of `#page-right-content` and `#note-page-number`; **`margin-notes.js`** is the only writer of `#page-margin` and `.notes-thread`.
-4. **`page-transitions.js`** holds the single animation lock. `animatePageTurn` and `crossfadeElement` share it, so a tab tap during a page turn — and a swipe during a tab crossfade — is ignored rather than queued.
-5. **Resize** re-renders the contents column for the current view mode; the layout itself is CSS, so nothing else has to react to a breakpoint change.
+3. **`spread-modes.js`** owns `body[data-spread-mode]` and the left-edge strip, via its own delegated listeners on `document` (`.spread-tab[data-mode]` clicks, and `focus` in the capture phase for the note input). It imports nothing but the animation lock: the re-render a mode change needs is a callback `app.js` registers with `registerSpreadRenderer()`, which is what keeps `recipe-display.js` → `page-tabs.js` from closing a cycle. Anything else that needs the mode reads it off the body.
+4. **`recipe-display.js`** is the only writer of `#page-right-content` and `#note-page-number`; **`margin-notes.js`** is the only writer of `#page-margin` and `.notes-thread`. `app.js`'s `renderSpread` is the only writer of `#page-left-content`, and the only mover of the ingredients panel between the pages.
+5. **`page-transitions.js`** holds the single animation lock. `animatePageTurn` and `crossfadeElement` share it, so a tab tap during a page turn — and a swipe during a tab crossfade — is ignored rather than queued. A spread mode change honours the same lock.
+6. **Resize** re-renders the spread for the effective mode; the layout itself is CSS, so nothing else has to react to a breakpoint change.
 
 ### Performance Considerations
 
@@ -798,13 +853,14 @@ Responsive styles should be added via media queries at the end of `styles.css`, 
 |---------|-----------------|-------------------|---------------|
 | Columns | Book only | Book only | Book only |
 | Book pages | Two-page spread | Two-page spread | One page, picked by `data-view-mode` |
+| Spread modes | `contents` / `cook` / `notes` on the left page | Same | None — the attribute is inert |
 | Book cover | Full leather frame | Full leather frame | Flush leather, 40px top strip |
 | Spine shadow | Yes | Yes | No |
 | Recipe nav | `.page-nav` 29px | `.page-nav` 36px | Edge zones + `.phone-footer` |
-| Section tabs | `.edge-tabs`, right outer edge | Same | `.page-tabs`, page top edge |
-| Contents filters | `.contents-tabs`, left page's outer edge | Same | Chip row under the contents title |
-| Note input | Slip pinned to the foot of the right page | Same | Bar beneath the book |
-| Margin notes | 150px column beside the recipe | Beneath the recipe body | Beneath the recipe body; hidden on the Notes tab |
+| Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; hidden in cook mode) | Same | `.page-tabs`, page top edge (all three) |
+| Left-edge strip | `.contents-tabs`, left page's outer edge: the contents filters while no recipe is open, Contents / Cook / Notes while one is | Same | Chip row under the contents title; filters only |
+| Note input | Slip pinned to the foot of the right page, or of the left page in notes mode | Same | Bar beneath the book |
+| Margin notes | 150px column beside the recipe; hidden in cook mode | Beneath the recipe body | Beneath the recipe body; hidden on the Notes tab |
 | Wood background | Full texture | Full texture | Flat gradient |
 | Body padding | 30px 50px | 20px | 0 |
 | Book label | `.section-label` above the book | Same | `#recipe-book-header` on the leather strip |

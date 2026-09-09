@@ -123,10 +123,21 @@ export async function sendMessage() {
     // Require either message text or an attached image
     if (!message && !state.attachedImage) return;
 
+    // The recipe this turn belongs to, captured once and before any await — the
+    // same reason fetchAndDisplayRecipe records its id up front. Every entry the
+    // turn produces (the user note, status lines, the streaming reply, errors) is
+    // filed under the recipe that was on the page when the note was sent, so a
+    // reply that lands after the reader has paged away stays with the recipe it
+    // answers, and a recipe this turn creates does not claim the turn's notes.
+    // null is the book-level thread: the contents page or a meal plan.
+    const turnRecipeId = state.viewMode === 'recipe' && state.currentRecipeId != null
+        ? String(state.currentRecipeId)
+        : null;
+
     input.value = '';
     // Reset textarea height after clearing
     input.style.height = 'auto';
-    MarginNotes.addNote(message, 'user');
+    MarginNotes.addNote(message, 'user', turnRecipeId);
     setLoading(true);
 
     // Each turn fetches a given recipe id at most once
@@ -192,9 +203,9 @@ export async function sendMessage() {
 
             MarginNotes.finalizeStreamingNote();
             if (response.status === 413) {
-                MarginNotes.addNote('Error: Image too large for server. Try a smaller image or compress it first.', 'error');
+                MarginNotes.addNote('Error: Image too large for server. Try a smaller image or compress it first.', 'error', turnRecipeId);
             } else {
-                MarginNotes.addNote(`Error: ${response.statusText || 'Server error'}`, 'error');
+                MarginNotes.addNote(`Error: ${response.statusText || 'Server error'}`, 'error', turnRecipeId);
             }
             setLoading(false);
             return;
@@ -215,7 +226,7 @@ export async function sendMessage() {
                             // Text streaming
                             if (parsed.text) {
                                 streamedText += parsed.text;
-                                MarginNotes.updateStreamingNote(streamedText);
+                                MarginNotes.updateStreamingNote(streamedText, turnRecipeId);
                             }
                             break;
 
@@ -223,7 +234,7 @@ export async function sendMessage() {
                             // Tool call notification
                             if (parsed.tool) {
                                 setLoading(true, `Using ${parsed.tool}...`);
-                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status');
+                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status', turnRecipeId);
                             }
                             break;
 
@@ -245,7 +256,8 @@ export async function sendMessage() {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
                                 MarginNotes.addNote(
                                     `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
-                                    'status'
+                                    'status',
+                                    turnRecipeId
                                 );
                             }
                             break;
@@ -262,7 +274,7 @@ export async function sendMessage() {
                             // Error handling
                             if (parsed.message) {
                                 MarginNotes.finalizeStreamingNote();
-                                MarginNotes.addNote(parsed.message, 'error');
+                                MarginNotes.addNote(parsed.message, 'error', turnRecipeId);
                             }
                             break;
 
@@ -271,7 +283,7 @@ export async function sendMessage() {
                             if (parsed.text !== undefined) {
                                 if (parsed.text) {
                                     streamedText += parsed.text;
-                                    MarginNotes.updateStreamingNote(streamedText);
+                                    MarginNotes.updateStreamingNote(streamedText, turnRecipeId);
                                 }
                             } else if (parsed.recipe_id !== undefined) {
                                 handleRecipeArtifact(parsed.recipe_id);
@@ -279,16 +291,17 @@ export async function sendMessage() {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
                                 MarginNotes.addNote(
                                     `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
-                                    'status'
+                                    'status',
+                                    turnRecipeId
                                 );
                             } else if (parsed.tool) {
                                 setLoading(true, `Using ${parsed.tool}...`);
-                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status');
+                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status', turnRecipeId);
                             } else if (parsed.conversation_id) {
                                 state.conversationId = parsed.conversation_id;
                                 MarginNotes.finalizeStreamingNote();
                             } else if (parsed.message && parsed.recoverable !== undefined) {
-                                MarginNotes.addNote(parsed.message, 'error');
+                                MarginNotes.addNote(parsed.message, 'error', turnRecipeId);
                             }
                             break;
                     }
@@ -301,13 +314,13 @@ export async function sendMessage() {
                 // The stream died without a done event: end the streaming note so the
                 // next turn starts a new one instead of overwriting this partial reply
                 MarginNotes.finalizeStreamingNote();
-                MarginNotes.addNote('Connection error. Please try again.', 'error');
+                MarginNotes.addNote('Connection error. Please try again.', 'error', turnRecipeId);
             }
         );
     } catch (error) {
         console.error('Error:', error);
         MarginNotes.finalizeStreamingNote();
-        MarginNotes.addNote('Connection error. Please try again.', 'error');
+        MarginNotes.addNote('Connection error. Please try again.', 'error', turnRecipeId);
     }
 
     setLoading(false);

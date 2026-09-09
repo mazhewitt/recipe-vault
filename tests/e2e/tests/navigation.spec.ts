@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, seedRecipes, openRecipe } from './helpers';
+import { authenticate, seedRecipes, openRecipe, useContentsMode } from './helpers';
 
 // Helper to get navigation selectors based on viewport
 function getNavSelectors(page: any) {
@@ -23,6 +23,10 @@ test.describe('Recipe Navigation', () => {
     await openRecipe(page, recipeIds[0]);
     const firstTitle = await page.locator('#page-right-content .recipe-title').textContent();
 
+    // Contents mode: a recipe opens in cook mode, where the left page carries
+    // the ingredients instead of the contents
+    await useContentsMode(page);
+
     // The open recipe is marked in the contents column on the left page
     const current = page.locator('#page-left-content .index-recipe-item.current');
     await expect(current).toHaveCount(1);
@@ -36,6 +40,10 @@ test.describe('Recipe Navigation', () => {
     // Wait for new recipe to load
     await expect(page.locator('#page-right-content .recipe-title')).not.toHaveText(firstTitle!, { timeout: 10000 });
     const secondTitle = await page.locator('#page-right-content .recipe-title').textContent();
+
+    // Turning the page put the spread back in cook mode, as opening a recipe
+    // always does; the contents follow the page whenever they are on it
+    await useContentsMode(page);
 
     // The contents highlight follows the page
     const nowCurrent = page.locator('#page-left-content .index-recipe-item.current');

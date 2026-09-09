@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone } from './helpers';
+import { authenticate, createRecipe, isPhone, openRecipe, useContentsMode } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -86,7 +86,15 @@ test.describe('Contents filter tabs', () => {
     await openBook(page);
 
     await expect(page.locator('.contents-tabs')).toHaveAttribute('aria-label', 'Contents filter');
-    await expect(page.locator('.contents-tab')).toHaveCount(4);
+    // Four filters. The strip also holds the three spread tabs, which wear the
+    // same paper-tab face but carry data-mode instead of data-filter and are on
+    // screen only while a recipe is open (see spread-modes.spec.ts).
+    await expect(page.locator('.contents-tab[data-filter]')).toHaveCount(4);
+    await expect(page.locator('.contents-tab[data-mode]')).toHaveCount(3);
+    await expect(page.locator('.spread-tab')).toHaveCount(3);
+    for (const mode of ['contents', 'cook', 'notes']) {
+      await expect(page.locator(`.spread-tab[data-mode="${mode}"]`)).toBeHidden();
+    }
     await expect(page.locator('.contents-tab-all')).toHaveText('All');
     await expect(page.locator('.contents-tab-mains')).toBeVisible();
     await expect(page.locator('.contents-tab-sweets')).toBeVisible();
@@ -109,8 +117,9 @@ test.describe('Contents filter tabs', () => {
     expect((await face('.contents-tab-sweets')).background).toBe('rgb(107, 68, 35)');
 
     // The section tabs on the right page are a different strip and untouched:
-    // three role="tab" buttons there, none of them here
-    await expect(page.locator('.edge-tabs[role="tablist"] .edge-tab[role="tab"]')).toHaveCount(3);
+    // its role="tab" buttons are there, none of them here. Two of them now —
+    // Notes left that strip when it became a spread mode.
+    await expect(page.locator('.edge-tabs[role="tablist"] .edge-tab[role="tab"]')).toHaveCount(2);
     await expect(page.locator('.contents-tab[role="tab"]')).toHaveCount(0);
   });
 
@@ -261,7 +270,7 @@ test.describe('Contents filter tabs', () => {
     await expect(page.locator('.index-recipe-item')).toHaveCount(3);
   });
 
-  test('the filter still applies while a recipe is open', async ({ page }) => {
+  test('the remembered filter still applies while a recipe is open', async ({ page }) => {
     // The contents only stay on the left page beside a recipe above the phone breakpoint
     test.skip(isPhone(page), 'the phone shows one page at a time, so the contents are replaced');
 
@@ -269,17 +278,32 @@ test.describe('Contents filter tabs', () => {
     const { apple, beef } = await seedTagged(page, suffix);
     await openBook(page);
 
+    // The filter is chosen on the contents page: while a recipe is open the
+    // strip offers the spread modes instead, and the filter is remembered
+    // rather than re-selected (sessionStorage['rv-contents-filter']).
+    await selectFilter(page, 'mains');
+
     await entry(page, beef).click();
     await expect(page.locator('.recipe-title')).toContainText('Beef Stew');
 
-    await selectFilter(page, 'mains');
+    // Contents mode brings them back beside the recipe, still filtered
+    await useContentsMode(page);
     await expect(seeded(page, suffix, '#page-left-content')).toHaveCount(2);
     await expect(page.locator('#page-left-content .index-recipe-item')).toHaveCount(2);
     await expect(entry(page, apple)).toHaveCount(0);
     await expect(page.locator('.index-recipe-item.current')).toHaveAttribute('data-recipe-id', beef);
 
-    // The open recipe is not in this filter, so no row is highlighted
+    // Back to the contents, change the filter, and open the same recipe again.
+    // It is a main, so this filter does not list it and no row is highlighted —
+    // and it cannot be opened from the contents either, which is why it is
+    // opened the way display_recipe and the navigation arrows do.
+    await page.locator('#recipe-book-header').click();
+    await expect(page.locator('.index-title')).toBeVisible({ timeout: 10000 });
     await selectFilter(page, 'sweets');
+    await expect(entry(page, beef)).toHaveCount(0);
+    await openRecipe(page, beef);
+    await expect(page.locator('#page-right-content .recipe-title')).toContainText('Beef Stew');
+    await useContentsMode(page);
     await expect(seeded(page, suffix, '#page-left-content')).toHaveCount(1);
     await expect(page.locator('#page-left-content .index-recipe-item')).toHaveCount(1);
     await expect(page.locator('.index-recipe-item.current')).toHaveCount(0);
@@ -317,7 +341,7 @@ test.describe('Contents filter tabs', () => {
 
     // It sits after Sweets in the strip
     const order = await page.locator('.contents-tabs').evaluate(el =>
-      Array.from(el.querySelectorAll('.contents-tab')).map(b => (b as HTMLElement).dataset.filter)
+      Array.from(el.querySelectorAll('.contents-tab[data-filter]')).map(b => (b as HTMLElement).dataset.filter)
     );
     expect(order).toEqual(['all', 'main', 'dessert', 'meals']);
 

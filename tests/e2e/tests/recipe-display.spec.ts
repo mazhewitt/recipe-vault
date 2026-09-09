@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe } from './helpers';
+import { authenticate, createRecipe, openRecipe, useContentsMode } from './helpers';
 
 test.describe('Recipe Display', () => {
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -30,8 +30,12 @@ test.describe('Recipe Display', () => {
     });
 
     await openRecipe(page, recipeId);
+    // A recipe opens in cook mode, which splits it across the spread. Contents
+    // mode is the arrangement asserted here: the whole recipe on the right page
+    // with the contents beside it. (The split itself is spread-modes.spec.ts.)
+    await useContentsMode(page);
 
-    // The whole recipe lives on the right page now, at every width
+    // The whole recipe lives on the right page here, at every width
     const rightContent = page.locator('#page-right-content');
     await expect(rightContent.locator('.recipe-title')).toHaveText(title);
 
@@ -71,6 +75,9 @@ test.describe('Recipe Display', () => {
     });
 
     await openRecipe(page, recipeId);
+    // Contents mode puts the whole recipe on one scrolling page; cook mode's
+    // page-per-section scrolling is spread-modes.spec.ts's to assert
+    await useContentsMode(page);
 
     // The recipe scrolls inside the right page
     const rightPage = page.locator('#page-right');

@@ -61,6 +61,8 @@ Replaces the current "~ Index ~".
 - Footer line: recipe and meal-plan count, "continued overleaf" when the index spans pages.
 - **Edge tabs** on the outer edge of the left page: All, Mains, Sweets, Meals. Coloured (leather red, tan, dark brown, ink). These are filters on the contents. "Meals" shows meal plans (see `meal-planning` spec / `planned-ideas/meal-planning-epic.md`). Categories are not in the recipe model today; see open questions.
 
+*Built (`book-spread-modes`, 2026-09-08): the left page is contextual, not permanently the contents.* Above 600px `body[data-spread-mode]` decides what it holds — the contents, the open recipe's ingredients (**Cook**, the default when a recipe opens: ingredients left, method right, the true cookbook spread) or the conversation (**Notes**, which also takes the note input to the foot of that page). The same edge strip carries both button sets: the four filters while no recipe is open, Contents / Cook / Notes while one is. See the `book-spread-modes` capability spec and the Spread Modes section of `design-system.md`.
+
 ### Right page: Recipe
 
 - Title in Kalam 28px, with a larger polaroid photo (96×76) top right. Click opens the existing full-window photo preview.
@@ -73,7 +75,7 @@ Replaces the current "~ Index ~".
   - *Sticky notes*: yellow Kalam notes with a drop shadow. Used for persistent artefacts like a shopping list or a reminder.
   - Status lines ("Step 3 timer set, I'll nudge you at 1:30") in muted ink.
 - **Note input** at the foot of the page: pencil icon, "Write a note to the cook…", page number on the right. This is the chat input. Image attachment stays (paperclip) but is secondary.
-- **Edge tabs** on the outer edge of the right page: Ingredients, Method, Notes. On desktop these scroll or switch the page content; on the phone they are the three views of a single page.
+- **Edge tabs** on the outer edge of the right page: Ingredients, Method, Notes. On desktop these scroll or switch the page content; on the phone they are the three views of a single page. *(Built: the desktop strip is Ingredients / Method only — Notes became a left-page mode — and it steps aside entirely in Cook mode, where both sections are already on the spread. The phone keeps all three.)*
 
 ### Phone (≤600px)
 
@@ -116,6 +118,7 @@ Contrast lessons from the review pass: muted `#a0937a` and `#8a7a60` fail on cre
 ## Interaction model
 
 - **The chat becomes annotation.** A user note goes in via the input; the AI's reply lands in the margin of whatever page is open. Long conversations should not pile up in the margin: keep the last two or three notes visible and let the Notes tab show the full thread for the current recipe. The Notes tab is where the chat history lives.
+  *Built (`book-spread-modes`, 2026-09-08).* "For the current recipe" is now literal: every thread entry is stamped with the recipe that was open when its turn began, and the margin and the Notes view show only that recipe's entries. Notes written while browsing form a book-level thread. The server-side conversation is untouched, so the AI still remembers the whole session.
 - **AI edits are visible and reversible.** When the AI changes a recipe (scale, substitute, halve the chilli) the change is shown in the page and a margin note explains it with an undo affordance.
 - **Timers** attach to a step. Setting one highlights the step and pins the timer pill to the cover.
 - **Contents filters** are edge tabs, not a search box. Search stays a chat action ("find me something with lamb") which is consistent with the AI-first principle.

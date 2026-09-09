@@ -102,6 +102,24 @@ export function startTimer(durationMinutes, label, stepNumber) {
     applyStepHighlight(recipeId);
 }
 
+/**
+ * True while a timer is running for the given recipe.
+ *
+ * The widget is not the answer and neither is the step highlight: #timer-widget
+ * carries no recipe id and outlives the recipe it was started under (it stays
+ * on screen while the reader pages to another recipe, and for three seconds
+ * after the timer completes), and a timer can be set with no step at all. The
+ * running timer's own recipe id is the only accurate one, so it is exposed
+ * here rather than inferred from the DOM.
+ *
+ * @param {string|number|null} recipeId - the recipe on the page
+ * @returns {boolean} true only when the running timer was started under it
+ */
+export function isTimerRunningFor(recipeId) {
+    if (!activeTimer || recipeId == null || activeTimer.recipeId == null) return false;
+    return String(recipeId) === String(activeTimer.recipeId);
+}
+
 export function cancelTimer() {
     if (activeTimer) {
         clearInterval(activeTimer.interval);

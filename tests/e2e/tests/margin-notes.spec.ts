@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, threadEntries, isTablet } from './helpers';
+import { authenticate, createRecipe, threadEntries, isTablet, useContentsMode } from './helpers';
 
 /**
  * These cover the margin column of the wide layout: the phone stacks the margin
@@ -115,13 +115,18 @@ test.describe('Margin notes', () => {
     const before = await noteTexts();
     expect(before[0]).toContain('Using tool: list_recipes');
 
-    // Turning back to the contents page re-projects the thread as one sticky
+    // Turning back to the contents page leaves those two behind: they were
+    // written under the recipe, and the contents page shows the book thread
     await page.locator('#recipe-book-header').click();
     await expect(page.locator('.index-title')).toBeVisible();
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
-    await expect(page.locator('#page-margin .sticky-note')).toHaveCount(1);
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(0);
 
-    // Opening a recipe again drops the sticky styling and restores the notes
+    // A note written here belongs to the book, and projects as one sticky
+    await send(page, 'hello contents');
+    await expect(page.locator('#page-margin .sticky-note')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
+
+    // Opening the recipe again drops the sticky and restores its own notes
     await openRecipe(page, recipeId);
     await expect(page.locator('#page-margin .sticky-note')).toHaveCount(0);
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(2);
@@ -307,16 +312,21 @@ test.describe('Margin notes', () => {
       steps: [],
     });
     await openRecipe(page, recipeId);
+    // Contents mode: cook mode hides the margin column outright, and a hidden
+    // element runs no animations for this to measure
+    await useContentsMode(page);
 
     // Driven through the module directly: the mock LLM delivers a reply in one
     // chunk, so a real turn cannot show whether a second render restarts the
     // 200ms fade of the notes that are already on the page.
-    const timings = await page.evaluate(async () => {
+    const timings = await page.evaluate(async (id) => {
       const M = await import('/static/margin-notes.js');
       const margin = document.getElementById('page-margin')!;
-      M.addNote('first note', 'reply');
+      // Stamped with the open recipe, as a real turn would: the margin shows
+      // that recipe's notes and nothing else
+      M.addNote('first note', 'reply', id);
       const first = margin.firstElementChild as HTMLElement;
-      M.updateStreamingNote('a streaming reply');
+      M.updateStreamingNote('a streaming reply', id);
       const streaming = margin.lastElementChild as HTMLElement;
 
       const at = (el: HTMLElement) => {
@@ -327,7 +337,7 @@ test.describe('Margin notes', () => {
       const before = { first: at(first), streaming: at(streaming) };
 
       // A further chunk on the streaming note re-renders every visible note
-      M.updateStreamingNote('a streaming reply, continued');
+      M.updateStreamingNote('a streaming reply, continued', id);
       const after = { first: at(first), streaming: at(streaming) };
 
       return {
@@ -336,7 +346,7 @@ test.describe('Margin notes', () => {
         sameFirst: first === margin.firstElementChild,
         sameStreaming: streaming === margin.lastElementChild,
       };
-    });
+    }, recipeId);
 
     // The nodes are reused...
     expect(timings.sameFirst).toBe(true);
@@ -402,16 +412,22 @@ test.describe('Margin notes', () => {
     await send(page, 'hello turn');
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
 
+    // The margin's geometry is read before the turn, not inside it: notes are
+    // per recipe now, so the first thing the turn does is empty the margin of
+    // the notes belonging to the recipe being left (and `.page-margin:empty`
+    // then collapses it). The claim is unchanged — the overlay carries the page
+    // content only and must stop short of the column the notes occupy.
+    const marginBefore = (await page.locator('#page-margin').boundingBox())!;
+
     // Measure the overlay the moment it is inserted, against the margin it must not hide
-    const rects = await page.evaluate(() => new Promise<{ overlayRight: number; overlayBottom: number; marginLeft: number; marginTop: number; marginWidth: number }>((resolve, reject) => {
+    const rects = await page.evaluate(() => new Promise<{ overlayRight: number; overlayBottom: number }>((resolve, reject) => {
       const container = document.querySelector('.pages-container')!;
       const observer = new MutationObserver(() => {
         const overlay = container.querySelector('.page-turn-overlay') as HTMLElement | null;
         if (!overlay) return;
         observer.disconnect();
         const o = overlay.getBoundingClientRect();
-        const m = document.getElementById('page-margin')!.getBoundingClientRect();
-        resolve({ overlayRight: o.right, overlayBottom: o.bottom, marginLeft: m.left, marginTop: m.top, marginWidth: m.width });
+        resolve({ overlayRight: o.right, overlayBottom: o.bottom });
       });
       observer.observe(container, { childList: true });
       setTimeout(() => { observer.disconnect(); reject(new Error('no page-turn overlay appeared')); }, 5000);
@@ -419,14 +435,14 @@ test.describe('Margin notes', () => {
       loadNextRecipe();
     }));
 
-    expect(rects.marginWidth).toBeGreaterThan(0);
+    expect(marginBefore.width).toBeGreaterThan(0);
     // The overlay carries only the page content, so it must stop before the margin.
     // Above 1024px the margin is a column to the right of the content; at or below
     // 1024px it collapses beneath it (static/styles.css:1836), so the claim rotates.
     if (isTablet(page)) {
-      expect(rects.overlayBottom).toBeLessThanOrEqual(rects.marginTop + 1);
+      expect(rects.overlayBottom).toBeLessThanOrEqual(marginBefore.y + 1);
     } else {
-      expect(rects.overlayRight).toBeLessThanOrEqual(rects.marginLeft + 1);
+      expect(rects.overlayRight).toBeLessThanOrEqual(marginBefore.x + 1);
     }
   });
 

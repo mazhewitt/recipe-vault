@@ -10,6 +10,9 @@
 import { crossfadeElement, isAnimating } from './page-transitions.js';
 import { renderThread } from './margin-notes.js';
 
+// 'notes' stays legal on every viewport: the phone's paper tabs still offer it
+// and #page-right[data-tab="notes"] still means the thread. Only the desktop
+// affordance is gone - Notes is a left-page spread mode there.
 const VALID_TABS = ['ingredients', 'method', 'notes'];
 
 export let state = null;
@@ -80,7 +83,12 @@ export function setActiveTab(tab, options = {}) {
 
         // Desktop/tablet: ingredients and method share one scrolling page, so
         // activating a tab scrolls it to that section rather than swapping it.
-        if (!isPhone() && tab !== 'notes' && options.scroll !== false && !force) {
+        // Not in cook mode: the sections are on separate pages there, so there
+        // is no header on this page to scroll to and scrolling anyway would
+        // move the wrong one. The mode is read off the body rather than
+        // imported - body[data-spread-mode] is its single source of truth.
+        const cookMode = document.body.dataset.spreadMode === 'cook';
+        if (!isPhone() && !cookMode && tab !== 'notes' && options.scroll !== false && !force) {
             const panel = document.querySelector(`#page-right-content .tab-panel[data-tab="${tab}"]`);
             const header = panel && panel.querySelector('.section-header');
             if (header) {

@@ -59,20 +59,29 @@
                 <div class="edge-tabs" role="tablist" aria-label="Recipe sections">
                     <button type="button" class="edge-tab active" role="tab" data-tab="ingredients" aria-selected="true" aria-controls="page-right-content">Ingredients</button>
                     <button type="button" class="edge-tab" role="tab" data-tab="method" aria-selected="false" aria-controls="page-right-content">Method</button>
-                    <button type="button" class="edge-tab" role="tab" data-tab="notes" aria-selected="false" aria-controls="page-right-content">Notes</button>
                 </div>
 
                 <div class="pages-container">
                     <!-- Left Page — contents -->
                     <div class="page page-left" id="page-left">
-                        <!-- Contents filter tabs, on the left page's outer edge.
+                        <!-- The left page's own tab strip, on its outer edge.
                              A sibling of #page-left-content, so the contents
-                             re-render never destroys them. -->
+                             re-render never destroys it. It holds two button
+                             sets and shows exactly one: the contents filters
+                             while no recipe is open, the spread modes while one
+                             is. spread-modes.js swaps them with `hidden`. -->
                         <nav class="contents-tabs" aria-label="Contents filter">
                             <button type="button" class="contents-tab contents-tab-all is-active" data-filter="all" aria-pressed="true">All</button>
                             <button type="button" class="contents-tab contents-tab-mains" data-filter="main" aria-pressed="false">Mains</button>
                             <button type="button" class="contents-tab contents-tab-sweets" data-filter="dessert" aria-pressed="false">Sweets</button>
                             <button type="button" class="contents-tab contents-tab-meals" data-filter="meals" aria-pressed="false" hidden>Meals</button>
+                            <!-- Spread modes. Deliberately no role="tab" and no
+                                 data-tab: page-tabs.js delegates on
+                                 [role="tab"][data-tab] and must never see these,
+                                 which control the left page, not the right. -->
+                            <button type="button" class="contents-tab spread-tab" data-mode="contents" aria-pressed="false" hidden>Contents</button>
+                            <button type="button" class="contents-tab spread-tab" data-mode="cook" aria-pressed="false" hidden>Cook</button>
+                            <button type="button" class="contents-tab spread-tab" data-mode="notes" aria-pressed="false" hidden>Notes</button>
                         </nav>
                         <div class="page-content" id="page-left-content">
                             <div class="recipe-placeholder">

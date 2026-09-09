@@ -7,6 +7,7 @@ import { escapeHtml } from './utils.js';
 import { getCachedRecipe, prefetchAdjacent, animatePageTurn } from './page-transitions.js';
 import { applyStepHighlight } from './timer.js';
 import { setActiveTab } from './page-tabs.js';
+import { getSpreadMode, setSpreadMode } from './spread-modes.js';
 
 // Import global state accessors (these will be set by app.js)
 export let state = null;
@@ -36,6 +37,10 @@ export function showRecipeLoading() {
 
 export function showRecipeError(message) {
     const rightContent = document.getElementById('page-right-content');
+    // There is no recipe on the page to split across the spread, so cook mode
+    // would leave the previous recipe's ingredients beside the error. Back to
+    // the contents, which is also the way out of here.
+    if (getSpreadMode() === 'cook') setSpreadMode('contents', { force: true });
     // SANITIZED: Error message could contain user input
     rightContent.innerHTML = `
         <div class="recipe-placeholder">
@@ -170,11 +175,15 @@ const FILTER_WORDING = {
  * Renders the contents.
  *
  * @param {Array} recipes - the full alphabetical list, unfiltered
- * @param {{currentRecipeId?: string|null, singleColumn?: boolean, filter?: string}} [options]
- *        singleColumn - render every letter group into #page-left-content and
- *        leave #page-right-content completely untouched (it holds the open
- *        recipe). Without it the contents keep the two-page split on wide
+ * @param {{currentRecipeId?: string|null, singleColumn?: boolean, page?: 'left'|'right', filter?: string}} [options]
+ *        singleColumn - render every letter group into one page and leave the
+ *        other completely untouched (it holds the open recipe, or the notes
+ *        thread). Without it the contents keep the two-page split on wide
  *        viewports.
+ *        page - which page the single column goes on, 'left' (the default) or
+ *        'right'. Only meaningful with singleColumn: notes mode gives the
+ *        thread the left page, so the contents cross the spine rather than
+ *        losing the half that carries the title and the A-Z strip.
  *        filter - one of CONTENTS_FILTERS; anything else is read as 'all'.
  *        The letter groups, the A-Z strip, the footer wording and the empty
  *        message all come from the filtered list, but page numbers keep coming
@@ -187,13 +196,17 @@ export function renderIndex(recipes, options = {}) {
     const alphabetLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     const currentRecipeId = options.currentRecipeId != null ? String(options.currentRecipeId) : null;
     const singleColumn = options.singleColumn === true;
+    // The single column's page, and the element it writes into. Without
+    // singleColumn the contents own both pages and this is the left one.
+    const columnPage = singleColumn && options.page === 'right' ? 'right' : 'left';
+    const columnContent = columnPage === 'right' ? rightContent : leftContent;
     const filter = CONTENTS_FILTERS.includes(options.filter) ? options.filter : 'all';
     const wording = FILTER_WORDING[filter];
     const photoEpoch = state?.photoEpoch ?? 0;
 
     if (recipes.length === 0) {
         // SAFE: Static HTML, no user data
-        leftContent.innerHTML = `
+        columnContent.innerHTML = `
             <div class="recipe-placeholder">
                 <div class="recipe-placeholder-text">
                     Your recipe book is empty. Ask me to create a recipe!
@@ -226,6 +239,14 @@ export function renderIndex(recipes, options = {}) {
 
     function sectionIdFor(letter, page) {
         return `index-section-${page}-${letter.toLowerCase()}`;
+    }
+
+    // The scrollable container is .page (parent of .page-content), so both are
+    // reset — whichever page the contents have just been written to.
+    function resetColumnScroll() {
+        const container = document.getElementById(columnPage === 'right' ? 'page-right' : 'page-left');
+        if (container) container.scrollTop = 0;
+        columnContent.scrollTop = 0;
     }
 
     function renderAlphabet(lettersToPage) {
@@ -289,30 +310,28 @@ export function renderIndex(recipes, options = {}) {
     // letter groups, every letter in the strip disabled, a zero footer.
     if (visible.length === 0) {
         // SAFE: the wording table is static, renderAlphabet emits no user data
-        leftContent.innerHTML = `
+        columnContent.innerHTML = `
             <div class="index-title">~ Contents ~</div>
             ${renderAlphabet({})}
             <div class="index-empty">${wording.empty}</div>
             ${renderFooter(0, false)}
         `;
         if (!singleColumn) rightContent.innerHTML = '';
-        const emptyLeftPage = document.getElementById('page-left');
-        if (emptyLeftPage) emptyLeftPage.scrollTop = 0;
-        leftContent.scrollTop = 0;
+        resetColumnScroll();
         return;
     }
 
     if (isMobile() || singleColumn) {
         const lettersToPage = {};
         sortedLetters.forEach(letter => {
-            if (activeAlphabet.has(letter)) lettersToPage[letter] = 'left';
+            if (activeAlphabet.has(letter)) lettersToPage[letter] = columnPage;
         });
 
         // SAFE: Contents title is static, renderGroup handles sanitization
-        leftContent.innerHTML = `
+        columnContent.innerHTML = `
             <div class="index-title">~ Contents ~</div>
             ${renderAlphabet(lettersToPage)}
-            ${renderGroup(sortedLetters, 'left')}
+            ${renderGroup(sortedLetters, columnPage)}
             ${renderFooter(visible.length, false)}
         `;
         if (!singleColumn) rightContent.innerHTML = '';
@@ -371,10 +390,7 @@ export function renderIndex(recipes, options = {}) {
     }
 
     // Reset scroll, then bring the last-viewed recipe into view if present.
-    // The scrollable container is .page (parent of .page-content).
-    const leftPage = document.getElementById('page-left');
-    if (leftPage) leftPage.scrollTop = 0;
-    leftContent.scrollTop = 0;
+    resetColumnScroll();
     if (!singleColumn) {
         const rightPage = document.getElementById('page-right');
         if (rightPage) rightPage.scrollTop = 0;
@@ -525,6 +541,14 @@ function renderIngredients(ingredients) {
 export function renderRecipe(recipe, options = {}) {
     const rightContent = document.getElementById('page-right-content');
     const pageNumber = options.pageNumber ?? null;
+
+    // Cook mode keeps the ingredients panel on the left page, where rewriting
+    // the right page below cannot reach it. Drop that node now: re-asserting
+    // the mode at the end relocates the freshly rendered one, and the document
+    // must never hold two ingredients panels (applyStepHighlight and the tab
+    // machinery each use a single querySelector).
+    const relocatedIngredients = document.querySelector('#page-left-content .tab-panel[data-tab="ingredients"]');
+    if (relocatedIngredients) relocatedIngredients.remove();
 
     // Build ingredients list
     const ingredientsList = renderIngredients(recipe.ingredients || []);
@@ -682,6 +706,15 @@ export function renderRecipe(recipe, options = {}) {
     // upload, update_recipe) keeps the user's tab and re-fills .notes-thread.
     const pageRight = document.getElementById('page-right');
     setActiveTab(pageRight?.dataset.tab || 'ingredients', { force: true });
+
+    // ...and the spread mode, for the same reason: a refresh must keep cook
+    // mode and put the new ingredients back on the left page. Contents mode
+    // needs nothing re-drawn (the contents are already there and the caller
+    // re-renders them), so it is left alone rather than made to re-fetch the
+    // list on every render. force: a refresh can arrive mid page-turn, and the
+    // lock is there to reject the reader's tab clicks, not our own re-render.
+    const spreadMode = getSpreadMode();
+    if (spreadMode !== 'contents') setSpreadMode(spreadMode, { force: true });
 }
 
 export async function fetchAndDisplayRecipe(recipeId) {
@@ -711,7 +744,12 @@ export async function fetchAndDisplayRecipe(recipeId) {
                     const list = await state.fetchRecipeList(true);
                     if (list.length > 0) {
                         const firstId = list[0].id;
-                        state.currentRecipeId = firstId;
+                        // currentRecipeId is deliberately left pointing at the
+                        // recipe that is missing: the recursive call assigns it
+                        // anyway, and pre-assigning it here made that call look
+                        // like a refresh of a recipe already on the page, which
+                        // skips the reset to Ingredients and to cook mode that
+                        // opening a different recipe is supposed to do.
                         state.currentRecipeTitle = list[0].title || null;
                         await fetchAndDisplayRecipe(firstId);
                     } else {
@@ -733,9 +771,17 @@ export async function fetchAndDisplayRecipe(recipeId) {
         const pageNumber = idx >= 0 ? pageNumberFor(idx) : null;
 
         renderRecipe(recipe, { pageNumber });
-        // Opening a recipe always starts on Ingredients (renderRecipe has
-        // already re-asserted the current tab, which is what a refresh keeps).
-        if (!isRefresh) setActiveTab('ingredients', { force: true });
+        // Opening a recipe always starts on Ingredients and in cook mode - the
+        // cookbook spread, ingredients left and method right (renderRecipe has
+        // already re-asserted the current tab and mode, which is what a refresh
+        // keeps). force: opening a recipe from the contents, the prev/next
+        // controls or a swipe happens inside a page turn, and the animation
+        // lock is meant to reject the reader's tab clicks, not the app's own
+        // choice of mode after navigating.
+        if (!isRefresh) {
+            setActiveTab('ingredients', { force: true });
+            setSpreadMode('cook', { force: true });
+        }
         setNotePageNumber(pageNumber);
 
         state.currentRecipeId = recipe.id || recipe.recipe?.id || state.currentRecipeId;
@@ -744,7 +790,13 @@ export async function fetchAndDisplayRecipe(recipeId) {
         // Refresh recipe list to include newly created recipes, and keep the
         // contents column on the left page in step with it.
         const fresh = await state.fetchRecipeList(true);
-        renderIndex(fresh, { currentRecipeId: state.currentRecipeId, singleColumn: true, filter: state.contentsFilter });
+        // Only while the left page is actually holding the contents: in cook
+        // and notes modes it holds the ingredients or the conversation, and
+        // renderIndex would overwrite them. The list is still refreshed, since
+        // navigation and the prefetch walk it either way.
+        if (getSpreadMode() === 'contents') {
+            renderIndex(fresh, { currentRecipeId: state.currentRecipeId, singleColumn: true, filter: state.contentsFilter });
+        }
         state.updateNavigationState();
         // Prefetch adjacent recipes for instant navigation
         prefetchAdjacent(state.currentRecipeId);
