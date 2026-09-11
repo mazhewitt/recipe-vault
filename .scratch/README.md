@@ -37,7 +37,19 @@ grep -rl "^Status: ready-for-agent" .scratch --include="*.md" | grep -v /archive
   through a release build and a real browser or not at all. Lists what would
   pay, what should stay in Playwright, and the five decisions to make first.
 
+- `book-spread-modes-follow-ups/02-open-decisions.md` — five judgement calls
+  left by the spread-modes change: the one-per-line cook ingredient list, the
+  now-inert right-edge strip, a deleted rather than adapted test, and the two
+  open questions `design.md` raised (sticky cook mode, meal-plan thread bucket).
+  Nothing broken; all cheap to reverse.
+
 ## Waiting on a human decision (`ready-for-human` / `needs-info`)
+
+- `book-spread-modes-follow-ups/01-deploy-and-purge-cache.md` — the spread-modes
+  work is implemented, tested and archived but unshipped: merge, tag a release,
+  and purge the Cloudflare cache (static assets only, so the compiled
+  `ASSET_VERSION` does not change on its own). Also deletes the stale
+  `book-spread-modes` branch.
 
 - `contents-thumbnails-full-size-photos/` — contents page polaroids load the
   full-size photo. Decision brief appended 2026-09-08 with measured bytes and
