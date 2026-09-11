@@ -15,7 +15,8 @@ The system SHALL organize frontend JavaScript code into ES modules with clear se
   - `app.js` (entry point and coordination)
   - `recipe-display.js` (recipe and contents rendering)
   - `chat.js` (note input and SSE handling)
-  - `margin-notes.js` (chat thread store, margin / sticky rendering, Notes thread rendering)
+  - `margin-notes.js` (chat thread store, per-recipe scoping, margin / sticky rendering, Notes thread rendering)
+  - `spread-modes.js` (contents / cook / notes spread mode state and the left-edge tab strip)
   - `page-tabs.js` (Ingredients / Method / Notes tab state on phone and desktop)
   - `timer.js` (cooking timer functionality)
   - `navigation.js` (recipe navigation state and footer links)
@@ -104,3 +105,16 @@ The system SHALL target modern browsers that support native ES modules.
 - **WHEN** the application is deployed
 - **THEN** JavaScript files are served directly without bundling or transpilation
 - **AND** module loading is handled natively by the browser
+
+### Requirement: Spread mode module boundaries
+
+`spread-modes.js` SHALL own the spread mode and its tab strip without importing the rendering modules, so that no import cycle is introduced.
+
+#### Scenario: No cycle through recipe-display
+- **WHEN** `spread-modes.js` needs the spread re-rendered after a mode change
+- **THEN** it invokes a callback registered by `app.js`
+- **AND** it does not import `recipe-display.js` or `page-tabs.js`
+
+#### Scenario: Mode is readable without importing the module
+- **WHEN** CSS or another module needs the current mode
+- **THEN** it reads `body[data-spread-mode]`, which `spread-modes.js` keeps as the single source of truth
