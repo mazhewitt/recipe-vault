@@ -15,20 +15,20 @@ Spec references are written as `capability › Requirement › Scenario`.
 
 ## 1. Layout-stability harness, written red (`tests/e2e/tests/helpers.ts`, `tests/e2e/tests/layout-stability.spec.ts`, `tests/usability/`)
 
-- [ ] 1.1 Confirm that the audit harness in `tests/usability/` reproduces its baseline before anything changes: `tests/usability/run-all.sh pre-steady-spread`. Diff it against `tests/usability/baseline-2026-10-17/`; differences may appear only in the README's "Known noise" lines. The harness uses ports 3011-3015, never 3001, so it can run beside the e2e suite but not beside another audit run.
+- [x] 1.1 Confirm that the audit harness in `tests/usability/` reproduces its baseline before anything changes: `tests/usability/run-all.sh pre-steady-spread`. Diff it against `tests/usability/baseline-2026-10-17/`; differences may appear only in the README's "Known noise" lines. The harness uses ports 3011-3015, never 3001, so it can run beside the e2e suite but not beside another audit run.
   - Serves design.md Verification and the "Before / after" table in `audit-summary.md`.
-- [ ] 1.2 Add `trackAnchors(page, selectors, action)` to `helpers.ts`.
+- [x] 1.2 Add `trackAnchors(page, selectors, action)` to `helpers.ts`.
   - It starts a `requestAnimationFrame` sampler in the page that records each selector's `getBoundingClientRect()` and displayed state (non-zero size, not `display: none`, not `visibility: hidden`) on every frame.
   - It then runs `action` and stops 500ms after the last mutation under `.book-container` (watched by a `MutationObserver`, with a 15s cap).
   - It returns per-anchor maximum deviation in x, y, width and height, plus a count of hidden frames.
   - Also add `expectAnchorsStill(result, tolerance = 1)`, whose failure message names the anchor and the delta.
   - Also add `ANCHORS(page)`, the list from family-recipe-ui › Nothing on the page moves unless the cook acted on it, with the mid step M = ceil(steps ÷ 2).
-- [ ] 1.3 Add `expectHitArea(page, selector)` to `helpers.ts`. For a 5x5 grid over the 44x44px square centred on the control, `document.elementFromPoint` must return the control or a descendant at every grid point inside the viewport (family-recipe-ui › Every control the cook taps has a 44px hit area). Groups 3, 6 and 7 use it.
-- [ ] 1.4 Add a `createCookingRecipe(page)` fixture to `helpers.ts`.
+- [x] 1.3 Add `expectHitArea(page, selector)` to `helpers.ts`. For a 5x5 grid over the 44x44px square centred on the control, `document.elementFromPoint` must return the control or a descendant at every grid point inside the viewport (family-recipe-ui › Every control the cook taps has a 44px hit area). Groups 3, 6 and 7 use it.
+- [x] 1.4 Add a `createCookingRecipe(page)` fixture to `helpers.ts`.
   - At least 12 ingredients and 9 steps, each step at least two lines long at 1280px, so that the method overflows the right page on every project.
   - Step 2 long enough that the current `.timer-active` padding re-wraps it at every project width.
   - `difficulty` set, so no backfill refresh lands mid-test.
-- [ ] 1.5 Write `layout-stability.spec.ts` with one test per scenario of family-recipe-ui › Nothing on the page moves unless the cook acted on it:
+- [x] 1.5 Write `layout-stability.spec.ts` with one test per scenario of family-recipe-ui › Nothing on the page moves unless the cook acted on it:
   - **Opening a recipe:** click an entry on the contents and track `#note-input` and `#message-input`.
   - **Switching spread mode:** Cook → Notes → Contents → Cook. `test.skip(isPhone(page), 'no spread modes at ≤600px')`.
   - **Sending a note:** hold the turn open by routing `**/api/chat` through `route.fetch()` and fulfilling 1.5s later. Track from Enter to the first chunk.
@@ -39,11 +39,19 @@ Spec references are written as `capability › Requirement › Scenario`.
     - Click the centre of the third `.ingredient-item`, then the mid step.
     - On the phone, tap the text centre and never within 60px of the page edge, where `.mobile-edge-nav` lies until safe-page-navigation N1 lands.
     - Also assert `data-ticked="true"` and `aria-current="step"`, so the case is red until the feature exists rather than passing because nothing happened.
-- [ ] 1.6 Run the spec red on all three projects. Under this task, record each case's failing anchor and delta per project.
+- [x] 1.6 Run the spec red on all three projects. Under this task, record each case's failing anchor and delta per project.
   - Annotate each case with `test.fail(<the projects where it failed>, 'fixed in group N (Dx)')`.
   - A case that already passes on a project stays unannotated there and guards against regression from now on.
   - Expected red: opening (D1, wide projects), switching (D2/D3), sending (D4), reply (D3/D4), refreshing (D5), timer (D8), ticking (D10).
-- [ ] 1.7 `make lint`, then `make test-e2e` green.
+  - Recorded red on 9f28329 (deltas in px; all three projects unless named):
+    - opening: chromium note-input/message-input dx=590, hidden 3 frames; ipad dx=385, hidden 3 frames; mobile-chrome message-input dwidth=5.5. `failOn(all, group 2 D1)`.
+    - switching: chromium recipe-title dwidth=162 dheight=43, mid-step-5 dy=535 dwidth=162; ipad mid-step-5 dy=350; mobile-chrome skipped. `failOn(chromium, ipad, group 4 D2)`.
+    - sending: note-input dy=dheight=28 (mobile-chrome 26); message-input dy=1.4 on chromium and ipad. Group 3 (D4).
+    - reply: note-input dy=dheight=28 (mobile-chrome 26). Group 3 (D3, D4).
+    - refreshing: recipe-title and mid-step-5 dy=252 (ipad 382, mobile-chrome 689), hidden 1 frame; note-input dy=28; message-input dwidth 4-80. Group 5 (D5).
+    - timer: mid-step-5 dy=23 (ipad 69, mobile-chrome 79); note-input dy=28; pill drifts 3-4px between ticks. Group 6 (D8).
+    - ticking: no anchor moved on the ingredient tap; red because `data-ticked` is never set. Group 8 (D10).
+- [x] 1.7 `make lint`, then `make test-e2e` green.
 
 ## 2. The slip has one home; the right edge is a ribbon (D1, D11)
 

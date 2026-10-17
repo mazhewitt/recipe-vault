@@ -288,3 +288,243 @@ export async function expectReply(page: Page, contains: string): Promise<void> {
   await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
     .toContainText(contains, { timeout: 15000 });
 }
+
+/** One element whose box the layout-stability harness watches. */
+export interface Anchor {
+  name: string;
+  selector: string;
+}
+
+export interface AnchorFrame {
+  t: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  shown: boolean;
+  text: string;
+}
+
+export interface AnchorDeviation {
+  selector: string;
+  /** Whether the anchor was displayed on the first frame; one that was not is judged from its first displayed frame. */
+  shownAtStart: boolean;
+  /** Frames on which the anchor was not displayed, counted from its first displayed frame. */
+  hiddenFrames: number;
+  dx: number;
+  dy: number;
+  dwidth: number;
+  dheight: number;
+  frames: AnchorFrame[];
+}
+
+export type AnchorResult = Record<string, AnchorDeviation>;
+
+/**
+ * The anchors of family-recipe-ui › Nothing on the page moves unless the cook
+ * acted on it. M is the mid-method step, ceil(steps ÷ 2), counted from the
+ * displayed recipe. Anchors that are not displayed when tracking starts (the
+ * timer pill before a timer, the mid step on the phone's Ingredients tab) are
+ * judged from the first frame they are shown.
+ */
+export async function ANCHORS(page: Page): Promise<Anchor[]> {
+  const steps = await page.locator('#page-right-content .prep-step').count();
+  const anchors: Anchor[] = [
+    { name: 'note-input', selector: '#note-input' },
+    { name: 'message-input', selector: '#message-input' },
+    { name: 'recipe-title', selector: '#page-right-content .recipe-title' },
+  ];
+  if (steps > 0) {
+    const m = Math.ceil(steps / 2);
+    anchors.push({ name: `mid-step-${m}`, selector: `#page-right-content .prep-step[data-step="${m}"]` });
+  }
+  anchors.push({ name: 'page-next', selector: '#page-next' });
+  anchors.push({ name: 'timer-widget', selector: '#timer-widget' });
+  return anchors;
+}
+
+/**
+ * Samples every anchor's `getBoundingClientRect()` and displayed state on each
+ * animation frame while `action` runs, and until 500ms after the last DOM
+ * mutation under `.book-container` (15s cap). Pass `settle: false` to stop as
+ * soon as `action` resolves, for interactions whose end the action itself
+ * marks. Returns each anchor's maximum deviation from its first displayed frame.
+ */
+export async function trackAnchors(
+  page: Page,
+  anchors: Anchor[],
+  action: () => Promise<void>,
+  opts: { settle?: boolean; quietMs?: number; capMs?: number } = {},
+): Promise<AnchorResult> {
+  const { settle = true, quietMs = 500, capMs = 15000 } = opts;
+  await page.evaluate((list) => {
+    const w = window as any;
+    const frames: Record<string, any[]> = {};
+    for (const a of list) frames[a.name] = [];
+    const state = { frames, running: true, lastMutation: performance.now(), start: performance.now() };
+    w.__anchorTrack = state;
+    const observer = new MutationObserver(() => { state.lastMutation = performance.now(); });
+    const root = document.querySelector('.book-container') || document.body;
+    observer.observe(root, { subtree: true, childList: true, attributes: true, characterData: true });
+    w.__anchorTrackObserver = observer;
+    const sample = () => {
+      if (!state.running) return;
+      const t = performance.now();
+      for (const a of list) {
+        const el = document.querySelector(a.selector) as HTMLElement | null;
+        if (!el) {
+          frames[a.name].push({ t, x: 0, y: 0, width: 0, height: 0, shown: false, text: '' });
+          continue;
+        }
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        const shown = r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden';
+        frames[a.name].push({ t, x: r.x, y: r.y, width: r.width, height: r.height, shown, text: (el.textContent || '').trim().slice(0, 80) });
+      }
+      requestAnimationFrame(sample);
+    };
+    sample();
+  }, anchors);
+
+  await action();
+
+  if (settle) {
+    await page.waitForFunction(
+      ({ quiet, cap }) => {
+        const s = (window as any).__anchorTrack;
+        const now = performance.now();
+        return now - s.lastMutation >= quiet || now - s.start >= cap;
+      },
+      { quiet: quietMs, cap: capMs },
+      { timeout: capMs + 5000, polling: 50 },
+    );
+  }
+
+  const frames: Record<string, AnchorFrame[]> = await page.evaluate(() => {
+    const w = window as any;
+    w.__anchorTrack.running = false;
+    w.__anchorTrackObserver.disconnect();
+    return w.__anchorTrack.frames;
+  });
+
+  const result: AnchorResult = {};
+  for (const a of anchors) {
+    const list = frames[a.name];
+    const firstShown = list.findIndex(f => f.shown);
+    const dev: AnchorDeviation = {
+      selector: a.selector,
+      shownAtStart: list.length > 0 && list[0].shown,
+      hiddenFrames: 0,
+      dx: 0, dy: 0, dwidth: 0, dheight: 0,
+      frames: list,
+    };
+    if (firstShown >= 0) {
+      const base = list[firstShown];
+      for (const f of list.slice(firstShown)) {
+        if (!f.shown) { dev.hiddenFrames++; continue; }
+        dev.dx = Math.max(dev.dx, Math.abs(f.x - base.x));
+        dev.dy = Math.max(dev.dy, Math.abs(f.y - base.y));
+        dev.dwidth = Math.max(dev.dwidth, Math.abs(f.width - base.width));
+        dev.dheight = Math.max(dev.dheight, Math.abs(f.height - base.height));
+      }
+    }
+    result[a.name] = dev;
+  }
+  return result;
+}
+
+/**
+ * Asserts that no tracked anchor moved more than `tolerance` px in x, y, width
+ * or height, nor was hidden on any frame after it was first shown.
+ */
+export function expectAnchorsStill(result: AnchorResult, tolerance = 1): void {
+  const moved: string[] = [];
+  for (const [name, d] of Object.entries(result)) {
+    const deltas = { dx: d.dx, dy: d.dy, dwidth: d.dwidth, dheight: d.dheight };
+    const over = Object.entries(deltas)
+      .filter(([, v]) => v > tolerance)
+      .map(([k, v]) => `${k}=${v.toFixed(1)}px`);
+    if (d.hiddenFrames > 0) over.push(`hidden on ${d.hiddenFrames} frame(s)`);
+    if (over.length) moved.push(`${name} (${d.selector}): ${over.join(' ')}`);
+  }
+  expect(moved, `anchors moved (tolerance ${tolerance}px):\n${moved.join('\n')}`).toEqual([]);
+}
+
+/**
+ * family-recipe-ui › Every control the cook taps has a 44px hit area: over a
+ * 5x5 grid spread evenly across the 44x44px square centred on the control,
+ * `elementFromPoint` must return the control or a descendant at every grid
+ * point inside the viewport.
+ */
+export async function expectHitArea(page: Page, selector: string): Promise<void> {
+  const misses: string[] = await page.locator(selector).first().evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.x + r.width / 2;
+    const cy = r.y + r.height / 2;
+    const out: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j < 5; j++) {
+        const x = cx - 22 + (44 * i) / 4;
+        const y = cy - 22 + (44 * j) / 4;
+        if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) continue;
+        const hit = document.elementFromPoint(x, y);
+        if (!hit || !el.contains(hit)) {
+          const desc = hit ? `${hit.tagName.toLowerCase()}${hit.id ? '#' + hit.id : ''}${hit.className && typeof hit.className === 'string' ? '.' + hit.className.split(/\s+/).join('.') : ''}` : 'nothing';
+          out.push(`(${x.toFixed(0)},${y.toFixed(0)}) -> ${desc}`);
+        }
+      }
+    }
+    return out;
+  });
+  expect(misses, `${selector} hit area under 44x44px; missed points:\n${misses.join('\n')}`).toEqual([]);
+}
+
+/**
+ * A recipe long enough to cook from: 12 ingredients and 9 two-line-plus steps,
+ * so the method overflows the right page on every project. Step 2 is long
+ * enough that any padding on `.timer-active` re-wraps it at every width.
+ * `difficulty` is set, so no backfill refresh lands mid-test.
+ */
+export async function createCookingRecipe(page: Page): Promise<{ id: string; title: string; steps: number }> {
+  const title = `Steady Stew ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const instructions = [
+    'Pat the beef dry with kitchen paper, season it well with salt and pepper, and leave it on the board for ten minutes while you prepare the vegetables.',
+    'Heat two tablespoons of oil in a heavy casserole over a medium-high flame and brown the beef in three batches, turning each piece only once it releases from the pan, so that every side takes on a deep crust; lift each batch onto a plate and keep the fat in the pan for the onions that follow.',
+    'Lower the heat, add the onions, carrots and celery to the casserole, and cook them gently for about eight minutes, scraping up the browned bits from the base.',
+    'Stir in the garlic and the tomato purée and cook for a further two minutes, until the purée darkens and smells sweet rather than sharp.',
+    'Sprinkle over the flour, stir until no dry patches remain, then pour in the red wine a little at a time, stirring all the while so the sauce stays smooth.',
+    'Return the beef and any juices to the casserole, add the stock, the bay leaves and the thyme, and bring everything to a gentle simmer on the hob.',
+    'Cover with a lid and move the casserole to the oven at 160°C for two and a half hours, checking once an hour and adding a splash of water if it looks dry.',
+    'Twenty minutes before the end, add the mushrooms and the pearl onions, stir them in so they sit under the liquid, and return the casserole to the oven uncovered.',
+    'Taste and adjust the seasoning, fish out the bay leaves and thyme stalks, scatter over the chopped parsley, and serve with mashed potato or crusty bread.',
+  ];
+  const ingredients: Ingredient[] = [
+    { name: 'beef chuck, cubed', quantity: 1.2, unit: 'kg' },
+    { name: 'olive oil', quantity: 3, unit: 'tbsp' },
+    { name: 'onions, sliced', quantity: 2 },
+    { name: 'carrots, cut into chunks', quantity: 3 },
+    { name: 'celery sticks, sliced', quantity: 2 },
+    { name: 'garlic cloves, crushed', quantity: 4 },
+    { name: 'tomato purée', quantity: 2, unit: 'tbsp' },
+    { name: 'plain flour', quantity: 2, unit: 'tbsp' },
+    { name: 'red wine', quantity: 400, unit: 'ml' },
+    { name: 'beef stock', quantity: 500, unit: 'ml' },
+    { name: 'bay leaves', quantity: 2 },
+    { name: 'thyme sprigs', quantity: 4 },
+    { name: 'chestnut mushrooms, halved', quantity: 250, unit: 'g' },
+    { name: 'pearl onions, peeled', quantity: 200, unit: 'g' },
+    { name: 'flat-leaf parsley, chopped', notes: 'to serve' },
+  ];
+  const id = await createRecipe(page, {
+    title,
+    description: 'A slow beef stew to cook from at the counter',
+    ingredients,
+    steps: instructions.map((instruction, i) => ({ step_number: i + 1, instruction })),
+    prep_time_minutes: 30,
+    cook_time_minutes: 180,
+    servings: 4,
+    difficulty: 3,
+    tags: ['main'],
+  });
+  return { id, title, steps: instructions.length };
+}
