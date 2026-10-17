@@ -55,6 +55,7 @@ impl ChatState {
                     self.config.ai_model.clone(),
                     Some(self.http_client.clone()),
                 )
+                .with_gemini_options(self.config.gemini_options.clone())
             };
 
             // Configure MCP servers

@@ -465,3 +465,53 @@ fn test_recipe_ids_are_deduplicated_preserving_order() {
         vec!["a".to_string(), "b".to_string(), "c".to_string()]
     );
 }
+
+// ==== Lost-history notice (web-chat: "Lost-history notice only for lost conversations") ====
+
+use recipe_vault::chat::SessionStore;
+use recipe_vault::handlers::chat::prepare_conversation;
+
+fn user_text(text: &str) -> Message {
+    Message::User {
+        content: vec![ContentBlock::Text { text: text.to_string() }],
+    }
+}
+
+fn has_reset_notice(conversation: &[Message]) -> bool {
+    conversation.iter().any(|m| match m {
+        Message::User { content } => content.iter().any(|b| {
+            matches!(b, ContentBlock::Text { text } if text.starts_with("[System]") && text.contains("conversation was reset"))
+        }),
+        _ => false,
+    })
+}
+
+#[tokio::test]
+async fn test_new_chat_without_conversation_id_gets_no_reset_notice() {
+    let sessions = SessionStore::new();
+    let (id, conversation) = prepare_conversation(&sessions, None, user_text("hello")).await;
+    assert!(!id.is_empty());
+    assert!(!has_reset_notice(&conversation), "new chat must not carry the reset notice");
+    assert_eq!(conversation.len(), 1);
+}
+
+#[tokio::test]
+async fn test_unknown_conversation_id_gets_reset_notice_first() {
+    let sessions = SessionStore::new();
+    let (id, conversation) =
+        prepare_conversation(&sessions, Some("lost-id".to_string()), user_text("hello")).await;
+    assert_eq!(id, "lost-id");
+    assert!(has_reset_notice(&conversation[..1]), "notice must be the first message");
+    assert_eq!(conversation.len(), 2);
+}
+
+#[tokio::test]
+async fn test_known_conversation_id_gets_no_reset_notice() {
+    let sessions = SessionStore::new();
+    let (id, _) = prepare_conversation(&sessions, None, user_text("first")).await;
+    let (id2, conversation) =
+        prepare_conversation(&sessions, Some(id.clone()), user_text("second")).await;
+    assert_eq!(id, id2);
+    assert!(!has_reset_notice(&conversation));
+    assert_eq!(conversation.len(), 2);
+}

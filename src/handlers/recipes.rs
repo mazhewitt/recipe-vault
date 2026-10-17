@@ -405,7 +405,8 @@ pub fn build_assessment_provider(
         api_key,
         config.difficulty_model.clone(),
         Some(http_client),
-    ))
+    )
+    .with_gemini_options(config.gemini_options.clone()))
 }
 
 /// Auto-assign tags to a recipe using AI assessment

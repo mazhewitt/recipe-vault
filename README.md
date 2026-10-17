@@ -103,8 +103,13 @@ PHOTOS_DIR=./data/photos  # photo storage directory
 ```
 
 To use Gemini instead of Anthropic, set `AI_PROVIDER=gemini`,
-`DIFFICULTY_PROVIDER=gemini`, `GEMINI_API_KEY`, and Gemini model names such as
-`AI_MODEL=gemini-2.5-pro` and `DIFFICULTY_MODEL=gemini-2.5-flash`.
+`DIFFICULTY_PROVIDER=gemini` and `GEMINI_API_KEY`. The Gemini defaults are
+`AI_MODEL=gemini-3.8-flash` and `DIFFICULTY_MODEL=gemini-3.5-flash-lite`; set
+`AI_MODEL=gemini-2.5-pro` to roll back. Two optional Gemini settings:
+`GEMINI_MAX_OUTPUT_TOKENS` (default 16384, shared by thinking and visible output)
+and `GEMINI_THINKING_LEVEL` (`low`, `medium` or `high`, sent only to
+`gemini-3*` / `gemini-4*` models; unset uses each model's default). Each Gemini
+call logs a `gemini usage ...` line at `info` with token counts, never content.
 Provider API keys are conditional: Anthropic mode needs `ANTHROPIC_API_KEY`,
 Gemini mode needs `GEMINI_API_KEY`, and `MOCK_LLM=true` needs neither.
 
@@ -313,8 +318,8 @@ docker run -d -p 3000:3000 \
   -e AI_PROVIDER=gemini \
   -e DIFFICULTY_PROVIDER=gemini \
   -e GEMINI_API_KEY=your-key \
-  -e AI_MODEL=gemini-2.5-pro \
-  -e DIFFICULTY_MODEL=gemini-2.5-flash \
+  -e AI_MODEL=gemini-3.8-flash \
+  -e DIFFICULTY_MODEL=gemini-3.5-flash-lite \
   mazhewitt/recipe-vault:latest
 ```
 
