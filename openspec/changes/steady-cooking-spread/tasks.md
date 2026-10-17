@@ -55,24 +55,24 @@ Spec references are written as `capability › Requirement › Scenario`.
 
 ## 2. The slip has one home; the right edge is a ribbon (D1, D11)
 
-- [ ] 2.1 `static/styles.css`: move the base `.note-input` rule (≈246-261) to the foot of the left page (`left: 10px; right: calc(50% + 10px)`). Delete the per-mode mirror (≈1959-1963) and the `recipe`/`meal` + `contents` hide (≈1973-1976). Leave the phone block alone.
+- [x] 2.1 `static/styles.css`: move the base `.note-input` rule (≈246-261) to the foot of the left page (`left: 10px; right: calc(50% + 10px)`). Delete the per-mode mirror (≈1959-1963) and the `recipe`/`meal` + `contents` hide (≈1973-1976). Leave the phone block alone.
   - book-spread-modes › The note input has one home › The note input keeps one position, Contents mode keeps the input
   - book-spread-modes › Left page is contextual › No recipe open, Recipe opened
   - book-spread-modes › Meal plans keep the contents spread › Meal plan displayed
   - family-recipe-ui › Main layout displays the recipe book alone › Default desktop layout, Narrow viewport stacks components (the input half)
   - family-recipe-ui › Note input lives in the book › Desktop note input
-- [ ] 2.2 `static/styles.css`: move the 72px bottom padding (`.page` ≈588, ≈1982-1985) from the right page to the left page's scroll area. Size it from a `--slip-clearance` custom property: the slip's height plus its bottom offset.
+- [x] 2.2 `static/styles.css`: move the 72px bottom padding (`.page` ≈588, ≈1982-1985) from the right page to the left page's scroll area. Size it from a `--slip-clearance` custom property: the slip's height plus its bottom offset.
   - book-spread-modes › The note input has one home › The left page's last line clears the input
-- [ ] 2.3 `static/recipe-display.js` `showRecipeError` (≈43): confirm that "Recipe not found" (empty book) and "Failed to load recipe" (5xx) both leave `.note-input` displayed on the left. Leave the 404 fall-through to the first recipe alone: safe-page-navigation N5 owns it.
+- [x] 2.3 `static/recipe-display.js` `showRecipeError` (≈43): confirm that "Recipe not found" (empty book) and "Failed to load recipe" (5xx) both leave `.note-input` displayed on the left. Leave the 404 fall-through to the first recipe alone: safe-page-navigation N5 owns it.
   - book-spread-modes › The note input has one home › A failed load keeps the input
-- [ ] 2.4 Make the right-edge strip a ribbon.
+- [x] 2.4 Make the right-edge strip a ribbon.
   - `static/chat.html`: give each `.edge-tab` `aria-hidden="true"` and `tabindex="-1"`. Above 600px a spread mode always applies, so static attributes are enough, and the phone hides `.edge-tabs` outright.
   - `static/styles.css` (≈1040-1069): add `pointer-events: none` and drop the hover, `.active` and pulled-out styling.
   - Keep `role="tab"`, which `contents-filters.spec.ts:128` counts.
   - family-recipe-ui › Right page edge ribbons (all)
   - book-spread-modes › Cook mode splits the recipe across the spread › Right-edge tabs stay on the edge in cook mode
   - book-spread-modes › Mode changes leave the right page alone › The ribbons stay inert in every mode
-- [ ] 2.5 Rewrite the e2e assertions of the old contract:
+- [x] 2.5 Rewrite the e2e assertions of the old contract:
   - `spread-modes.spec.ts`:
     - "contents mode hides the slip, and the Notes tab brings it back" becomes "contents mode keeps the slip where it was": same box, ±1px, in cook, contents and notes.
     - "the contents page keeps its slip and gains a Notes tab": the slip is on the left page with the same box as after opening a recipe.
@@ -80,12 +80,12 @@ Spec references are written as `capability › Requirement › Scenario`.
   - `responsive.spec.ts` "desktop shows the edge tabs, and the slip sits at the foot of the left page": the slip is visible in contents mode; drop the ribbon `active` class assertion.
   - `page-tabs.spec.ts` "desktop: the edge tabs scroll the right page to the section" becomes "desktop: the edge ribbons are inert", per the Migration of family-recipe-ui REMOVED "Right page edge tabs".
   - `page-tabs.spec.ts:330` and any other wide-viewport `openTab(page, 'ingredients'|'method')` caller: the ribbon cannot be clicked any more. Remove those calls, since both sections are on the spread in cook mode.
-- [ ] 2.6 New cases in `spread-modes.spec.ts`:
+- [x] 2.6 New cases in `spread-modes.spec.ts`:
   - A 500 on `GET /api/recipes/:id` (via `page.route`) leaves the slip displayed on the left.
   - The left page's last line clears the slip, for the contents, the ingredients and the thread.
   - In `meal-plan-display.spec.ts` "chat message triggers meal plan display via mock LLM", assert the slip is displayed at the same box as on the contents.
-- [ ] 2.7 `layout-stability.spec.ts`: remove `test.fail` from "Opening a recipe".
-- [ ] 2.8 `make lint`, then `make test-e2e` green.
+- [x] 2.7 `layout-stability.spec.ts`: remove `test.fail` from "Opening a recipe".
+- [x] 2.8 `make lint`, then `make test-e2e` green.
 
 ## 3. The reply has a home, and a turn keeps the slip still (D3, D4)
 

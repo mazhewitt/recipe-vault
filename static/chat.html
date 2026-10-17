@@ -53,12 +53,12 @@
                     </svg>
                 </div>
 
-                <!-- Desktop / tablet edge tabs, on the right outer edge of the book.
+                <!-- Desktop / tablet edge ribbons (inert furniture), on the right outer edge of the book.
                      Sibling of .pages-container so they neither scroll with the page
                      nor take part in the #page-right grid. -->
                 <div class="edge-tabs" role="tablist" aria-label="Recipe sections">
-                    <button type="button" class="edge-tab active" role="tab" data-tab="ingredients" aria-selected="true" aria-controls="page-right-content">Ingredients</button>
-                    <button type="button" class="edge-tab" role="tab" data-tab="method" aria-selected="false" aria-controls="page-right-content">Method</button>
+                    <button type="button" class="edge-tab" role="tab" aria-hidden="true" tabindex="-1" data-tab="ingredients" aria-selected="true" aria-controls="page-right-content">Ingredients</button>
+                    <button type="button" class="edge-tab" role="tab" aria-hidden="true" tabindex="-1" data-tab="method" aria-selected="false" aria-controls="page-right-content">Method</button>
                 </div>
 
                 <div class="pages-container">

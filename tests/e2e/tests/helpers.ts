@@ -215,8 +215,8 @@ export async function sendNote(page: Page, text: string): Promise<void> {
 
 /**
  * The x of the book's spine — the middle of the two-page spread. The note input
- * is a slip over the right page in contents and cook modes and over the left
- * page in notes mode, so which side of this line it falls on is the assertion.
+ * is a slip over the foot of the left page in every state above 600px, so
+ * which side of this line it falls on is the assertion.
  */
 export async function spineX(page: Page): Promise<number> {
   const pages = (await page.locator('.pages-container').boundingBox())!;

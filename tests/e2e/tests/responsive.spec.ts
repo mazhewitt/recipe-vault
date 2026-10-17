@@ -94,24 +94,22 @@ test.describe('Responsive Layout (book only)', () => {
     // (spread-modes.spec.ts).
     await useContentsMode(page);
 
-    // Edge tabs on the book's outer edge; the phone paper tabs stay hidden.
+    // Edge ribbons on the book's outer edge; the phone paper tabs stay hidden.
     // Two of them: Notes is a left-page spread mode now, not a section.
     await expect(page.locator('.edge-tabs')).toBeVisible();
     await expect(page.locator('.edge-tab')).toHaveCount(2);
-    await expect(page.locator('.edge-tab[data-tab="ingredients"]')).toHaveClass(/active/);
     await expect(page.locator('.page-tabs')).toBeHidden();
 
-    // Contents mode carries no slip at all: the contents are for finding a
-    // recipe, and the Notes tab on the same strip is the way to write
-    await expect(page.locator('.note-input')).toBeHidden();
+    // Contents mode keeps the slip: it has one home in every mode
+    await expect(page.locator('.note-input')).toBeVisible();
 
     // The recipe is on the right page and the contents stay on the left
     await expect(page.locator('#page-right-content')).toContainText('test ingredient');
     await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
 
     // Back in cook mode the slip is a pinned absolute over the foot of the LEFT
-    // page — the one position it holds in every mode that shows it, so that
-    // clicking into it cannot move it
+    // page — the one position it holds in every state, so that clicking into
+    // it cannot move it
     await page.locator('.spread-tab[data-mode="cook"]').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
     const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);

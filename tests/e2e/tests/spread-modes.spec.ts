@@ -39,6 +39,41 @@ async function createLongRecipe(page: Page, name: string): Promise<string> {
   });
 }
 
+type Box = { x: number; y: number; width: number; height: number };
+
+/** The largest difference, in px, between two boxes on any edge or size. */
+function boxDelta(a: Box, b: Box): number {
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y),
+    Math.abs(a.width - b.width), Math.abs(a.height - b.height));
+}
+
+/** The slip's box, after asserting it is displayed. */
+async function slipBox(page: Page): Promise<Box> {
+  await expect(page.locator('.note-input')).toBeVisible();
+  return (await page.locator('.note-input').boundingBox())!;
+}
+
+/**
+ * Scrolls the left page to its foot and returns how far, in px, the bottom of
+ * the last `selector` match reaches below the slip's top edge (<= 0 clears it).
+ */
+async function lastLineOverlap(page: Page, selector: string): Promise<number> {
+  return page.evaluate((sel) => {
+    const left = document.getElementById('page-left')!;
+    left.scrollTop = left.scrollHeight;
+    const items = left.querySelectorAll(sel);
+    const last = items[items.length - 1];
+    if (!last) throw new Error(`no ${sel} on the left page`);
+    const slip = document.querySelector('.note-input')!.getBoundingClientRect();
+    return last.getBoundingClientRect().bottom - slip.top;
+  }, selector);
+}
+
+/** Whether the left page actually scrolls, so a clearance check has teeth. */
+async function leftPageOverflows(page: Page): Promise<boolean> {
+  return page.locator('#page-left').evaluate(el => el.scrollHeight > el.clientHeight + 50);
+}
+
 async function isAnimating(page: Page): Promise<boolean> {
   return page.evaluate(async () => {
     const M = await import('/static/page-transitions.js');
@@ -132,29 +167,52 @@ test.describe('Spread modes', () => {
     expect(await scrollTop('page-left')).toBeGreaterThan(100);
   });
 
-  test('the right-edge strip stays on the edge in cook mode and offers no Notes tab', async ({ page }) => {
+  test('the right-edge strip stays on the edge in cook mode as inert ribbons', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createLongRecipe(page, 'Edge Strip');
     await openRecipe(page, recipeId);
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
 
     // The strip is the book's furniture and stays put in every mode
     await expect(page.locator('.edge-tabs')).toBeVisible();
     await expect(page.locator('.edge-tab')).toHaveCount(2);
-    await expect(page.locator('.edge-tab[data-tab="ingredients"]')).toBeVisible();
-    await expect(page.locator('.edge-tab[data-tab="method"]')).toBeVisible();
-
     // Notes is a left-page mode now, so it has left the right-edge strip entirely
     await expect(page.locator('.edge-tab[data-tab="notes"]')).toHaveCount(0);
 
-    // In cook mode the strip does not decide what the right page shows: the
-    // ingredients are on the LEFT page, so a tap on Ingredients must not blank
-    // the method the cook is reading
-    await page.locator('.edge-tab[data-tab="ingredients"]').click();
-    await expect(page.locator('#page-right-content .tab-panel[data-tab="method"]')).toBeVisible();
-    await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+    for (const mode of ['cook', 'notes', 'contents'] as const) {
+      if (mode !== 'cook') await selectMode(page, mode);
+      await expect(page.locator('.edge-tabs')).toBeVisible();
 
-    await selectMode(page, 'contents');
-    await expect(page.locator('.edge-tabs')).toBeVisible();
+      for (const tab of ['ingredients', 'method']) {
+        const ribbon = page.locator(`.edge-tab[data-tab="${tab}"]`);
+        await expect(ribbon).toBeVisible();
+        // Ribbons, not controls: not announced, not focusable, no pointer input
+        await expect(ribbon).toHaveAttribute('aria-hidden', 'true');
+        await expect(ribbon).toHaveAttribute('tabindex', '-1');
+        expect(await ribbon.evaluate(el => getComputedStyle(el).pointerEvents)).toBe('none');
+
+        const box = (await ribbon.boundingBox())!;
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
+        expect(await page.evaluate(({ x, y }) => {
+          const hit = document.elementFromPoint(x, y);
+          return !!hit && !!hit.closest('.edge-tab');
+        }, { x: cx, y: cy }), `elementFromPoint at the ${tab} ribbon`).toBe(false);
+
+        // A click where the ribbon is drawn changes neither page
+        const snapshot = () => page.evaluate(() => ({
+          left: document.getElementById('page-left-content')!.innerHTML,
+          right: document.getElementById('page-right-content')!.innerHTML,
+          leftTop: document.getElementById('page-left')!.scrollTop,
+          rightTop: document.getElementById('page-right')!.scrollTop,
+          mode: document.body.dataset.spreadMode,
+        }));
+        const before = await snapshot();
+        await page.mouse.click(cx, cy);
+        await page.waitForTimeout(400);
+        expect(await snapshot()).toEqual(before);
+      }
+    }
   });
 
   test('cook mode does not scroll the right page to a section header', async ({ page }) => {
@@ -324,19 +382,22 @@ test.describe('Spread modes', () => {
     expect(after.y).toBe(before.y);
   });
 
-  test('contents mode hides the slip, and the Notes tab brings it back', async ({ page }) => {
+  test('contents mode keeps the slip where it was', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createLongRecipe(page, 'Contents Slip');
     await openRecipe(page, recipeId);
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+
+    // One home in every mode: the foot of the LEFT page, never hidden
+    const spine = await spineX(page);
+    const cook = await slipBox(page);
+    expect(cook.x + cook.width).toBeLessThanOrEqual(spine);
 
     await selectMode(page, 'contents');
-    // Nothing to write on while finding a recipe...
-    await expect(page.locator('.note-input')).toBeHidden();
-    // ...and the way back is the tab on the strip the reader is already using
-    await expect(page.locator('.spread-tab[data-mode="notes"]')).toBeVisible();
+    expect(boxDelta(await slipBox(page), cook), 'contents mode moved the slip').toBeLessThanOrEqual(1);
 
     await selectMode(page, 'notes');
-    await expect(page.locator('.note-input')).toBeVisible();
+    expect(boxDelta(await slipBox(page), cook), 'notes mode moved the slip').toBeLessThanOrEqual(1);
   });
 
   test('the contents page keeps its slip and gains a Notes tab', async ({ page }) => {
@@ -352,10 +413,78 @@ test.describe('Spread modes', () => {
     await expect(page.locator('.spread-tab[data-mode="cook"]')).toBeHidden();
     await expect(page.locator('.spread-tab[data-mode="contents"]')).toBeHidden();
 
-    // The slip stays where it has always been here, and focusing it is inert
-    await expect(page.locator('.note-input')).toBeVisible();
+    // The slip is at the foot of the LEFT page here too, the box it keeps once
+    // a recipe is open, and focusing it is inert
+    const spine = await spineX(page);
+    const contents = await slipBox(page);
+    expect(contents.x + contents.width).toBeLessThanOrEqual(spine);
     await page.locator('#message-input').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'contents');
+
+    const recipeId = await createLongRecipe(page, 'Contents Home');
+    await openRecipe(page, recipeId);
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+    await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
+    expect(boxDelta(await slipBox(page), contents), 'opening a recipe moved the slip').toBeLessThanOrEqual(1);
+  });
+
+  test('a failed recipe load keeps the slip on the left page', async ({ page }) => {
+    skipOnPhone(page);
+    const recipeId = await createLongRecipe(page, 'Failed Load');
+    const home = await slipBox(page);
+    await page.route(`**/api/recipes/${recipeId}`, route =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }));
+
+    await page.evaluate((id) => {
+      // @ts-ignore - fetchAndDisplayRecipe is exposed by app.js
+      fetchAndDisplayRecipe(id);
+    }, recipeId);
+    await expect(page.locator('#page-right-content')).toContainText('Failed to load recipe', { timeout: 10000 });
+    await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
+
+    const spine = await spineX(page);
+    const after = await slipBox(page);
+    expect(after.x + after.width).toBeLessThanOrEqual(spine);
+    expect(boxDelta(after, home), 'a failed load moved the slip').toBeLessThanOrEqual(1);
+  });
+
+  test("the left page's last line clears the slip", async ({ page }) => {
+    skipOnPhone(page);
+    // The contents: enough entries that the left page scrolls. All under "A",
+    // the first letter group, which the split always keeps on the left page.
+    const stamp = Date.now();
+    for (let i = 0; i < 60; i++) {
+      await createRecipe(page, {
+        title: `A Clearance Entry ${stamp} ${String(i).padStart(2, '0')}`,
+        ingredients: [{ name: 'salt', quantity: 1, unit: 'g' }],
+        steps: [{ step_number: 1, instruction: 'Season.' }],
+        servings: 1,
+        difficulty: 1,
+      });
+    }
+    await page.reload();
+    await expect(page.locator('.index-title')).toBeVisible();
+    await expect(page.locator('#page-left-content .index-recipe-item').first()).toBeVisible();
+    expect(await leftPageOverflows(page), 'the contents must overflow the left page').toBe(true);
+    expect(await lastLineOverlap(page, '#page-left-content > *'), 'the contents').toBeLessThanOrEqual(0);
+
+    // The ingredients, in cook mode
+    const recipeId = await createLongRecipe(page, 'Clearance');
+    await openRecipe(page, recipeId);
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+    await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
+    expect(await leftPageOverflows(page), 'the ingredients must overflow the left page').toBe(true);
+    expect(await lastLineOverlap(page, '.ingredient-item'), 'the ingredients').toBeLessThanOrEqual(0);
+
+    // The thread, in notes mode, long enough to scroll
+    await selectMode(page, 'notes');
+    await page.evaluate(async (id) => {
+      const M = await import('/static/margin-notes.js');
+      for (let i = 1; i <= 30; i++) M.addNote(`Note ${i} about the stew, long enough to wrap a little on the page.`, 'reply', id);
+    }, recipeId);
+    await expect(page.locator('#page-left-content .notes-thread > *').nth(29)).toBeAttached();
+    expect(await leftPageOverflows(page), 'the thread must overflow the left page').toBe(true);
+    expect(await lastLineOverlap(page, '.notes-thread > *'), 'the thread').toBeLessThanOrEqual(0);
   });
 
   test('cook mode keeps a running timer step highlighted on the method page', async ({ page }) => {

@@ -92,9 +92,6 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
   });
 
   test('opening a recipe', async ({ page }) => {
-    // Red on 9f28329: chromium note-input/message-input dx=590 hidden 3 frames; ipad dx=385 hidden 3 frames;
-    // mobile-chrome message-input dwidth=5.5.
-    failOn(ALL, 'fixed in group 2 (D1)');
     const recipe = await createCookingRecipe(page);
     await page.reload();
     await expect(page.locator('.index-title')).toBeVisible();

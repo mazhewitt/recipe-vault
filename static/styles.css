@@ -241,13 +241,15 @@ body::before {
 
 /* ==================== NOTE INPUT ==================== */
 /* The single chat surface. Desktop/tablet: a cream slip absolutely positioned
-   over the foot of the right page, so it never scrolls away with the recipe.
-   Phone: a static cream bar beneath the book - see the 600px block. */
+   over the foot of the LEFT page, in every state - the contents page, all three
+   spread modes, a meal plan, a failed load. It has one home, so nothing a cook
+   does can move it or hide it. Phone: a static cream bar beneath the book - see
+   the 600px block. */
 .note-input {
     position: absolute;
-    left: calc(50% + 10px); /* just right of the spine */
-    right: 10px;
-    bottom: 10px;
+    left: 10px;
+    right: calc(50% + 10px); /* just left of the spine */
+    bottom: var(--slip-bottom);
     z-index: 6; /* above .pages-container (1), below .page-turn-overlay (10) */
     display: flex;
     flex-direction: column;
@@ -348,6 +350,10 @@ body::before {
 
 .note-page-number {
     flex-shrink: 0;
+    /* A fixed width, so "p. 1" becoming "p. 13" on opening a recipe cannot
+       narrow the textarea beside it. Room for a three-digit page. */
+    width: 3.5em;
+    text-align: right;
     padding-bottom: 8px;
     font-family: var(--font-handwritten);
     font-size: 13px;
@@ -476,6 +482,11 @@ body::before {
     display: flex;
     flex-direction: column;
     position: relative; /* containing block for the absolute .note-input */
+    /* The slip's one-line height and its offset from the foot of the book. The
+       left page pads its foot by the sum, so its last line clears the slip. */
+    --slip-bottom: 10px;
+    --slip-height: 52px;
+    --slip-clearance: calc(var(--slip-height) + var(--slip-bottom) + 10px);
 }
 
 .recipe-book {
@@ -580,12 +591,20 @@ body::before {
 .page-left {
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);
     box-shadow: var(--shadow-inset-left);
+    padding-bottom: var(--slip-clearance); /* clear the .note-input slip pinned to the foot */
+}
+
+/* The content grows with what it holds rather than overflowing a box fixed at
+   the page's height: otherwise the overflow runs past the foot padding above
+   and the left page's last line scrolls only as far as under the slip. */
+.page-left > .page-content {
+    height: auto;
+    flex: 1 0 auto;
 }
 
 .page-right {
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     box-shadow: var(--shadow-inset-right);
-    padding-bottom: 72px; /* clear the .note-input slip pinned to the foot */
 }
 
 /* Center binding shadows */
@@ -1024,9 +1043,15 @@ body::before {
 }
 
 /* ==================== EDGE TABS (desktop / tablet) ==================== */
-/* Section tabs poking out of the book's right outer edge. A child of
+/* Bookmark ribbons poking out of the book's right outer edge. A child of
    .recipe-book, so they neither scroll with the page nor join the
-   #page-right grid. Shown on the recipe page only. */
+   #page-right grid. Shown on the recipe page only.
+
+   They are the book's furniture, not controls: above 600px a spread mode
+   always applies and the right page is fixed, so there is nothing for them to
+   switch. chat.html marks them aria-hidden and out of the tab order; here they
+   take no pointer input and are all drawn alike - no hover, nothing pulled out
+   as active. */
 .edge-tabs {
     display: none;
     position: absolute;
@@ -1063,9 +1088,8 @@ body::before {
     font-size: 14px;
     line-height: 1;
     letter-spacing: 0.5px;
-    cursor: pointer;
+    pointer-events: none;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.25);
-    transition: background 0.2s, color 0.2s;
 }
 
 .edge-tab[data-tab="method"] {
@@ -1076,19 +1100,6 @@ body::before {
 .edge-tab[data-tab="notes"] {
     background: var(--color-leather);
     color: var(--color-paper-cream);
-}
-
-/* The active tab reads as the page itself, pulled out past the edge */
-.edge-tab.active {
-    background: var(--color-paper-cream);
-    color: var(--color-ink-dark);
-    font-weight: 700;
-    padding-right: 8px;
-}
-
-.edge-tab:focus-visible {
-    outline: 2px solid var(--color-ink-dark);
-    outline-offset: 2px;
 }
 
 /* ==================== PAGE TABS (phone) ==================== */
@@ -1945,48 +1956,6 @@ body[data-view-mode="index"] #page-margin {
        takes the reading size a full page can afford. */
     body[data-spread-mode="notes"] #page-left-content .notes-thread {
         font-size: 16px;
-    }
-
-    /* ---- Where the slip sits, across all three modes ---- */
-    /* One rule for the whole spread: while a recipe is open the slip is at the
-       foot of the LEFT page in both modes that show it, and hidden in the
-       third. It therefore never moves under the cursor — the jump that made a
-       click on the input re-lay-out the book is gone, and with it the reason
-       for the focus-selects-notes transition that caused it.
-
-       No JS moves the form and no second form exists: it is the same
-       absolutely positioned element with its offsets mirrored. */
-    body[data-spread-mode="cook"] .note-input,
-    body[data-spread-mode="notes"] .note-input {
-        left: 10px;
-        right: calc(50% + 10px);
-    }
-
-    /* Contents mode has no slip at all. The contents are for finding a recipe,
-       not for writing, and the Notes tab is one click away on the same strip
-       the reader is already using. Hidden rather than moved, so nothing on the
-       page shifts when the mode changes.
-
-       Scoped to a recipe being open: on the contents page proper the strip
-       offers the filters, with no Notes tab to reach the thread by, so the slip
-       has to stay where it has always been. */
-    body[data-view-mode="recipe"][data-spread-mode="contents"] .note-input,
-    body[data-view-mode="meal"][data-spread-mode="contents"] .note-input {
-        display: none;
-    }
-
-    /* The foot clearance follows the slip onto the left page; the right page
-       goes back to .page's own 20px. Contents mode with a recipe open needs
-       neither, but leaving the right page's default 72px there costs nothing
-       and keeps the rule to the two modes that actually moved the slip. */
-    body[data-spread-mode="cook"] .page-left,
-    body[data-spread-mode="notes"] .page-left {
-        padding-bottom: 72px;
-    }
-
-    body[data-spread-mode="cook"] .page-right,
-    body[data-spread-mode="notes"] .page-right {
-        padding-bottom: 20px;
     }
 }
 

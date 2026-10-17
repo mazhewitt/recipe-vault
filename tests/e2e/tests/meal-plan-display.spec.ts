@@ -173,6 +173,10 @@ test.describe('Meal Plan Panel', () => {
   test('chat message triggers meal plan display via mock LLM', async ({ page }) => {
     // Seed 2 recipes so the mock can build a centrepiece + side meal plan
     await seedRecipes(page, 2);
+    // The slip's box on the contents, which a meal plan must not move or hide
+    const slip = page.locator('.note-input');
+    await expect(slip).toBeVisible();
+    const before = (await slip.boundingBox())!;
 
     await sendNote(page, 'create a meal plan');
 
@@ -183,5 +187,14 @@ test.describe('Meal Plan Panel', () => {
     // The meal plan panel should have been rendered by the meal_artifact SSE event
     await expect(page.locator('.meal-plan-panel')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.meal-plan-title')).toHaveText('Mock Dinner Party');
+
+    // book-spread-modes › Meal plans keep the contents spread: the slip is
+    // displayed where it was on the contents
+    await expect(slip).toBeVisible();
+    await expect.poll(async () => {
+      const box = (await slip.boundingBox())!;
+      return Math.max(Math.abs(box.x - before.x), Math.abs(box.y - before.y),
+        Math.abs(box.width - before.width), Math.abs(box.height - before.height));
+    }, { timeout: 5000 }).toBeLessThanOrEqual(1);
   });
 });

@@ -143,9 +143,18 @@ test.describe('Page tabs', () => {
   test('a tab tap during a page turn is ignored', async ({ page }) => {
     const recipeId = await createLongRecipe(page, 'Tab Lock');
     await openRecipe(page, recipeId);
-    // The right-edge strip is hidden in cook mode (both sections are on the
-    // spread there), so the tab it controls is only tappable in contents mode
+    // Contents mode, where the right page holds both sections. Above 600px the
+    // edge strip is inert ribbons, so the tap there is setActiveTab itself,
+    // the call the delegated listener would make; the phone taps its paper tab.
     await useContentsMode(page);
+    const tapMethod = async () => {
+      if (isPhone(page)) {
+        await page.locator(tabSelector(page, 'method')).dispatchEvent('click');
+      } else {
+        // @ts-ignore - setActiveTab is exposed by app.js
+        await page.evaluate(() => { setActiveTab('method'); });
+      }
+    };
     await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
 
     // A real page turn, held open by a slow render so the tap lands inside it
@@ -158,7 +167,7 @@ test.describe('Page tabs', () => {
 
     // dispatchEvent, not click(): a view transition covers the page mid-turn,
     // but the delegated listener is the same one a tap would reach
-    await page.locator(tabSelector(page, 'method')).dispatchEvent('click');
+    await tapMethod();
 
     await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
     await expect(page.locator(tabSelector(page, 'method'))).not.toHaveClass(/active/);
@@ -166,7 +175,7 @@ test.describe('Page tabs', () => {
     // Once the turn is over the very same tap works — so the assertion above is
     // about the lock, not about a tab that never worked
     await expect.poll(() => isAnimating(page), { timeout: 10000 }).toBe(false);
-    await page.locator(tabSelector(page, 'method')).click();
+    await tapMethod();
     await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'method');
   });
 
@@ -198,51 +207,40 @@ test.describe('Page tabs', () => {
     await expect(page.locator('.footer-page')).toHaveText('p. 3');
   });
 
-  test('desktop: the edge tabs scroll the right page to the section', async ({ page }) => {
-    test.skip(isPhone(page), 'edge tabs are the wide layout');
-    const recipeId = await createLongRecipe(page, 'Edge Scroll');
+  test('desktop: the edge ribbons are inert', async ({ page }) => {
+    test.skip(isPhone(page), 'edge ribbons are the wide layout');
+    const recipeId = await createLongRecipe(page, 'Edge Ribbons');
     await openRecipe(page, recipeId);
-    // Contents mode is where the right page holds the whole recipe and so has
-    // two section headers to scroll between; cook mode has one section per page
-    // and hides this strip entirely (see spread-modes.spec.ts).
+    // Contents mode is where the old tabs used to scroll the right page between
+    // its two section headers; the ribbons must not do it now
     await useContentsMode(page);
 
     const scrollTop = () => page.locator('#page-right').evaluate(el => el.scrollTop);
-    // The page really does overflow, otherwise there is nothing to scroll
+    // The page really does overflow, so a scroll would have somewhere to go
     const overflow = await page.locator('#page-right').evaluate(el => el.scrollHeight - el.clientHeight);
     expect(overflow).toBeGreaterThan(50);
     expect(await scrollTop()).toBe(0);
 
-    // Distance, in either direction, from the section's header to the top of the
-    // visible page area
-    const headerDistance = (tab: string) => page.evaluate((t) => {
-      const pageRight = document.getElementById('page-right')!;
-      const header = document.querySelector(`#page-right-content .tab-panel[data-tab="${t}"] .section-header`)!;
-      return Math.abs(header.getBoundingClientRect().top - pageRight.getBoundingClientRect().top);
-    }, tab);
+    for (const tab of ['method', 'ingredients']) {
+      const ribbon = page.locator(`.edge-tab[data-tab="${tab}"]`);
+      await expect(ribbon).toBeVisible();
+      await expect(ribbon).toHaveAttribute('aria-hidden', 'true');
+      await expect(ribbon).toHaveAttribute('tabindex', '-1');
+      expect(await ribbon.evaluate(el => getComputedStyle(el).pointerEvents)).toBe('none');
 
-    // Both sections share one scrolling page here, so Method scrolls to it
-    expect(await headerDistance('method')).toBeGreaterThan(100);
-    await page.locator('.edge-tab[data-tab="method"]').click();
-    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'method');
-    await expect.poll(scrollTop, { timeout: 5000 }).toBeGreaterThan(0);
-    await expect.poll(() => headerDistance('method'), { timeout: 5000 }).toBeLessThan(4);
-    expect(await headerDistance('ingredients')).toBeGreaterThan(100);
+      const box = (await ribbon.boundingBox())!;
+      const tabBefore = await page.locator('#page-right').getAttribute('data-tab');
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(600);
+      expect(await scrollTop(), `a click at the ${tab} ribbon scrolled the right page`).toBe(0);
+      await expect(page.locator('#page-right')).toHaveAttribute('data-tab', tabBefore!);
+    }
 
-    // Ingredients scrolls back up to its own header
-    const scrolledToMethod = await scrollTop();
-    await page.locator('.edge-tab[data-tab="ingredients"]').click();
-    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
-    await expect.poll(() => headerDistance('ingredients'), { timeout: 5000 }).toBeLessThan(4);
-    await expect.poll(scrollTop, { timeout: 5000 }).toBeLessThan(scrolledToMethod);
-    // Neither section was swapped out: this width shows both
-    await expect(page.locator('#page-right-content .ingredients-list')).toBeVisible();
-    await expect(page.locator('#page-right-content .prep-list')).toBeVisible();
-
-    // ...and nothing crossfaded: the wide layout scrolls, it does not animate
-    expect(await page.evaluate(() =>
-      document.getElementById('page-right-content')!.style.opacity)).toBe('');
-    expect(await isAnimating(page)).toBe(false);
+    // Keyboard focus never lands on a ribbon
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Tab');
+      expect(await page.evaluate(() => !!document.activeElement?.closest('.edge-tab'))).toBe(false);
+    }
   });
 
   // The desktop Notes edge tab is gone: Notes is a left-page spread mode above
@@ -327,7 +325,18 @@ test.describe('Page tabs', () => {
     await openRecipe(page, first);
     // Contents mode: the strip that carries the Method tab is hidden in cook mode
     await useContentsMode(page);
-    await openTab(page, 'method');
+    // The phone taps its paper tab. Above 600px the edge strip is inert ribbons
+    // and nothing offers the tab, so the state is set directly: the reset under
+    // test belongs to opening a recipe, not to the strip.
+    if (isPhone(page)) {
+      await openTab(page, 'method');
+    } else {
+      await page.evaluate(() => {
+        // @ts-ignore - setActiveTab is exposed by app.js
+        setActiveTab('method', { force: true });
+      });
+      await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'method');
+    }
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
 
     await openRecipe(page, other.id);
