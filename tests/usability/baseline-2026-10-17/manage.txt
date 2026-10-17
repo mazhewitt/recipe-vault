@@ -1,0 +1,21 @@
+phone-book-narrows-during-reload: book width deviation (390px viewport; 0 = fixed): photo-upload maxDev=75px, chat update_recipe maxDev=75px
+photo-upload-resets-scroll: phone scrollTop 200->0, content height maxDev 200px; tablet scrollTop 191->0, content height maxDev 191px; desktop scrollTop 189->0, content height maxDev 189px
+late-difficulty-reflow: phone dots=5 step3 maxDev=27px tags maxDev=125px meta dh=27px; tablet dots=5 step3 maxDev=0px tags maxDev=129px meta dh=0px
+timer-pill-covers-next: tablet next-centre->page-next next-corner->timer-cancel; tablet-landscape next-centre->timer-widget next-corner->timer-cancel; desktop next-centre->timer-widget next-corner->timer-cancel  (fixed when every centre/corner hits page-nav next)
+logout-above-timer-cancel: phone gap=16px dx=3px cancel=28x28 logout=34x19; tablet gap=23px dx=3px cancel=28x28 logout=36x21; tablet-landscape gap=18px dx=3px cancel=28x28 logout=36x21; desktop gap=18px dx=3px cancel=28x28 logout=36x21
+phone-edge-strip-over-content: 3rd ingredient qty hit=mobile-edge-prev strip=60x639; tapping it -> "Chocolate Brownies" (expected Granny's Beef Lasagne)
+header-full-width-hit-zone: tablet hit 770x35 vs label 122px; desktop hit 1180x35 vs label 122px; phone hit 81x16 vs label 81px
+failed-load-hides-note-input: after "Failed to load recipe": spread=contents note-input display=none
+phone-rotate-landscape-loses-input: 844x390: spread=contents note-input display=none left page="~ Contents ~
+A"
+long-title-wraps: phone:roast=7l/146of350px phone:lasagne=3l/146of350px tablet:roast=7l/147of323px tablet:lasagne=3l/147of323px tablet-landscape:roast=4l/252of428px tablet-landscape:lasagne=2l/252of428px desktop:roast=3l/352of528px desktop:lasagne=1l/352of528px
+first-paint-placeholder-jump: phone All tab y 92->158 (66px); first text "Ask me to find or create " then "~ Contents ~ A"
+font-swap-reflow: phone title h 129->129, step6 y 830->859 (29px), user chip w 390->390; tablet title h 129->129, step6 y 746->764 (18px), user chip w 180->198; desktop title h 43->43, step6 y 610->605 (-5px), user chip w 180->198
+share-new-token-each-tap: two taps -> http://127.0.0.1:3014/share/mTZwErZsSO , http://127.0.0.1:3014/share/akytibG6ts (distinct=true); share button 28x28
+share-page-issues: og:image="/share/4iw1RX2wSB/photo" (absolute=false); img has width/height=false; copy button 127x30; first step text "Step 1. Heat" inside a numbered <ol>
+photo-error-far-or-hidden: tablet/cook: 1011px from button, book maxDev 0px; tablet/contents: invisible, book maxDev 0px; phone/-: 620px from button, book maxDev 44px
+small-manage-targets: phone: .share-btn=28x28 .add-photo-btn=28x28 .logout-link=34x19 #recipe-book-header=81x16 #page-next=0x0; tablet: .share-btn=28x28 .add-photo-btn=28x28 .logout-link=36x21 #recipe-book-header=770x35 #page-next=36x36
+resize-refetch-storm: 20 resize events on the contents page -> 2 GET /api/recipes
+breakpoint-resets-scroll: scrollTop 1280:189 -> 500:0 -> 1280:0 (mode cook)
+cdn-script-blocks-paint: jsdelivr delayed 3000ms -> FCP 3120ms
+difficulty-backfill-lock-race: created without difficulty+tags -> after 3s difficulty=undefined tags=["curry","main"] (see server.log for "database is locked")

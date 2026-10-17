@@ -1,0 +1,55 @@
+input-jumps-across-spine: tablet open recipe: #note-input dx=-385px maxDev=973px visFlips=2
+cook-reply-offscreen: tablet method scrollTop=191: reply rect y=-94..-41 vs page top=73 -> visible=false
+cook-reply-covers-recipe: tablet 3 replies: margin 379x154px, overhangs page left edge by 24px, overlaps 4 recipe elements, taps blocked on [.share-btn .add-photo-btn .recipe-photo], note background=rgba(0, 0, 0, 0)
+debug-status-lines: tablet after timer: 2/3 visible margin notes are technical ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+halve-scroll-reset: tablet scrollTop 214 -> 0; skeleton frames=36; step5 y 493 -> 707
+cook-to-notes-reflow: tablet Cook->Notes: method step 4 moved dy=421px; layout-shift=0.133
+input-hidden-contents-and-meal: tablet input visible: contents-tab-with-recipe=false, after meal plan=false (viewMode=meal, mode=contents)
+reply-filed-out-of-sight: tablet meal plan view margin shows [] (expected the meal-plan reply "I've assembled your meal plan")
+input-jumps-across-spine: tablet-landscape open recipe: #note-input dx=-490px maxDev=713px visFlips=2
+cook-reply-offscreen: tablet-landscape method scrollTop=200: reply rect y=-93..-12 vs page top=83 -> visible=false
+cook-reply-covers-recipe: tablet-landscape 3 replies: margin 150x264px, overhangs page left edge by -310px, overlaps 5 recipe elements, taps blocked on [.add-photo-btn .recipe-photo], note background=rgba(0, 0, 0, 0)
+debug-status-lines: tablet-landscape after timer: 2/3 visible margin notes are technical ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+halve-scroll-reset: tablet-landscape scrollTop 250 -> 0; skeleton frames=36; step5 y 332 -> 582
+cook-to-notes-reflow: tablet-landscape Cook->Notes: method step 4 moved dy=603px; layout-shift=0.000
+input-hidden-contents-and-meal: tablet-landscape input visible: contents-tab-with-recipe=false, after meal plan=false (viewMode=meal, mode=contents)
+reply-filed-out-of-sight: tablet-landscape meal plan view margin shows [] (expected the meal-plan reply "I've assembled your meal plan")
+input-jumps-across-spine: desktop open recipe: #note-input dx=-590px maxDev=703px visFlips=2
+cook-reply-offscreen: desktop method scrollTop=189: reply rect y=-82..-1 vs page top=83 -> visible=false
+cook-reply-covers-recipe: desktop 3 replies: margin 150x264px, overhangs page left edge by -410px, overlaps 5 recipe elements, taps blocked on [.add-photo-btn .recipe-photo], note background=rgba(0, 0, 0, 0)
+debug-status-lines: desktop after timer: 2/3 visible margin notes are technical ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+halve-scroll-reset: desktop scrollTop 189 -> 0; skeleton frames=36; step5 y 360 -> 549
+cook-to-notes-reflow: desktop Cook->Notes: method step 4 moved dy=453px; layout-shift=0.000
+input-hidden-contents-and-meal: desktop input visible: contents-tab-with-recipe=false, after meal plan=false (viewMode=meal, mode=contents)
+reply-filed-out-of-sight: desktop meal plan view margin shows [] (expected the meal-plan reply "I've assembled your meal plan")
+reply-filed-out-of-sight: phone "show me the lasagne": recipe open (recipe), margin notes shown=0 (reply filed on book thread)
+reply-filed-out-of-sight: tablet "show me the lasagne": recipe open (recipe), margin notes shown=0 (reply filed on book thread)
+cook-reply-offscreen: phone method scrolled: reply y=1162 vs input top=783 -> visible=false
+debug-status-lines: phone margin after timer: ["Using tool: start_timer","Timer set: Mock timer, 0.1 min","Timer started for step 2."]
+focus-lost-after-send: phone textarea disabled while thinking=true; focus after reply=BODY
+focus-lost-after-send: tablet textarea disabled while thinking=true; focus after reply=BODY
+slip-grows-over-page: phone 7-line note: slip h 61->157 (+96px upward); pages-container h 703->607
+thinking-row-jump: phone send: slip maxDev=26px, pages-container maxDev=26px
+sticky-covers-contents: phone contents sticky 382x81px overlaps [Lemon Drizzle Cake], dismiss controls=0, left page h now 622
+image-chip: phone chip grows slip +53px; remove target 22x18px; text "Image attached (0.0MB)"; re-attach same file after remove shows chip=false
+small-targets-and-text: phone send 44x44, attach 44x44, remove-image 22x18; reply font-size=14px
+empty-send-silent: phone whitespace send: thread 2->2, textarea keeps "   ", no feedback
+slip-grows-over-page: tablet 7-line note: slip h 57->157 (+100px upward); pages-container h 961->961
+thinking-row-jump: tablet send: slip maxDev=28px, pages-container maxDev=0px
+sticky-covers-contents: tablet contents sticky 150x125px overlaps [Pancakes], dismiss controls=0, left page h now 961
+image-chip: tablet chip grows slip +55px; remove target 22x18px; text "Image attached (0.0MB)"; re-attach same file after remove shows chip=false
+small-targets-and-text: tablet send 40x40, attach 40x40, remove-image 22x18; reply font-size=14px
+empty-send-silent: tablet whitespace send: thread 2->2, textarea keeps "   ", no feedback
+slip-grows-over-page: desktop 7-line note: slip h 57->157 (+100px upward); pages-container h 681->681
+thinking-row-jump: desktop send: slip maxDev=28px, pages-container maxDev=0px
+sticky-covers-contents: desktop contents sticky 150x125px overlaps [Pancakes], dismiss controls=0, left page h now 681
+image-chip: desktop chip grows slip +55px; remove target 22x18px; text "Image attached (0.0MB)"; re-attach same file after remove shows chip=false
+small-targets-and-text: desktop send 40x40, attach 40x40, remove-image 22x18; reply font-size=14px
+empty-send-silent: desktop whitespace send: thread 2->2, textarea keeps "   ", no feedback
+notes-tab-on-contents: tablet Notes tab: input dx=-385px, contents title dx=379px, active tabs=["All","Notes"], sticky still rendered=1
+notes-tab-on-contents: desktop Notes tab: input dx=-590px, contents title dx=584px, active tabs=["All","Notes"], sticky still rendered=1
+phone-book-thread-unreachable: phone contents: 4 book entries, 1 shown, Notes tab visible=false
+thread-lost-on-reload: phone after reload: thread entries=0
+keyboard-resets-contents-scroll: phone contents #page-left scrollTop 200 -> 0 when viewport height drops to 500
+keyboard-resets-contents-scroll: tablet-landscape contents #page-left scrollTop 157 -> 0 when viewport height drops to 450
+meal-plan-dead-end: tablet: 3 disabled action buttons on the plan; after opening a recipe from it, routes back to the plan=0

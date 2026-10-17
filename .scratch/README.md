@@ -43,6 +43,41 @@ grep -rl "^Status: ready-for-agent" .scratch --include="*.md" | grep -v /archive
   open questions `design.md` raised (sticky cook mode, meal-plan thread bucket).
   Nothing broken; all cheap to reverse.
 
+### From the 2026-10-17 usability audit
+
+These findings fall outside `openspec/changes/steady-cooking-spread` and
+`safe-page-navigation`. Each maps back to its audit rows in
+`openspec/changes/steady-cooking-spread/audit-summary.md`. The audit also added
+a comment to `recipe-create-spawns-two-racing-writers/`: it reproduces on a
+file-backed database too (`SQLITE_BUSY`, 4 of 4 creates).
+
+- `notes-thread-gaps/` — the thread is lost on reload, the phone cannot reach
+  the book-level thread, and a turn that opens a recipe or meal plan files its
+  reply where the cook cannot see it. The most user-visible of this batch.
+- `tablet-swipe/` — no swipe on the tablet, the likely cooking device;
+  deliberately deferred by safe-page-navigation for its own design.
+- `share-flow/` — every tap mints a new public link, the share falls back to
+  `prompt()`, and the public page has a relative `og:image` and double step
+  numbers.
+- `photo-upload-feedback/` — errors appear 600-1200px from the camera button,
+  photos over 5MB are refused with no downscale, there is no remove, and the
+  photo is re-downloaded on every render.
+- `contents-page-rough-edges/` — the A-Z strip scrolls away, the return scroll
+  overshoots, the letters are 20px, Notes moves the contents across the spine,
+  and four results split across two pages. Three items need a spec decision.
+- `meal-plan-dead-end/` — three disabled buttons, and no way back to the plan.
+- `first-paint-stability/` — the Google Fonts swap reflows the recipe,
+  unpinned `marked@latest` blocks paint, and the placeholder jumps on load.
+- `timer-pill-and-duration-chips/` — the running pill does not lead back to
+  its step, and the "4 min" chips look tappable but are not.
+- `note-input-rough-edges/` — the image chip grows the slip and cannot
+  re-attach the same file, an empty send is silent, and send keeps its hover
+  colour on touch.
+- `phone-paging-rough-edges/` — "next recipe ›" moves between taps, paging
+  resets the tab, and a header tap during a view transition is lost.
+- `cook-page-polish/` — uneven cook-mode ingredient spacing, and 14px replies
+  beside an 18px method.
+
 ## Waiting on a human decision (`ready-for-human` / `needs-info`)
 
 - `book-spread-modes-follow-ups/01-deploy-and-purge-cache.md` — the spread-modes

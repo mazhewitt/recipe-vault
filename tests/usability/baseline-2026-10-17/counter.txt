@@ -1,0 +1,49 @@
+cook-reply-covers-title: tablet: margin 379x53 at x=381 (page-right x=405, sticks out left by 24px); overlap title=5733px² polaroid=3920px²; note bg=rgba(0, 0, 0, 0); share-btn BLOCKED by #page-margin; add-photo BLOCKED by #page-margin
+cook-reply-covers-title: tablet-landscape: margin 150x81 at x=850 (page-right x=540, sticks out left by 0px); overlap title=0px² polaroid=6664px²; note bg=rgba(0, 0, 0, 0); share-btn reachable; add-photo BLOCKED by #page-margin
+cook-reply-covers-title: desktop: margin 150x81 at x=1050 (page-right x=640, sticks out left by 0px); overlap title=0px² polaroid=6664px²; note bg=rgba(0, 0, 0, 0); share-btn reachable; add-photo BLOCKED by #page-margin
+refresh-loses-place: tablet: page-right scrollTop 191 -> 0; skeleton frames=1; app-container min width 770 vs 770; tab after=ingredients
+refresh-loses-place: phone: page-right scrollTop 300 -> 0; skeleton frames=1; app-container min width 315 vs 390; tab after=method
+phone-edge-strips-steal-taps: mobile-edge-prev 60x639 op=0.2, mobile-edge-next 60x639 op=0.2; element under first quantity="mobile-edge-prev"; tapping "225 g" turned "Lemon Drizzle Cake" -> "Granny's Beef Lasagne"
+phone-diagonal-scroll-turns-page: drag(-125,-240) 62deg scrollSuppressed=true TURNED to Lemon Drizzle Cake; drag(-60,-110) 61deg scrollSuppressed=true stayed
+mode-switch-reflows-recipe: tablet: ->notes: step1 dy=421 ingredients dx=379 input vis 1->1 CLS=0.103 | ->cook: step1 dy=-421 ingredients dx=-379 input vis 1->1 CLS=0.103 | ->contents: step1 dy=421 ingredients dx=379 input vis 1->0 CLS=0.103 | ->cook: step1 dy=-421 ingredients dx=-379 input vis 0->1 CLS=0.103
+mode-switch-reflows-recipe: tablet-landscape: ->notes: step1 dy=488 ingredients dx=484 input vis 1->1 CLS=0.000 | ->cook: step1 dy=-488 ingredients dx=-484 input vis 1->1 CLS=0.000 | ->contents: step1 dy=488 ingredients dx=484 input vis 1->0 CLS=0.000 | ->cook: step1 dy=-488 ingredients dx=-484 input vis 0->1 CLS=0.000
+note-slip-crosses-spine: tablet: #note-input dx=-385px maxDev=973px visFlips=2
+note-slip-crosses-spine: tablet-landscape: #note-input dx=-490px maxDev=713px visFlips=2
+note-slip-crosses-spine: desktop: #note-input dx=-590px maxDev=703px visFlips=2
+timer-highlight-pushes-steps: tablet: step2 height 47->70px, step3 dy=23px
+timer-pill-covers-next: tablet: pill 218x36 at 560,57; #page-next reachable; cancel {x:740,y:61,w:28,h:28,b:89,r:768}
+debug-status-lines: tablet: 2 status notes shown: ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+timer-done-vanishes: tablet: "Done!" visible for 3009ms then pill hidden; audio alert code present=false
+timer-highlight-pushes-steps: tablet-landscape: step2 height 47->47px, step3 dy=0px
+timer-pill-covers-next: tablet-landscape: pill 218x36 at 800,67; #page-next BLOCKED by #timer-widget; cancel {x:980,y:71,w:28,h:28,b:99,r:1008}
+debug-status-lines: tablet-landscape: 2 status notes shown: ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+timer-done-vanishes: tablet-landscape: "Done!" visible for 3009ms then pill hidden; audio alert code present=false
+timer-highlight-pushes-steps: desktop: step2 height 24->47px, step3 dy=23px
+timer-pill-covers-next: desktop: pill 218x36 at 1000,67; #page-next BLOCKED by #timer-widget; cancel {x:1180,y:71,w:28,h:28,b:99,r:1208}
+debug-status-lines: desktop: 2 status notes shown: ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+timer-done-vanishes: desktop: "Done!" visible for 3008ms then pill hidden; audio alert code present=false
+timer-highlight-pushes-steps: phone: step2 height 53->77px, step3 dy=23px
+timer-pill-covers-next: phone: pill 175x30 at 207,42; #page-next n/a (no arrow); cancel {x:346,y:43,w:28,h:28,b:71,r:374}
+debug-status-lines: phone: 2 status notes shown: ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+timer-done-vanishes: phone: "Done!" visible for 3009ms then pill hidden; audio alert code present=false
+recipe-text-small: tablet: ingredient=14px step=14px duration=12px timerText=18px; left page filled 90%, right 68%
+title-wraps: tablet: "Lemon Drizzle Cake" title box 147x86 (~2 lines)
+recipe-text-small: tablet-landscape: ingredient=14px step=14px duration=12px timerText=18px; left page filled 87%, right 87%
+title-wraps: tablet-landscape: "Lemon Drizzle Cake" title box 252x43 (~1 lines)
+recipe-text-small: phone: ingredient=16px step=16px duration=12px timerText=14px; left page filled NaN%, right 66%
+title-wraps: phone: "Lemon Drizzle Cake" title box 146x86 (~2 lines)
+title-wraps: phone: "Granny's Beef Lasagne" title box 146x129
+small-touch-targets: tablet: 13 under 44px: Logout 36x21; Recipe Book 770x35; Previous recip 36x36; Next recipe 36x36; Ingredients 26x95; Method 26x92; Contents 26x76; Cook 26x76; Notes 26x76; Share recipe 28x28; Add photo to r 28x28; Attach image f 40x40; Send note 40x40
+small-touch-targets: tablet-landscape: 13 under 44px: Logout 36x21; Recipe Book 980x35; Previous recip 29x29; Next recipe 29x29; Ingredients 26x95; Method 26x92; Contents 26x76; Cook 26x76; Notes 26x76; Share recipe 28x28; Add photo to r 28x28; Attach image f 40x40; Send note 40x40
+small-touch-targets: phone: 4 under 44px: Logout 34x19; Recipe Book 81x16; Share recipe 28x28; Add photo to r 28x28
+edge-tabs-noop-in-cook: tablet: panels before=[0,[433,274,473],[54,111,199]] afterMethod=[0,[433,274,473],[54,111,199]] afterIngredients=[0,[433,274,473],[54,111,199]] afterCook=[0,[433,274,473],[54,111,199]] -> NO visible change from 3 taps
+phone-reply-offscreen: phone: reply top=1034 vs visible page bottom=779 (inside scroller, 255px below)
+sending-shifts-layout: tablet: note-input maxDev=28px, .recipe-book maxDev=0px, #page-right maxDev=0px; textarea disabled while sending=true
+sending-shifts-layout: phone: note-input maxDev=26px, .recipe-book maxDev=26px, #page-right maxDev=26px; textarea disabled while sending=true
+packed-ingredients-split: tablet notes mode: 6 packed lines; qty split across lines: ["2 tbsp"]
+packed-ingredients-split: tablet-landscape notes mode: 6 packed lines; qty split across lines: ["60 g"]
+duration-chip-looks-tappable: tablet: tag=SPAN bg=rgb(240, 230, 204) cursor=auto listeners=false
+no-wake-lock: navigator.wakeLock used=false
+chrome-budget: tablet: paper 83%, ingredient+step blocks 40%, everything else 17%
+chrome-budget: tablet-landscape: paper 76%, ingredient+step blocks 42%, everything else 24%
+chrome-budget: phone: paper 82%, ingredient+step blocks 44%, everything else 18%

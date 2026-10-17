@@ -1,0 +1,14 @@
+phone-edge-zone-steals-contents-taps: tap "p. 7" on Granny's Beef Lasagne row: hit=mobile-edge-next, opened="Banana Bread" (expected Granny's Beef Lasagne)
+phone-edge-zones-cover-recipe-text: 5/5 visible step numbers sit under #mobile-edge-prev; each edge zone 60x639px = 31% of page width, opacity 0.2
+phone-diagonal-scroll-turns-page: 31deg drift: TURNED to Lemon Drizzle Cake; sideways wobble then scroll: TURNED to Lemon Drizzle Cake; 20deg drift: stayed
+timer-pill-covers-next-arrow: tablet: 37% covered, centre->arrow; tablet-landscape: 46% covered, centre->timer; desktop: 46% covered, centre->timer
+header-return-intermediate-frame: tablet: CLS=0.123, mid-frame(list 400ms) leftEmpty=true recipeWithIngredientsOnRight=true; desktop: CLS=0.145, mid-frame(list 400ms) leftEmpty=true recipeWithIngredientsOnRight=true
+next-waits-for-list-and-ignores-prefetch: 300ms API latency: first visible response 325ms, new recipe at 632ms; requests during first 1.6s: list,recipe,list,recipe (recipe fetched despite prefetch)
+no-history-reload-loses-recipe: history.length 2->2 on open (url /chat); after reload viewMode=index (recipe lost)
+contents-return-scrolls-title-away: tablet-landscape: row visible at top=true, after return scrollTop=157/157 A-Z visible=false; desktop: row visible at top=true, after return scrollTop=167/167 A-Z visible=false; phone: row visible at top=true, after return scrollTop=271/839 A-Z visible=false
+alphabet-strip-scrolls-away: after jumping to M: A-Z bottom=-462 page top=76 visible=false
+touch-targets-under-44px: phone: A-Z 20x19, filter tab 66x44, arrow -, header 81x16; tablet: A-Z 20x21, filter tab 26x76, arrow 36x36, header 770x35; tablet-landscape: A-Z 22x22, filter tab 26x76, arrow 29x29, header 980x35
+open-recipe-moves-note-input: tablet: dx=-385px flips=2; desktop: dx=-590px flips=2
+contents-tab-reflows-method: step 1 moved dy=421px when the Contents tab was tapped
+phone-footer-next-moves: footer-next y 719 -> 573 (dy=-146); tab after next=ingredients (was method)
+tablet-no-swipe: swipe left 300px on tablet: no navigation

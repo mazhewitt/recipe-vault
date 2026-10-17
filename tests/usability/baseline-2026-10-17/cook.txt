@@ -1,0 +1,19 @@
+note-input-crosses-spine-on-open: tablet dx=-385px flips=2; tablet-landscape dx=-490px flips=2; desktop dx=-590px flips=2
+touch-photo-preview-closes-instantly: tablet opened=1x visibleAfter500ms=false; phone opened=1x visibleAfter500ms=false; desktop opened=1x visibleAfter500ms=true
+cook-margin-notes-cover-header: tablet marginW=379 overflowsPageLeftBy=24 covered=[.recipe-title,.share-btn,.add-photo-btn,.recipe-photo]; tablet-landscape marginW=150 overflowsPageLeftBy=0 covered=[.add-photo-btn,.recipe-photo]; desktop marginW=150 overflowsPageLeftBy=0 covered=[.add-photo-btn,.recipe-photo]
+timer-pill-over-next-arrow: tablet pill∩next=561px² (of 1296) ✕∩next=299px²; tablet-landscape pill∩next=442px² (of 841) ✕∩next=208px²; desktop pill∩next=442px² (of 841) ✕∩next=208px²
+timer-highlight-reflows-method: tablet start: step2 dh=23 step3 dy=23, expiry: step3 dy=-23; phone start: step2 dh=26 step3 dy=27, expiry: step3 dy=-27; tablet-landscape start: step2 dh=23 step3 dy=23, expiry: step3 dy=-23; desktop start: step2 dh=0 step3 dy=0, expiry: step3 dy=0
+timer-expiry-silent-and-fleeting: audioPlays=0 vibrations=0 notificationPermission=denied doneShownFor≈3000ms
+phone-edge-nav-covers-content: strips 60x639 each; ingredient starts under strip 13/19; tap qty -> "Granny's Beef Lasagne" became "Chocolate Brownies"; 300px vertical drag at x=30 scrolled 0px
+phone-diagonal-scroll-swallowed: dx=0,dy=-200 -> scrolled 263px, recipe="Granny's Beef "; dx=60,dy=-200 -> scrolled 263px, recipe="Granny's Beef "; dx=80,dy=-150 -> scrolled 0px, recipe="Granny's Beef "; dx=110,dy=-200 -> scrolled 0px, recipe="Granny's Beef "
+phone-tab-switch-loses-place: step 7 top y=299 before -> 685 after Ingredients->Method round trip (moved 386px; viewport 844)
+phone-reply-offscreen: latest reply top y=1034 vs viewport height 844 (OFF-SCREEN)
+notes-tab-moves-method: tablet method header y: cook=317 notes=738 (moved 421px) contents=738 (moved 421px)
+edge-tabs-noop-in-cook: [rightScroll,leftScroll,rightTextLen,leftTextLen] before=0,0,1059,418 after both taps=0,0,1059,418 (NO-OP)
+small-text-at-arms-length: tablet ingredient=14px step=14px duration=12px leftPageEmptyBelowList=42%; tablet-landscape ingredient=14px step=14px duration=12px leftPageEmptyBelowList=19%; phone ingredient=16px step=16px duration=12px leftPageEmptyBelowList=null%; desktop ingredient=14px step=14px duration=12px leftPageEmptyBelowList=18%
+small-touch-targets: tablet: #page-prev=36x36 #page-next=36x36 .spread-tab[data-mode="cook"]=26x76 .edge-tab[data-tab="method"]=26x92 .timer-cancel=28x28 .share-btn=28x28 .add-photo-btn=28x28 #send-button=40x40 #recipe-book-header=770x35; phone: .timer-cancel=28x28 .share-btn=28x28 .add-photo-btn=28x28 #recipe-book-header=81x16
+no-place-keeping-or-wake-lock: wakeLock requests=0; elements marked after tapping an ingredient and a step=0
+debug-status-lines: tablet: ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]; phone: ["Using tool: start_timer","Timer set: Mock timer, 0.1 min"]
+tablet-title-word-per-line: tablet title 147x129 lines≈3; phone title 146x129 lines≈3
+note-input-grows-while-thinking: tablet #note-input maxDev=28px during send
+timer-pill-width-jitter: phone pill widths seen over 16s: 0,149,152,153,154,155,156,189px
