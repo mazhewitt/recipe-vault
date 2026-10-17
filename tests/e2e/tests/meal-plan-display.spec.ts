@@ -180,7 +180,7 @@ test.describe('Meal Plan Panel', () => {
 
     await sendNote(page, 'create a meal plan');
 
-    // The reply lands in the margin (the mock completes the two-step flow)
+    // The reply lands on the sticky (the mock completes the two-step flow)
     await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
       .toContainText('meal plan', { timeout: 15000 });
 

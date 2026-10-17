@@ -124,8 +124,6 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
   });
 
   test('sending a note', async ({ page }) => {
-    // Red on 9f28329: note-input dy=dheight=28 (mobile-chrome 26); message-input dy=1.4 on chromium and ipad.
-    failOn(ALL, 'fixed in group 3 (D4)');
     await openCookingRecipe(page);
     const anchors = await ANCHORS(page);
     const chat = holdChat(page, async (route) => {
@@ -134,7 +132,10 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     });
     await chat.ready;
 
-    await page.locator('#message-input').fill('is the oven hot enough');
+    // One line at every width (web-chat "The slip does not change height" is
+    // about a one-line note): the ipad slip's textarea is ~170px wide, and a
+    // longer note wraps there, so clearing it on send would shrink the slip.
+    await page.locator('#message-input').fill('oven hot?');
     const result = await trackAnchors(page, anchors, async () => {
       await page.locator('#message-input').press('Enter');
       await chat.requested;
@@ -147,8 +148,6 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
   });
 
   test('a reply arriving', async ({ page }) => {
-    // Red on 9f28329: note-input dy=dheight=28 (mobile-chrome 26).
-    failOn(ALL, 'fixed in group 3 (D3, D4)');
     await openCookingRecipe(page);
     const anchors = await ANCHORS(page);
     const chat = holdChat(page, async (route) => {

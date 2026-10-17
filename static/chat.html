@@ -109,10 +109,15 @@
                             <button type="button" class="page-tab" role="tab" data-tab="notes" aria-selected="false" aria-controls="page-right-content">Notes</button>
                         </div>
                         <div class="page-content" id="page-right-content"></div>
-                        <aside id="page-margin" class="page-margin" aria-live="polite"></aside>
                     </div>
                 </div>
             </div>
+
+            <!-- The reply sticky: the latest reply (or the in-flight line) of the
+                 thread on display, overlaid directly above the note input - at the
+                 foot of the left page above 600px, above the input bar on a phone.
+                 margin-notes.js renders into it and places it. -->
+            <aside id="page-margin" class="page-margin" aria-live="polite"></aside>
 
             <!-- The single chat surface. Desktop/tablet: absolutely positioned over
                  the foot of the right page. Phone: a cream bar beneath the book. -->
@@ -121,10 +126,6 @@
                     <span class="image-icon">🖼️</span>
                     <span class="image-text">Image attached</span>
                     <button class="remove-image" onclick="removeImage()" type="button" aria-label="Remove attached image">✕</button>
-                </div>
-                <div id="loading" class="loading">
-                    <div class="spinner"></div>
-                    <span id="loading-text">Thinking...</span>
                 </div>
                 <div class="note-input-row">
                     <span class="note-pencil" aria-hidden="true">

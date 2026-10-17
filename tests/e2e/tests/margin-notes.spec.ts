@@ -1,13 +1,26 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, threadEntries, isTablet, useContentsMode } from './helpers';
+import { authenticate, createRecipe, expectHitArea, threadEntries, isTablet, paceChat, useContentsMode } from './helpers';
 
 /**
- * These cover the margin column of the wide layout: the phone stacks the margin
- * under the active panel and hides it entirely on the Notes tab, so the geometry
- * and the sticky-note projection are asserted on the wider projects only.
+ * These cover the reply sticky (#page-margin) of the wide layout, where it sits
+ * at the foot of the left page directly above the slip. The phone's sticky,
+ * above the input bar, is asserted in reply-sticky.spec.ts.
  */
 function skipOnPhone(page: Page) {
-  test.skip(page.viewportSize()!.width <= 600, 'the margin is a column only above 600px');
+  test.skip(page.viewportSize()!.width <= 600, 'the sticky sits above the slip on the left page only above 600px');
+}
+
+/** The sticky's bottom edge is 0-8px above the slip, and it lies inside the left page. */
+async function expectAboveTheSlip(page: Page) {
+  const g = await page.evaluate(() => {
+    const r = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
+    return { sticky: r('#page-margin'), input: r('#note-input'), left: r('#page-left'), right: r('#page-right') };
+  });
+  expect(g.input.top - g.sticky.bottom).toBeGreaterThanOrEqual(-0.5);
+  expect(g.input.top - g.sticky.bottom).toBeLessThanOrEqual(8.5);
+  expect(g.sticky.left).toBeGreaterThanOrEqual(g.left.left - 0.5);
+  expect(g.sticky.right).toBeLessThanOrEqual(g.left.right + 0.5);
+  expect(g.sticky.right).toBeLessThanOrEqual(g.right.left + 0.5);
 }
 
 async function openRecipe(page: Page, recipeId: string) {
@@ -28,7 +41,7 @@ test.describe('Margin notes', () => {
     await authenticate(page);
   });
 
-  test('reply renders as a margin note with a recipe open', async ({ page }) => {
+  test('reply renders on the sticky above the slip with a recipe open', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createRecipe(page, {
       title: `Margin Recipe ${Date.now()}`,
@@ -44,9 +57,10 @@ test.describe('Margin notes', () => {
     await expect(reply).toHaveCount(1, { timeout: 10000 });
     await expect(reply.first()).toBeVisible();
     await expect(reply.first()).toContainText('mock assistant');
+    await expectAboveTheSlip(page);
   });
 
-  test('four replies leave three notes visible', async ({ page }) => {
+  test('four replies leave one note on the sticky', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createRecipe(page, {
       title: `Margin Cap ${Date.now()}`,
@@ -65,8 +79,9 @@ test.describe('Margin notes', () => {
         .toBe(i);
     }
 
-    // The margin shows only the three most recent notes...
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(3);
+    // The sticky shows only the latest reply...
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
+    await expect(page.locator('#page-margin .margin-note')).toHaveAttribute('data-kind', 'reply');
     // ...while the store keeps every entry (4 user + 4 replies)
     const kinds = await page.evaluate(() =>
       // @ts-ignore - getMarginThread is exposed by app.js
@@ -87,12 +102,23 @@ test.describe('Margin notes', () => {
     await expect(page.locator('.index-title')).toBeVisible();
 
     await send(page, 'hello contents');
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
     await send(page, 'hello again');
+    await expect.poll(async () => (await threadEntries(page)).filter(n => n.kind === 'reply').length,
+      { timeout: 10000 }).toBe(2);
 
-    const sticky = page.locator('#page-margin .sticky-note');
-    await expect(sticky).toHaveCount(1, { timeout: 10000 });
+    const sticky = page.locator('#page-margin .margin-note');
+    await expect(sticky).toHaveCount(1);
     await expect(sticky.first()).toBeVisible();
     await expect(sticky.first()).toContainText('mock assistant');
+    // Above the slip on the left page, clear of the contents' second half
+    await expectAboveTheSlip(page);
+
+    // ...and dismissible
+    await expectHitArea(page, '#page-margin .note-dismiss');
+    await page.locator('#page-margin .note-dismiss').click();
+    await expect(page.locator('#page-margin')).toBeHidden();
   });
 
   test('margin re-projects when the view mode changes', async ({ page }) => {
@@ -105,32 +131,32 @@ test.describe('Margin notes', () => {
     });
     await openRecipe(page, recipeId);
 
-    // "list" makes the mock call a tool first, so the two notes differ in text
+    // "list" makes the mock call a tool first; the tool leaves no line behind
     await send(page, 'list all recipes');
     await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
       .toHaveCount(1, { timeout: 10000 });
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(2);
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
     const noteTexts = async () =>
       (await page.locator('#page-margin .margin-note').allTextContents()).map((t) => t.trim());
     const before = await noteTexts();
-    expect(before[0]).toContain('Using tool: list_recipes');
+    expect(before.join(' ')).not.toContain('Using tool');
 
-    // Turning back to the contents page leaves those two behind: they were
+    // Turning back to the contents page leaves that reply behind: it was
     // written under the recipe, and the contents page shows the book thread
     await page.locator('#recipe-book-header').click();
     await expect(page.locator('.index-title')).toBeVisible();
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(0);
 
-    // A note written here belongs to the book, and projects as one sticky
+    // A note written here belongs to the book, and projects as the one sticky
+    // (The mock's reply text depends on the conversation so far, so it is not asserted.)
     await send(page, 'hello contents');
-    await expect(page.locator('#page-margin .sticky-note')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
 
-    // Opening the recipe again drops the sticky and restores its own notes
+    // Opening the recipe again swaps in the recipe's own latest reply
     await openRecipe(page, recipeId);
-    await expect(page.locator('#page-margin .sticky-note')).toHaveCount(0);
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(2);
-    // ...in their original order, oldest first
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
     expect(await noteTexts()).toEqual(before);
   });
 
@@ -153,19 +179,29 @@ test.describe('Margin notes', () => {
     });
     await send(page, 'hello error');
 
-    const sticky = page.locator('#page-margin .sticky-note[data-kind="error"]');
+    const sticky = page.locator('#page-margin .margin-note[data-kind="error"]');
     await expect(sticky).toHaveCount(1, { timeout: 10000 });
     await expect(sticky.first()).toContainText('Connection error');
+    // In the leather red
+    const colours = await sticky.first().evaluate((el) => {
+      const probe = document.createElement('div');
+      probe.style.color = 'var(--color-leather)';
+      document.body.appendChild(probe);
+      const leather = getComputedStyle(probe).color;
+      probe.remove();
+      return { note: getComputedStyle(el).color, leather };
+    });
+    expect(colours.note).toBe(colours.leather);
   });
 
-  test('tablet layout renders the margin beneath the page content', async ({ page }) => {
-    test.skip(!isTablet(page), 'the <=1024px collapse, above the 600px phone breakpoint');
+  test('tablet: the reply sits on the sticky above the slip', async ({ page }) => {
+    test.skip(!isTablet(page), 'the tablet band, above the 600px phone breakpoint');
     // Runs at the ipad project's own 810x1080 viewport rather than resizing
     const recipeId = await createRecipe(page, {
       title: `Tablet Recipe ${Date.now()}`,
       ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
-      // Long enough to overflow the page: with a full-height content box the
-      // margin would be laid out over the tail of the steps instead of after them
+      // Long enough to overflow the page: the sticky must still sit above the
+      // slip, not after the tail of the steps
       steps: Array.from({ length: 14 }, (_, i) => ({
         step_number: i + 1,
         instruction: `Step ${i + 1}: stir the mixture slowly and evenly until smooth`,
@@ -176,20 +212,12 @@ test.describe('Margin notes', () => {
 
     await send(page, 'hello tablet');
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
+    await expectAboveTheSlip(page);
 
-    // The collapse is a property of the margin COLUMN, which contents and notes
-    // modes have and cook mode does not
+    // The same in contents mode: there is no margin column to collapse any more
     await useContentsMode(page);
-
-    // The content box itself, not its last child: the last child is the phone
-    // footer, which renderRecipe emits at every width and CSS hides above 600px
-    const contentBottom = await page.locator('#page-right-content').evaluate(
-      el => el.getBoundingClientRect().bottom
-    );
-    const margin = (await page.locator('#page-margin').boundingBox())!;
-    // Directly beneath the content: neither overlapping it nor pushed to the page bottom
-    expect(margin.y).toBeGreaterThanOrEqual(contentBottom - 1);
-    expect(margin.y).toBeLessThanOrEqual(contentBottom + 60);
+    await expect(page.locator('#page-margin')).toBeVisible();
+    await expectAboveTheSlip(page);
   });
 
   // One chunk and then end of stream, with no `done` event: what the browser
@@ -225,11 +253,14 @@ test.describe('Margin notes', () => {
     await page.unroute('**/api/chat');
     await send(page, 'hello again');
     const replies = page.locator('#page-margin .margin-note[data-kind="reply"]');
-    await expect(replies).toHaveCount(2, { timeout: 10000 });
-    await expect(replies.first()).toContainText('half a reply');
-    await expect(replies.last()).toContainText('mock assistant');
+    await expect(replies).toContainText('mock assistant', { timeout: 10000 });
+    await expect(replies).toHaveCount(1);
     await expect(page.locator('#page-margin .margin-note.streaming')).toHaveCount(0);
     await expect(page.locator('#page-margin')).toHaveAttribute('aria-busy', 'false');
+    // ...and the partial reply is still in the thread, intact
+    const stored = (await threadEntries(page)).filter(n => n.kind === 'reply').map(n => n.text);
+    expect(stored).toHaveLength(2);
+    expect(stored[0]).toBe('half a reply');
   });
 
   test('a streaming sticky on the contents page carries the streaming state', async ({ page }) => {
@@ -245,18 +276,18 @@ test.describe('Margin notes', () => {
     await routeInterruptedStream(page, 'still writing');
     await send(page, 'hello sticky');
 
-    const sticky = page.locator('#page-margin .sticky-note');
+    const sticky = page.locator('#page-margin .margin-note');
     await expect(sticky).toHaveCount(1, { timeout: 10000 });
     await expect(sticky).toHaveClass(/streaming/);
 
     // A completed turn clears the streaming state on the sticky
     await page.unroute('**/api/chat');
     await send(page, 'hello done');
-    await expect(page.locator('#page-margin .sticky-note')).toContainText('mock assistant', { timeout: 10000 });
-    await expect(page.locator('#page-margin .sticky-note')).not.toHaveClass(/streaming/);
+    await expect(page.locator('#page-margin .margin-note')).toContainText('mock assistant', { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note')).not.toHaveClass(/streaming/);
   });
 
-  test('tool_use renders a status line', async ({ page }) => {
+  test('tool_use shows a cook-language in-flight line and stores nothing', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createRecipe(page, {
       title: `Status Recipe ${Date.now()}`,
@@ -265,12 +296,17 @@ test.describe('Margin notes', () => {
     });
     await openRecipe(page, recipeId);
 
-    // "list" makes the mock call the list_recipes tool before replying
+    // "list" makes the mock call the list_recipes tool before replying; the
+    // stream is paced so the in-flight line can be read between its events
+    await paceChat(page, 700);
     await send(page, 'list all recipes');
 
     const status = page.locator('#page-margin .margin-note[data-kind="status"]');
-    await expect(status).toHaveCount(1, { timeout: 10000 });
-    await expect(status.first()).toHaveText('Using tool: list_recipes');
+    await expect(status).toHaveText('Looking through the book…', { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]')).toBeVisible({ timeout: 10000 });
+    await expect(status).toHaveCount(0);
+    expect((await threadEntries(page)).map(n => n.kind)).toEqual(['user', 'reply']);
   });
 
   test('halving a recipe re-renders the page and adds a one-line note', async ({ page }) => {
@@ -308,7 +344,7 @@ test.describe('Margin notes', () => {
     await expect(reply.first()).toContainText('serves 2 now');
   });
 
-  test('adding a note does not restart the fade-in of the notes already in the margin', async ({ page }) => {
+  test('a streaming reply\'s element is reused across chunks, so its fade-in plays once', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createRecipe(page, {
       title: `Fade Recipe ${Date.now()}`,
@@ -316,50 +352,37 @@ test.describe('Margin notes', () => {
       steps: [],
     });
     await openRecipe(page, recipeId);
-    // Contents mode: cook mode hides the margin column outright, and a hidden
-    // element runs no animations for this to measure
-    await useContentsMode(page);
-
     // Driven through the module directly: the mock LLM delivers a reply in one
-    // chunk, so a real turn cannot show whether a second render restarts the
-    // 200ms fade of the notes that are already on the page.
+    // chunk, so a real turn cannot show whether a second chunk restarts the
+    // 200ms fade of the note that is already on the sticky.
     const timings = await page.evaluate(async (id) => {
       const M = await import('/static/margin-notes.js');
       const margin = document.getElementById('page-margin')!;
-      // Stamped with the open recipe, as a real turn would: the margin shows
+      // Stamped with the open recipe, as a real turn would: the sticky shows
       // that recipe's notes and nothing else
-      M.addNote('first note', 'reply', id);
-      const first = margin.firstElementChild as HTMLElement;
       M.updateStreamingNote('a streaming reply', id);
-      const streaming = margin.lastElementChild as HTMLElement;
+      const streaming = margin.querySelector('.margin-note') as HTMLElement;
 
       const at = (el: HTMLElement) => {
-        const a = el.getAnimations()[0];
+        const a = el.getAnimations().find(x => (x as CSSAnimation).animationName === 'marginNoteIn');
         return a ? Number(a.currentTime) : null;
       };
       await new Promise(r => setTimeout(r, 80));
-      const before = { first: at(first), streaming: at(streaming) };
+      const before = at(streaming);
 
-      // A further chunk on the streaming note re-renders every visible note
+      // A further chunk re-renders the sticky
       M.updateStreamingNote('a streaming reply, continued', id);
-      const after = { first: at(first), streaming: at(streaming) };
-
-      return {
-        before,
-        after,
-        sameFirst: first === margin.firstElementChild,
-        sameStreaming: streaming === margin.lastElementChild,
-      };
+      const after = at(streaming);
+      const same = streaming === margin.querySelector('.margin-note');
+      M.finalizeStreamingNote();
+      return { before, after, same };
     }, recipeId);
 
-    // The nodes are reused...
-    expect(timings.sameFirst).toBe(true);
-    expect(timings.sameStreaming).toBe(true);
-    // ...and their running fade-in is not cancelled and restarted
-    expect(timings.before.first).toBeGreaterThan(0);
-    expect(timings.before.streaming).toBeGreaterThan(0);
-    expect(timings.after.first).toBeGreaterThanOrEqual(timings.before.first!);
-    expect(timings.after.streaming).toBeGreaterThanOrEqual(timings.before.streaming!);
+    // The node is reused...
+    expect(timings.same).toBe(true);
+    // ...and its running fade-in is not cancelled and restarted
+    expect(timings.before).toBeGreaterThan(0);
+    expect(timings.after).toBeGreaterThanOrEqual(timings.before!);
   });
 
   test('duplicate recipe_artifact ids in one turn fetch the recipe once', async ({ page }) => {
@@ -396,7 +419,7 @@ test.describe('Margin notes', () => {
     expect(fetches).toBe(1);
   });
 
-  test('a forward page turn does not cover the margin notes', async ({ page }) => {
+  test('the reply sticky keeps its box through a page turn', async ({ page }) => {
     // page-transitions.js takes the overlay path above 600px, tablet included
     skipOnPhone(page);
     await createRecipe(page, {
@@ -413,47 +436,57 @@ test.describe('Margin notes', () => {
     await page.reload();
     await openRecipe(page, recipes[0].id);
 
-    // Written in cook mode, where the slip is on the page...
+    // A reply belongs to the recipe it was written under, so turning the page
+    // would take it away. The in-flight line belongs to no page: it stays on the
+    // sticky whichever page is displayed, so a turn taken mid-turn is where the
+    // sticky has to hold still. Paced so the line stays up through the turn.
+    await paceChat(page, 3000);
     await send(page, 'hello turn');
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note[data-kind="status"]')).toHaveText('Thinking…');
+    const before = (await page.locator('#page-margin').boundingBox())!;
+    expect(before.width).toBeGreaterThan(0);
 
-    // ...then read in contents mode. The claim is about the margin COLUMN,
-    // which exists in contents and notes modes. Cook mode has no column by
-    // design — the method owns its page and the reply is a pinned slip instead.
-    await useContentsMode(page);
-
-    // The margin's geometry is read before the turn, not inside it: notes are
-    // per recipe now, so the first thing the turn does is empty the margin of
-    // the notes belonging to the recipe being left (and `.page-margin:empty`
-    // then collapses it). The claim is unchanged — the overlay carries the page
-    // content only and must stop short of the column the notes occupy.
-    const marginBefore = (await page.locator('#page-margin').boundingBox())!;
-
-    // Measure the overlay the moment it is inserted, against the margin it must not hide
-    const rects = await page.evaluate(() => new Promise<{ overlayRight: number; overlayBottom: number }>((resolve, reject) => {
+    // Sample the sticky on every frame of the page turn, and the overlay as it
+    // appears: the sticky must not move, and the overlay (which carries the
+    // right page) must never cover it.
+    const seen = await page.evaluate(() => new Promise<{
+      boxes: Array<{ x: number; y: number; width: number; height: number }>;
+      overlay: { left: number; right: number; top: number; bottom: number } | null;
+    }>((resolve) => {
+      const margin = document.getElementById('page-margin')!;
       const container = document.querySelector('.pages-container')!;
-      const observer = new MutationObserver(() => {
-        const overlay = container.querySelector('.page-turn-overlay') as HTMLElement | null;
-        if (!overlay) return;
-        observer.disconnect();
-        const o = overlay.getBoundingClientRect();
-        resolve({ overlayRight: o.right, overlayBottom: o.bottom });
-      });
-      observer.observe(container, { childList: true });
-      setTimeout(() => { observer.disconnect(); reject(new Error('no page-turn overlay appeared')); }, 5000);
+      const boxes: Array<{ x: number; y: number; width: number; height: number }> = [];
+      let overlay: { left: number; right: number; top: number; bottom: number } | null = null;
+      const start = performance.now();
+      const sample = () => {
+        const el = container.querySelector('.page-turn-overlay');
+        if (el && !overlay) {
+          const o = el.getBoundingClientRect();
+          overlay = { left: o.left, right: o.right, top: o.top, bottom: o.bottom };
+        }
+        const r = margin.getBoundingClientRect();
+        boxes.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+        if (performance.now() - start < 1500) requestAnimationFrame(sample);
+        else resolve({ boxes, overlay });
+      };
+      requestAnimationFrame(sample);
       // @ts-ignore - loadNextRecipe is exposed by app.js
       loadNextRecipe();
     }));
 
-    expect(marginBefore.width).toBeGreaterThan(0);
-    // The overlay carries only the page content, so it must stop before the margin.
-    // Above 1024px the margin is a column to the right of the content; at or below
-    // 1024px it collapses beneath it (static/styles.css:1836), so the claim rotates.
-    if (isTablet(page)) {
-      expect(rects.overlayBottom).toBeLessThanOrEqual(marginBefore.y + 1);
-    } else {
-      expect(rects.overlayRight).toBeLessThanOrEqual(marginBefore.x + 1);
+    expect(seen.overlay, 'a page-turn overlay appeared').not.toBeNull();
+    // Shown on every frame of the turn, so the box checks below are not vacuous
+    expect(seen.boxes.length).toBeGreaterThan(10);
+    for (const b of seen.boxes) {
+      expect(Math.abs(b.x - before.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(b.y - before.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(b.width - before.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(b.height - before.height)).toBeLessThanOrEqual(1);
     }
+    const o = seen.overlay!;
+    const intersects = o.left < before.x + before.width - 1 && o.right > before.x + 1
+      && o.top < before.y + before.height - 1 && o.bottom > before.y + 1;
+    expect(intersects, 'the page-turn overlay covers the sticky').toBe(false);
   });
 
   test('a contents-to-recipe turn does not pin the right page to a full height', async ({ page }) => {

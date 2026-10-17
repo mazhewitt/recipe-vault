@@ -136,12 +136,13 @@ test.describe('Responsive Layout (book only)', () => {
     await expect(page.locator('.page-tabs')).toBeHidden();
   });
 
-  test('tablet widths collapse the margin beneath the page content', async ({ page }) => {
+  test('tablet: the reply sits on the sticky above the slip', async ({ page }) => {
     test.skip(!isTablet(page), 'the 601-1024px band; the ipad project supplies it');
     // Runs at the project viewport (ipad: 810x1080) rather than resizing, so the
-    // tablet CSS is exercised as a real device sees it. Book full width, margin
-    // under the content, edge tabs still shown. viewport-contract.spec.ts
-    // guarantees a project is in this band, so this skip cannot go silent.
+    // tablet CSS is exercised as a real device sees it. Book full width, the
+    // reply on the sticky above the slip, edge ribbons still shown.
+    // viewport-contract.spec.ts guarantees a project is in this band, so this
+    // skip cannot go silent.
     const recipeId = await createRecipe(page, {
       title: `Tablet Layout ${Date.now()}`,
       ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
@@ -156,26 +157,26 @@ test.describe('Responsive Layout (book only)', () => {
     await expect(page.locator('.edge-tabs')).toBeVisible();
     await expect(page.locator('.page-tabs')).toBeHidden();
 
-    // The note is written in cook mode, where the slip is on the page; contents
-    // mode carries none
     await page.locator('#message-input').fill('hello tablet');
     await page.locator('#message-input').press('Enter');
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]')).toHaveCount(1, { timeout: 10000 });
 
-    // The collapse is felt in contents and notes modes, the two that still have
-    // a margin column to collapse; cook mode has a pinned slip instead
-    await useContentsMode(page);
-
-    const direction = await page.locator('#page-right').evaluate(el => getComputedStyle(el).flexDirection);
-    expect(direction).toBe('column');
-
-    const contentBottom = await page.locator('#page-right-content').evaluate(
-      el => el.getBoundingClientRect().bottom
-    );
-    const margin = (await page.locator('#page-margin').boundingBox())!;
-    // Directly beneath the content, not overlapping it and not at the page foot
-    expect(margin.y).toBeGreaterThanOrEqual(contentBottom - 1);
-    expect(margin.y).toBeLessThanOrEqual(contentBottom + 60);
+    // The same place in cook and contents modes: above the slip, on the left page
+    for (const mode of ['cook', 'contents']) {
+      if (mode === 'contents') await useContentsMode(page);
+      const g = await page.evaluate(() => {
+        const r = (id: string) => document.getElementById(id)!.getBoundingClientRect();
+        return {
+          sticky: r('page-margin'), input: r('note-input'), left: r('page-left'), right: r('page-right'),
+          inRight: !!document.getElementById('page-margin')!.closest('#page-right'),
+        };
+      });
+      expect(g.inRight).toBe(false);
+      expect(g.input.top - g.sticky.bottom).toBeGreaterThanOrEqual(-0.5);
+      expect(g.input.top - g.sticky.bottom).toBeLessThanOrEqual(8.5);
+      expect(g.sticky.left).toBeGreaterThanOrEqual(g.left.left - 0.5);
+      expect(g.sticky.right).toBeLessThanOrEqual(g.right.left + 0.5);
+    }
 
     // The note input is still a slip over the page at this width
     const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);

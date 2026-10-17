@@ -273,9 +273,17 @@ function setupTextareaAutoResize() {
     const textarea = document.getElementById('message-input');
     if (!textarea) return;
 
+    // Grows with what is typed up to three lines, then scrolls: the slip it sits
+    // in must stay a slip, not climb the page
     textarea.addEventListener('input', function() {
+        const cs = window.getComputedStyle(this);
+        const px = (v) => parseFloat(v) || 0;
+        const padding = px(cs.paddingTop) + px(cs.paddingBottom);
+        const borders = px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+        const cap = 3 * px(cs.lineHeight) + padding + borders;
         this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
+        // scrollHeight covers content and padding; the box (border-box) adds borders
+        this.style.height = Math.min(this.scrollHeight + borders, cap) + 'px';
     });
 }
 

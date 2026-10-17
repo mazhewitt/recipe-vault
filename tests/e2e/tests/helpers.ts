@@ -528,3 +528,39 @@ export async function createCookingRecipe(page: Page): Promise<{ id: string; tit
   });
   return { id, title, steps: instructions.length };
 }
+
+/**
+ * Slows `/api/chat` down so the stages of a turn can be watched: the request
+ * itself runs unchanged, then its SSE events are re-delivered one per `gapMs`
+ * (the first after a gap too, so "Thinking…" stays up for at least that long).
+ * A route cannot do this — `route.fulfill` hands the whole body over at once and
+ * every stage of the turn renders in one frame — so it wraps `window.fetch`.
+ * Calling it again only changes the gap.
+ */
+export async function paceChat(page: Page, gapMs = 600): Promise<void> {
+  await page.evaluate((gap) => {
+    const w = window as unknown as { __chatGap: number; __chatPaced?: boolean };
+    w.__chatGap = gap;
+    if (w.__chatPaced) return;
+    w.__chatPaced = true;
+    const original = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const res = await original(input, init);
+      if (!url.includes('/api/chat') || !res.ok || !res.body) return res;
+      const text = await res.text();
+      const events = text.split('\n\n').filter(e => e.trim()).map(e => e + '\n\n');
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          for (const event of events) {
+            await new Promise(r => setTimeout(r, w.__chatGap));
+            controller.enqueue(encoder.encode(event));
+          }
+          controller.close();
+        },
+      });
+      return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    };
+  }, gapMs);
+}

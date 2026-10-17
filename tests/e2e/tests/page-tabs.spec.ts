@@ -36,6 +36,15 @@ async function recipeList(page: Page): Promise<Array<{ id: string; title: string
   );
 }
 
+/** The reply sticky's bottom edge is 0-8px above the note input's top edge. */
+async function expectStickyAboveInput(page: Page): Promise<void> {
+  const gap = await page.evaluate(() =>
+    document.getElementById('note-input')!.getBoundingClientRect().top
+      - document.getElementById('page-margin')!.getBoundingClientRect().bottom);
+  expect(gap).toBeGreaterThanOrEqual(-0.5);
+  expect(gap).toBeLessThanOrEqual(8.5);
+}
+
 async function isAnimating(page: Page): Promise<boolean> {
   return page.evaluate(async () => {
     const M = await import('/static/page-transitions.js');
@@ -111,7 +120,7 @@ test.describe('Page tabs', () => {
     await expect(steps).toBeHidden();
   });
 
-  test('phone: Notes shows the whole thread instead of the margin', async ({ page }) => {
+  test('phone: Notes shows the whole thread instead of the reply sticky', async ({ page }) => {
     test.skip(!isPhone(page), 'paper tabs are the phone layout');
     const recipeId = await createLongRecipe(page, 'Phone Notes');
     await openRecipe(page, recipeId);
@@ -120,12 +129,7 @@ test.describe('Page tabs', () => {
     await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
       .toHaveCount(1, { timeout: 10000 });
     await expect(page.locator('#page-margin')).toBeVisible();
-
-    // The last-three margin notes sit BENEATH the active panel on a phone,
-    // not in a column beside it
-    const contentBox = await page.locator('#page-right-content').boundingBox();
-    const marginBox = await page.locator('#page-margin').boundingBox();
-    expect(marginBox!.y).toBeGreaterThanOrEqual(contentBox!.y + contentBox!.height - 2);
+    await expectStickyAboveInput(page);
 
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
     await page.locator(tabSelector(page, 'notes')).click();
@@ -134,10 +138,17 @@ test.describe('Page tabs', () => {
     await expect(thread).toBeVisible();
     await expect(thread.locator('.thread-note[data-kind="user"]')).toHaveText('hello phone notes');
     await expect(thread.locator('.thread-note[data-kind="reply"]')).toContainText('mock assistant');
-    // The panel replaces the recipe body, and the margin does not double up
+    // The panel replaces the recipe body, and the sticky does not double up
     await expect(page.locator('#page-right-content .ingredients-list')).toBeHidden();
     await expect(page.locator('#page-right-content .prep-list')).toBeHidden();
     await expect(page.locator('#page-margin')).toBeHidden();
+
+    // Leaving the Notes tab brings the sticky back, above the input bar
+    await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
+    await page.locator(tabSelector(page, 'method')).click();
+    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'method');
+    await expect(page.locator('#page-margin')).toBeVisible();
+    await expectStickyAboveInput(page);
   });
 
   test('a tab tap during a page turn is ignored', async ({ page }) => {
@@ -286,8 +297,8 @@ test.describe('Page tabs', () => {
     await expect(thread).toBeVisible();
     await expect(thread).toHaveAttribute('data-empty', 'true');
 
-    // The Notes panel is the only surface on screen here (on a phone the margin
-    // is hidden outright), so it has to stay live without a tab switch
+    // The Notes panel is the only surface on screen here (the reply sticky is
+    // hidden beside the full thread), so it has to stay live without a tab switch
     await sendNote(page, 'live note');
 
     await expect(thread.locator('.thread-note[data-kind="user"]')).toHaveText('live note', { timeout: 10000 });
@@ -302,16 +313,17 @@ test.describe('Page tabs', () => {
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
 
     // #page-right[data-tab] is not reset on the way back to the contents, so
-    // anything keyed on it alone would still be hiding the margin here
+    // anything keyed on it alone would still be hiding the sticky here
     await page.locator('#recipe-book-header').click();
     await expect(page.locator('.index-title')).toBeVisible({ timeout: 10000 });
 
     await sendNote(page, 'hello contents');
 
-    const sticky = page.locator('#page-margin .sticky-note');
+    const sticky = page.locator('#page-margin .margin-note[data-kind="reply"]');
     await expect(sticky).toHaveCount(1, { timeout: 15000 });
     await expect(sticky.first()).toBeVisible();
     await expect(sticky.first()).toContainText('mock assistant');
+    await expectStickyAboveInput(page);
   });
 
   test('opening a different recipe resets the tab to Ingredients', async ({ page }) => {

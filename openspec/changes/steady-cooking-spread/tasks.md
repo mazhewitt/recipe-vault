@@ -91,9 +91,9 @@ Spec references are written as `capability › Requirement › Scenario`.
 
 The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3.4, before starting on the turn.
 
-- [ ] 3.1 `static/chat.html`: move `<aside id="page-margin" aria-live="polite">` out of `#page-right`, beside the slip (for example as the sibling just before `form.note-input` in `.book-container`), keeping its id. Remove the `#loading` row from the form.
+- [x] 3.1 `static/chat.html`: move `<aside id="page-margin" aria-live="polite">` out of `#page-right`, beside the slip (for example as the sibling just before `form.note-input` in `.book-container`), keeping its id. Remove the `#loading` row from the form.
   - family-recipe-ui › Note input lives in the book › Existing input ids are preserved
-- [ ] 3.2 `static/styles.css`: restyle `#page-margin` as the sticky.
+- [x] 3.2 `static/styles.css`: restyle `#page-margin` as the sticky.
   - Absolutely positioned with its bottom edge 0-8px above the slip. Above 600px its left and right edges are those of the left page's column; at ≤600px it sits directly above the input bar.
   - `--color-sticky` paper with Kalam in `--color-biro`.
   - `max-height: 40%` of the page it sits on, with `overflow-y: auto`.
@@ -103,7 +103,7 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - web-chat › The latest reply is a sticky note above the input › Above the input on the wide book, Above the input bar on the phone, It looks like a sticky note, Its height is capped, Not shown beside the full thread, Showing it moves nothing
   - web-chat › Notes and replies in the book › Responsive layout with artifact
   - family-recipe-ui › Main layout displays the recipe book alone › Narrow viewport stacks components
-- [ ] 3.3 `static/margin-notes.js`:
+- [x] 3.3 `static/margin-notes.js`:
   - `visibleNotes` returns at most one entry: the latest reply or error of `threadForDisplayedRecipe()`, or the transient in-flight line while a turn runs.
   - Keep a per-thread dismissed note id, keyed by recipe id with `null` for the book thread. A newer reply clears it.
   - Render a `.note-dismiss` button (`aria-label="Dismiss note"`) inside the sticky.
@@ -112,7 +112,7 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - web-chat › Notes and replies in the book › Reply renders on the sticky, The sticky shows only the latest reply, Reply on the contents page renders as a sticky note
   - web-chat › The latest reply is a sticky note above the input › It can be dismissed, A dismissed reply stays dismissed, The next turn replaces it
   - web-chat › A turn keeps the slip still and the input live › In-flight line while the thread is open
-- [ ] 3.4 `static/chat.js`:
+- [x] 3.4 `static/chat.js`:
   - Delete the `Using tool:` status notes (≈237, ≈299), the `Using … ` loading text (≈236, ≈298) and the `Timer set:` notes (≈253-262, ≈290-296).
   - Add an exported pure `statusLabelFor(tool)` with the design D4 table. Check the actual tool names the `search` MCP server (duckduckgo-mcp 2.2.0) exposes; the `fetch`/`search` substring rule should cover them.
   - Replace `setLoading` with `setInFlight('Thinking…')` on send, `setInFlight(statusLabelFor(tool))` on `tool_use`, and `setInFlight(null)` once the first chunk starts the streaming reply, and on `done` or `error`.
@@ -120,15 +120,15 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - web-chat › A turn keeps the slip still and the input live › One in-flight line
   - web-chat › Notes and replies in the book › Display tool use, Display streaming response, Handle errors gracefully, Timer start is confirmed by the pill
   - web-chat › Notes are scoped to the recipe they were written under › Note is stamped at turn start
-- [ ] 3.5 `static/chat.js`:
+- [x] 3.5 `static/chat.js`:
   - Never set `input.disabled`, and leave focus where it is.
   - Keep a `turnInFlight` flag: Enter and form submit are no-ops while it is set, and `#send-button` carries `aria-disabled="true"`.
   - Clear the flag on `done`, on `error` and on a failed fetch.
   - web-chat › A turn keeps the slip still and the input live › The textarea stays live, A second send waits for the turn, The slip does not change height
   - family-recipe-ui › Note input lives in the book › Sending a note
-- [ ] 3.6 `static/app.js` textarea autosize (≈272-279): cap the height at three lines (three times the computed line-height plus vertical padding and borders) and scroll beyond that. Replace the CSS `max-height: 140px` (≈287-293) to match.
+- [x] 3.6 `static/app.js` textarea autosize (≈272-279): cap the height at three lines (three times the computed line-height plus vertical padding and borders) and scroll beyond that. Replace the CSS `max-height: 140px` (≈287-293) to match.
   - family-recipe-ui › Note input lives in the book › The textarea grows to three lines
-- [ ] 3.7 Rewrite the e2e assertions of the old contract:
+- [x] 3.7 Rewrite the e2e assertions of the old contract:
   - `margin-notes.spec.ts`:
     - "reply renders as a margin note with a recipe open": sticky geometry above the slip.
     - "four replies leave three notes visible" becomes "four replies leave one note on the sticky".
@@ -148,7 +148,7 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - `page-tabs.spec.ts` "phone: Notes shows the whole thread instead of the margin" and "the contents sticky note survives a visit to the Notes tab": sticky above the input bar, hidden while Notes is active, back afterwards.
   - `responsive.spec.ts` "tablet widths collapse the margin beneath the page content": rewritten like the margin-notes tablet case.
   - Run `image-paste.spec.ts`, `image-upload.spec.ts` and `xss-protection.spec.ts` unchanged; fix only what the `#loading` removal breaks.
-- [ ] 3.8 New cases, in `margin-notes.spec.ts` or a new `reply-sticky.spec.ts`:
+- [x] 3.8 New cases, in `margin-notes.spec.ts` or a new `reply-sticky.spec.ts`:
   - Sticky geometry, wide and phone; no intersection with `#page-right`.
   - The 40% cap with internal scroll (long SSE reply).
   - Dismiss with `expectHitArea('#page-margin .note-dismiss')`; the reply stays dismissed across a recipe switch and a mode switch, and a new reply shows again.
@@ -161,8 +161,8 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - `aria-disabled` on send while a turn runs.
   - Three-line textarea cap.
   - `statusLabelFor` table via `page.evaluate`.
-- [ ] 3.9 `layout-stability.spec.ts`: remove `test.fail` from "Sending a note" and "A reply arriving".
-- [ ] 3.10 `make lint`, then `make test-e2e` green.
+- [x] 3.9 `layout-stability.spec.ts`: remove `test.fail` from "Sending a note" and "A reply arriving".
+- [x] 3.10 `make lint`, then `make test-e2e` green.
 
 ## 4. The right page stays put across modes (D2)
 

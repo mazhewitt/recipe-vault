@@ -1,9 +1,9 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, seedRecipes, openRecipe, sendNote, isPhone, openNotesView, notesThread } from './helpers';
+import { authenticate, createRecipe, seedRecipes, openRecipe, sendNote, isPhone, openNotesView, notesThread, paceChat } from './helpers';
 
 /**
  * The note input is the only chat surface now: a note goes into the thread,
- * the reply is drawn in the page margin, and the Notes tab shows the whole
+ * the latest reply is drawn on the sticky above it, and the Notes tab shows the whole
  * thread. Nothing is prefixed with a speaker name.
  */
 test.describe('Notes and replies', () => {
@@ -66,11 +66,13 @@ test.describe('Notes and replies', () => {
     await seedRecipes(page, 1);
     await openTestRecipe(page, 'List Recipe');
 
+    // Paced, so the in-flight line can be read between the stream's events
+    await paceChat(page, 700);
     await sendNote(page, 'list all recipes');
 
-    // The tool status line first, then the reply itself
+    // The in-flight line in the cook's words first, then the reply itself
     const status = page.locator('#page-margin .margin-note[data-kind="status"]');
-    await expect(status).toHaveText('Using tool: list_recipes', { timeout: 10000 });
+    await expect(status).toHaveText('Looking through the book…', { timeout: 10000 });
 
     const reply = page.locator('#page-margin .margin-note[data-kind="reply"]');
     await expect(reply).toHaveCount(1, { timeout: 10000 });

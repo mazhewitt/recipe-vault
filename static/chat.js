@@ -1,7 +1,8 @@
 /**
  * Chat Module
  * Handles the note input and SSE streaming. It renders nothing itself: every
- * note, reply, status line and error goes to margin-notes.js.
+ * note, reply and error, and the turn's transient in-flight line, goes to
+ * margin-notes.js.
  */
 
 import * as MealPlanDisplay from './meal-plan-display.js';
@@ -31,14 +32,45 @@ export function initializeState(appState) {
     state = appState;
 }
 
-export function setLoading(loading, text = 'Thinking...') {
-    const loadingEl = document.getElementById('loading');
-    const loadingText = document.getElementById('loading-text');
-    const input = document.getElementById('message-input');
+// What the in-flight line says while a tool runs, in the cook's words. Tool
+// names never reach the page.
+const STATUS_LABELS = {
+    start_timer: 'Setting a timer…',
+    display_recipe: 'Opening the recipe…',
+    update_recipe: 'Updating the recipe…',
+    create_recipe: 'Writing it into the book…',
+    list_recipes: 'Looking through the book…',
+    get_recipe: 'Looking through the book…',
+    display_meal_plan: 'Laying out the meal…',
+};
 
-    loadingEl.classList.toggle('active', loading);
-    loadingText.textContent = text;
-    input.disabled = loading;
+/**
+ * The in-flight line for a tool. Web tools are matched by substring: the fetch
+ * server exposes `fetch`, and the search server (duckduckgo-mcp 2.2.0)
+ * `duckduckgo_search`, `duckduckgo_news_search` and `jina_fetch`.
+ * @param {string} tool - the tool name from a tool_use event
+ * @returns {string}
+ */
+export function statusLabelFor(tool) {
+    const name = tool == null ? '' : String(tool);
+    if (Object.prototype.hasOwnProperty.call(STATUS_LABELS, name)) return STATUS_LABELS[name];
+    if (name.includes('fetch') || name.includes('search')) return 'Looking it up…';
+    return 'Working on it…';
+}
+
+// True from a send until its turn ends. The textarea is never disabled — the
+// cook can write the next note while the reply streams, and focus stays put —
+// so this flag is what makes Enter and send inert in the meantime.
+let turnInFlight = false;
+
+function setTurnInFlight(inFlight) {
+    turnInFlight = inFlight;
+    const send = document.getElementById('send-button');
+    if (send) {
+        if (inFlight) send.setAttribute('aria-disabled', 'true');
+        else send.removeAttribute('aria-disabled');
+    }
+    if (!inFlight) MarginNotes.setInFlight(null);
 }
 
 /**
@@ -117,6 +149,9 @@ async function parseSSEStream(stream, onEvent, onError) {
  * Uses proper SSE parsing to handle multi-line events.
  */
 export async function sendMessage() {
+    // One turn at a time; the typed text stays in the textarea for later
+    if (turnInFlight) return;
+
     const input = document.getElementById('message-input');
     const message = input.value.trim();
 
@@ -125,7 +160,7 @@ export async function sendMessage() {
 
     // The recipe this turn belongs to, captured once and before any await — the
     // same reason fetchAndDisplayRecipe records its id up front. Every entry the
-    // turn produces (the user note, status lines, the streaming reply, errors) is
+    // turn produces (the user note, the streaming reply, errors) is
     // filed under the recipe that was on the page when the note was sent, so a
     // reply that lands after the reader has paged away stays with the recipe it
     // answers, and a recipe this turn creates does not claim the turn's notes.
@@ -138,7 +173,8 @@ export async function sendMessage() {
     // Reset textarea height after clearing
     input.style.height = 'auto';
     MarginNotes.addNote(message, 'user', turnRecipeId);
-    setLoading(true);
+    setTurnInFlight(true);
+    MarginNotes.setInFlight('Thinking…');
 
     // Each turn fetches a given recipe id at most once
     fetchedRecipeIds = new Set();
@@ -192,6 +228,7 @@ export async function sendMessage() {
         console.log('Response received:', response.status, response.statusText);
 
         if (response.status === 401) {
+            setTurnInFlight(false);
             window.location.href = '/chat';
             return;
         }
@@ -207,7 +244,7 @@ export async function sendMessage() {
             } else {
                 MarginNotes.addNote(`Error: ${response.statusText || 'Server error'}`, 'error', turnRecipeId);
             }
-            setLoading(false);
+            setTurnInFlight(false);
             return;
         }
 
@@ -223,18 +260,18 @@ export async function sendMessage() {
                     // Handle different event types
                     switch (eventType) {
                         case 'chunk':
-                            // Text streaming
+                            // Text streaming: the reply takes the in-flight line's place
                             if (parsed.text) {
                                 streamedText += parsed.text;
                                 MarginNotes.updateStreamingNote(streamedText, turnRecipeId);
+                                MarginNotes.setInFlight(null);
                             }
                             break;
 
                         case 'tool_use':
-                            // Tool call notification
+                            // Tool call notification: a label on the in-flight line, nothing stored
                             if (parsed.tool) {
-                                setLoading(true, `Using ${parsed.tool}...`);
-                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status', turnRecipeId);
+                                MarginNotes.setInFlight(statusLabelFor(parsed.tool));
                             }
                             break;
 
@@ -251,14 +288,9 @@ export async function sendMessage() {
                             break;
 
                         case 'timer_start':
-                            // Timer start
+                            // Timer start: the pill is the confirmation
                             if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
-                                MarginNotes.addNote(
-                                    `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
-                                    'status',
-                                    turnRecipeId
-                                );
                             }
                             break;
 
@@ -268,12 +300,14 @@ export async function sendMessage() {
                                 state.conversationId = parsed.conversation_id;
                             }
                             MarginNotes.finalizeStreamingNote();
+                            MarginNotes.setInFlight(null);
                             break;
 
                         case 'error':
                             // Error handling
                             if (parsed.message) {
                                 MarginNotes.finalizeStreamingNote();
+                                MarginNotes.setInFlight(null);
                                 MarginNotes.addNote(parsed.message, 'error', turnRecipeId);
                             }
                             break;
@@ -284,23 +318,20 @@ export async function sendMessage() {
                                 if (parsed.text) {
                                     streamedText += parsed.text;
                                     MarginNotes.updateStreamingNote(streamedText, turnRecipeId);
+                                    MarginNotes.setInFlight(null);
                                 }
                             } else if (parsed.recipe_id !== undefined) {
                                 handleRecipeArtifact(parsed.recipe_id);
                             } else if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
-                                MarginNotes.addNote(
-                                    `Timer set: ${parsed.label}, ${parsed.duration_minutes} min`,
-                                    'status',
-                                    turnRecipeId
-                                );
                             } else if (parsed.tool) {
-                                setLoading(true, `Using ${parsed.tool}...`);
-                                MarginNotes.addNote(`Using tool: ${parsed.tool}`, 'status', turnRecipeId);
+                                MarginNotes.setInFlight(statusLabelFor(parsed.tool));
                             } else if (parsed.conversation_id) {
                                 state.conversationId = parsed.conversation_id;
                                 MarginNotes.finalizeStreamingNote();
+                                MarginNotes.setInFlight(null);
                             } else if (parsed.message && parsed.recoverable !== undefined) {
+                                MarginNotes.setInFlight(null);
                                 MarginNotes.addNote(parsed.message, 'error', turnRecipeId);
                             }
                             break;
@@ -314,14 +345,16 @@ export async function sendMessage() {
                 // The stream died without a done event: end the streaming note so the
                 // next turn starts a new one instead of overwriting this partial reply
                 MarginNotes.finalizeStreamingNote();
+                MarginNotes.setInFlight(null);
                 MarginNotes.addNote('Connection error. Please try again.', 'error', turnRecipeId);
             }
         );
     } catch (error) {
         console.error('Error:', error);
         MarginNotes.finalizeStreamingNote();
+        MarginNotes.setInFlight(null);
         MarginNotes.addNote('Connection error. Please try again.', 'error', turnRecipeId);
     }
 
-    setLoading(false);
+    setTurnInFlight(false);
 }

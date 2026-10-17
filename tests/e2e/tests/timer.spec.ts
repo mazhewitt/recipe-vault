@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe, sendNote } from './helpers';
+import { authenticate, createRecipe, paceChat, sendNote } from './helpers';
 
 function isPhone(page: any): boolean {
   return page.viewportSize()!.width <= 600;
@@ -187,12 +187,22 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
     const { first } = await seedTwoRecipes(page);
     await openRecipe(page, first, 'Timer Recipe');
 
+    // Paced, so the in-flight line can be read between the stream's events
+    await paceChat(page, 700);
     await sendNote(page, 'start a timer');
 
-    // The timer_start event is announced in the margin as its own status line
-    await expect(page.locator('#page-margin .margin-note[data-kind="status"]')
-      .filter({ hasText: 'Timer set' }))
-      .toContainText('Timer set: Mock timer', { timeout: 10000 });
+    // The tool shows as a line in the cook's words; the pill is the confirmation
+    await expect(page.locator('#page-margin .margin-note[data-kind="status"]'))
+      .toHaveText('Setting a timer…', { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
+      .toContainText('Timer started', { timeout: 10000 });
+    // No "Timer set" line anywhere: not on the sticky, not in the thread
+    await expect(page.locator('body')).not.toContainText('Timer set');
+    const kinds = await page.evaluate(() =>
+      // @ts-ignore - getMarginThread is exposed by app.js
+      getMarginThread().map((n: { kind: string; text: string }) => `${n.kind}:${n.text}`));
+    expect(kinds.join('\n')).not.toContain('Timer set');
+    expect(kinds.filter((k: string) => k.startsWith('status:'))).toEqual([]);
 
     await expect(page.locator('#timer-widget')).toBeVisible();
     await expect(page.locator('#timer-text')).toContainText('Mock timer');

@@ -5,8 +5,8 @@ import {
 } from './helpers';
 
 /**
- * Notes belong to the recipe that was open when their turn began. The margin
- * and the Notes view show that recipe's conversation and nothing else; notes
+ * Notes belong to the recipe that was open when their turn began. The reply
+ * sticky and the Notes view show that recipe's conversation and nothing else; notes
  * written while the contents or a meal plan is on the page form the book-level
  * thread. The store itself is never filtered or cleared — the server keeps the
  * whole session either way — so everything here is about what is displayed.
@@ -57,7 +57,7 @@ test.describe('Notes scoped to their recipe', () => {
     await expect(page.locator('#page-margin .margin-note[data-kind="reply"]'))
       .toHaveCount(1, { timeout: 10000 });
 
-    // The second recipe starts with an empty margin, not the first one's notes
+    // The second recipe starts with an empty sticky, not the first one's reply
     await openRecipe(page, second);
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(0);
     await openNotesView(page);
@@ -83,6 +83,8 @@ test.describe('Notes scoped to their recipe', () => {
     const stored = await storedEntries(page);
     expect(stored.filter(n => n.kind === 'user').map(n => n.text))
       .toEqual(['note about the first', 'note about the second']);
+    // ...and only notes, replies and errors: progress is never stored
+    expect(stored.filter(n => n.kind === 'status')).toEqual([]);
     expect(new Set(stored.map(n => n.recipeId))).toEqual(new Set([first, second]));
   });
 
@@ -132,7 +134,9 @@ test.describe('Notes scoped to their recipe', () => {
     await expect(page.locator('.index-title')).toBeVisible();
 
     await sendNote(page, 'note from the contents page');
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
+    // The reply itself, not the in-flight line, so the turn is over
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
     expect((await storedEntries(page)).every(n => n.recipeId === null)).toBe(true);
 
     // A recipe does not inherit the book's thread
@@ -158,7 +162,7 @@ test.describe('Notes scoped to their recipe', () => {
     await expect(page.locator('.index-title')).toBeVisible();
 
     await sendNote(page, 'a note while browsing');
-    await expect(page.locator('#page-margin .margin-note')).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator('#page-margin .margin-note[data-kind="reply"]')).toHaveCount(1, { timeout: 10000 });
 
     // The Notes tab sits beside the filters on the contents page, and opens the
     // book-level thread there

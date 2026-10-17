@@ -1,13 +1,16 @@
 /**
  * Margin Notes Module
- * Owns the chat thread store and renders notes into the page margin.
+ * Owns the chat thread store and renders the reply sticky (#page-margin).
  *
  * The thread is the single record of the conversation for the page: replies,
- * tool/timer status lines, errors and the user's own messages. Only the last
- * three non-user entries are drawn in the margin; the whole thread is drawn
- * into the Notes tab by renderThread().
+ * errors and the user's own messages. Progress ("Thinking…", a tool's label)
+ * is never stored: it is one transient in-flight line, set by chat.js through
+ * setInFlight(). The sticky shows one note — the in-flight line while a turn
+ * runs, otherwise the latest reply or error of the thread on display unless
+ * the cook dismissed it. The whole thread is drawn into the Notes views by
+ * renderThread().
  *
- * Every entry carries the recipe it was written under, so the margin and the
+ * Every entry carries the recipe it was written under, so the sticky and the
  * Notes view show one recipe's conversation rather than the whole session.
  * The store itself is never filtered or cleared — the server keeps the full
  * conversation either way, so this is a display concern only.
@@ -15,7 +18,10 @@
 
 import { escapeHtml, renderMarkdown } from './utils.js';
 
-const MAX_VISIBLE = 3;
+// Gap between the sticky's bottom edge and the top of the note input
+const STICKY_GAP = 4;
+// The sticky's height cap, as a fraction of the page it sits on
+const STICKY_MAX_FRACTION = 0.4;
 
 // Shared app state (set by app.js)
 export let state = null;
@@ -26,6 +32,11 @@ export let state = null;
 const thread = [];
 let nextId = 1;
 let streamingId = null;
+// The transient in-flight line ("Thinking…", a tool's label), or null
+let inFlightText = null;
+// Per thread (key: recipe id, '' for the book thread), the id of the note the
+// cook dismissed. A newer reply has a different id, so it shows again.
+const dismissed = new Map();
 
 export function initializeState(appState) {
     state = appState;
@@ -82,7 +93,7 @@ export function updateStreamingNote(text, recipeId = null) {
     return note;
 }
 
-/** Ends the streaming state; the note stays in the margin. */
+/** Ends the streaming state; the note stays on the sticky. */
 export function finalizeStreamingNote() {
     streamingId = null;
     render();
@@ -120,24 +131,38 @@ function threadForDisplayedRecipe() {
     return thread.filter(n => n.recipeId === recipeId);
 }
 
-function visibleNotes(viewMode) {
-    // Scoped first: the margin and the sticky show this recipe's conversation,
-    // never a note left over from the recipe before it
-    const notes = threadForDisplayedRecipe();
-    if (viewMode === 'index') {
-        // Contents page: only the latest note (reply, status or error), as a sticky
-        for (let i = notes.length - 1; i >= 0; i--) {
-            if (notes[i].kind !== 'user') return [notes[i]];
-        }
-        return [];
-    }
-    return notes.filter(n => n.kind !== 'user').slice(-MAX_VISIBLE);
+function threadKey(recipeId) {
+    return recipeId == null ? '' : recipeId;
 }
 
-function classNameFor(note, viewMode) {
-    if (viewMode === 'index') {
-        return 'margin-note sticky-note' + (note.id === streamingId ? ' streaming' : '');
+/** The in-flight line as a note-shaped value; never stored in the thread. */
+function inFlightNote() {
+    return { id: 'in-flight', kind: 'status', text: inFlightText };
+}
+
+/** The latest reply or error of the thread on display, or null. */
+function latestReply() {
+    const notes = threadForDisplayedRecipe();
+    for (let i = notes.length - 1; i >= 0; i--) {
+        if (notes[i].kind === 'reply' || notes[i].kind === 'error') return notes[i];
     }
+    return null;
+}
+
+/**
+ * What the sticky holds: at most one note. The in-flight line wins while a turn
+ * runs, on whichever page is displayed; otherwise the displayed thread's latest
+ * reply or error, unless the cook dismissed that very note.
+ */
+function visibleNotes() {
+    if (inFlightText !== null) return [inFlightNote()];
+    const latest = latestReply();
+    if (!latest) return [];
+    if (dismissed.get(threadKey(displayedRecipeId())) === latest.id) return [];
+    return [latest];
+}
+
+function classNameFor(note) {
     return 'margin-note' + (note.id === streamingId ? ' streaming' : '');
 }
 
@@ -147,60 +172,117 @@ function bodyFor(note) {
 }
 
 /**
- * Renders the visible slice of the thread into #page-margin.
- * Existing note elements are reused so the fade-in does not replay on every
- * streaming chunk.
+ * Sets or clears the transient in-flight line ("Thinking…", a tool's label).
+ * It is shown on the sticky, and as the last entry of any on-screen thread,
+ * but never stored, so the Notes view never lists it once the turn is over.
+ * @param {string|null} text - the line, or null to clear it
+ */
+export function setInFlight(text) {
+    inFlightText = text == null ? null : String(text);
+    render();
+}
+
+/** Hides the sticky's note until a newer reply arrives in the same thread. */
+function dismissLatest() {
+    const latest = latestReply();
+    if (latest) dismissed.set(threadKey(displayedRecipeId()), latest.id);
+    render();
+}
+
+function dismissButton() {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'note-dismiss';
+    button.setAttribute('aria-label', 'Dismiss note');
+    button.textContent = '✕';
+    button.addEventListener('click', dismissLatest);
+    return button;
+}
+
+/**
+ * Renders the sticky's note into #page-margin.
+ * The note element is reused while it is the same note, so a streaming reply's
+ * fade-in plays once rather than on every chunk.
  */
 export function render() {
     const container = document.getElementById('page-margin');
     if (!container) return;
 
-    const viewMode = currentViewMode();
-    const notes = visibleNotes(viewMode);
+    const note = visibleNotes()[0] || null;
 
-    const existing = Array.from(container.children);
-    const byId = new Map(existing.map(el => [el.dataset.noteId, el]));
-    const kept = [];
-
-    for (const note of notes) {
-        const key = String(note.id);
-        let el = byId.get(key);
+    let el = container.querySelector(':scope > .margin-note');
+    if (el && (!note || el.dataset.noteId !== String(note.id))) {
+        el.remove();
+        el = null;
+    }
+    if (note) {
         if (!el) {
             el = document.createElement('div');
-            el.dataset.noteId = key;
+            el.dataset.noteId = String(note.id);
+            container.insertBefore(el, container.firstChild);
         }
-        el.className = classNameFor(note, viewMode);
+        el.className = classNameFor(note);
         el.setAttribute('data-kind', note.kind);
         const body = bodyFor(note);
         // Only rewrite when the body actually changed: an aria-live region
         // re-announces its contents on every text replacement
         if (el.innerHTML !== body) el.innerHTML = body;
-        kept.push(el);
     }
 
-    for (const el of existing) {
-        if (!kept.includes(el)) el.remove();
-    }
-    // Put the kept elements in thread order (oldest first), touching the DOM only
-    // where the order is actually wrong: re-inserting a connected node detaches
-    // and re-inserts it, which cancels and restarts its fade-in and makes the
-    // aria-live region re-announce it
-    kept.forEach((el, i) => {
-        if (container.children[i] !== el) {
-            container.insertBefore(el, container.children[i] || null);
-        }
-    });
+    // A reply or error can be dismissed; the in-flight line goes by itself.
+    // With no note the sticky is left truly :empty, which hides it.
+    let button = container.querySelector(':scope > .note-dismiss');
+    const dismissible = note && note.kind !== 'status';
+    if (dismissible && !button) container.appendChild(button = dismissButton());
+    if (!dismissible && button) button.remove();
 
     // Suppress announcements until the streaming note is complete
     container.setAttribute('aria-busy', streamingId === null ? 'false' : 'true');
 
+    placeSticky();
     refreshOpenThread();
 }
 
+let placementObserved = false;
+
 /**
- * Keeps an on-screen thread live. The margin and the thread are views of the
+ * Keeps the sticky's bottom edge STICKY_GAP above the note input and its height
+ * at most STICKY_MAX_FRACTION of the page it sits on. Both depend on boxes CSS
+ * cannot reach from #page-margin (the input's height grows with its textarea;
+ * the page's height is not the containing block's), so they are measured and
+ * handed to CSS as custom properties, and re-measured when those boxes resize.
+ */
+function placeSticky() {
+    const container = document.getElementById('page-margin');
+    const input = document.getElementById('note-input');
+    // .book-container, the sticky's containing block at every width
+    const host = container && container.parentElement;
+    if (!container || !input || !host) return;
+
+    const bottom = host.getBoundingClientRect().bottom - input.getBoundingClientRect().top + STICKY_GAP;
+    // The page it sits on: the left page above 600px; on a phone whichever page
+    // is displayed (the other has no height)
+    const pageHeight = Math.max(
+        ...['page-left', 'page-right'].map(id => {
+            const page = document.getElementById(id);
+            return page ? page.clientHeight : 0;
+        })
+    );
+    container.style.setProperty('--sticky-bottom', `${bottom}px`);
+    container.style.setProperty('--sticky-max-height', `${pageHeight * STICKY_MAX_FRACTION}px`);
+
+    if (!placementObserved && typeof window.ResizeObserver !== 'undefined') {
+        placementObserved = true;
+        const observer = new window.ResizeObserver(() => placeSticky());
+        [input, host, document.getElementById('page-left'), document.getElementById('page-right')]
+            .forEach(el => { if (el) observer.observe(el); });
+    }
+}
+
+/**
+ * Keeps an on-screen thread live. The sticky and the thread are views of the
  * same store, and the Notes panel is on screen (in place of the recipe body)
- * while #page-right[data-tab="notes"] — on a phone the margin is hidden
+ * while #page-right[data-tab="notes"] — on a phone the sticky is hidden
  * outright there, so without this a note sent from the Notes tab would be
  * rendered nowhere at all. Notes spread mode puts a second `.notes-thread` on
  * the left page, which is the same store again and must stay live too. No-op
@@ -216,8 +298,9 @@ function refreshOpenThread() {
 }
 
 /**
- * Renders the displayed recipe's thread — its user notes, replies, status lines
- * and errors, oldest first — into the given container (the Notes tab's
+ * Renders the displayed recipe's thread — its user notes, replies and errors,
+ * oldest first, then the in-flight line while a turn runs (shown, never
+ * stored) — into the given container (the Notes tab's
  * `.notes-thread`, or the notes-mode left page). Entries belonging to another
  * recipe are not shown, so a recipe with no notes of its own gets the empty
  * message rather than the previous recipe's conversation. Idempotent; safe to
@@ -230,6 +313,7 @@ export function renderThread(container) {
     if (!container) return 0;
 
     const notes = threadForDisplayedRecipe();
+    if (inFlightText !== null) notes.push(inFlightNote());
 
     if (notes.length === 0) {
         container.innerHTML = '<p class="notes-thread-empty">No notes yet.</p>';
@@ -238,7 +322,7 @@ export function renderThread(container) {
     }
 
     container.removeAttribute('data-empty');
-    // bodyFor() keeps the margin's XSS rules: only AI replies are markdown,
+    // bodyFor() keeps the sticky's XSS rules: only AI replies are markdown,
     // everything else — user notes included — is escaped
     container.innerHTML = notes.map(note =>
         `<div class="thread-note" data-kind="${note.kind}" data-note-id="${note.id}">${bodyFor(note)}</div>`
