@@ -1882,31 +1882,34 @@ body[data-feature-meals] .contents-tab-meals {
        two pages scroll independently for free - .page
        already carries overflow-y: auto - which is the point of the mode: a long
        ingredient list no longer pushes the method down. */
-    body[data-spread-mode="cook"] #page-right {
+    /* With a recipe open the right page is laid out the same in every mode -
+       title, meta, method - so a mode change touches the left page only and
+       the method being read never moves. */
+    body[data-view-mode="recipe"] #page-right {
         display: flex;
         flex-direction: column;
     }
 
     /* Same reasoning as the tablet collapse below: the content block sizes to
        its content so the page scrolls with it instead of clipping at 100%. */
-    body[data-spread-mode="cook"] #page-right-content {
+    body[data-view-mode="recipe"] #page-right-content {
         height: auto;
         flex: 0 0 auto;
     }
 
-    /* Whatever tab state the right page carried into cook mode, the method is
-       what it shows. Both other tab values would blank the only page the cook
-       is reading: `notes` is still legal though its desktop tab is gone, and
-       `ingredients` names a panel that now lives on the LEFT page, so the right
-       page would have nothing to render. The strip stays on the edge (it is the
-       book's furniture, and an empty edge reads as a missing page), but in this
-       mode it does not decide what the right page shows. */
-    body[data-spread-mode="cook"] #page-right[data-tab="notes"] .tab-panel[data-tab="method"],
-    body[data-spread-mode="cook"] #page-right[data-tab="ingredients"] .tab-panel[data-tab="method"] {
+    /* Whatever tab state the right page carries, the method is what it shows,
+       in every mode. Both other tab values would blank the page being read:
+       `notes` is still legal though its desktop tab is gone, and `ingredients`
+       names a panel that lives on the LEFT page or off the page altogether.
+       The strip stays on the edge (it is the book's furniture, and an empty
+       edge reads as a missing page), but it does not decide what the right
+       page shows. */
+    body[data-view-mode="recipe"] #page-right[data-tab="notes"] .tab-panel[data-tab="method"],
+    body[data-view-mode="recipe"] #page-right[data-tab="ingredients"] .tab-panel[data-tab="method"] {
         display: block;
     }
 
-    body[data-spread-mode="cook"] #page-right[data-tab="notes"] .tab-panel[data-tab="notes"] {
+    body[data-view-mode="recipe"] #page-right[data-tab="notes"] .tab-panel[data-tab="notes"] {
         display: none;
     }
 
@@ -1922,8 +1925,8 @@ body[data-feature-meals] .contents-tab-meals {
     }
 
     /* ---- Notes mode: the conversation takes the left page ---- */
-    /* The right page is untouched - the whole recipe, exactly as in contents
-       mode. Only the left page changes, and the reply sticky stands down: the
+    /* The right page is untouched - title, meta and method, exactly as in
+       cook mode. Only the left page changes, and the reply sticky stands down: the
        thread above the slip already shows the reply. */
     .notes-page {
         max-width: 62ch; /* the page is nearly this narrow already; the cap only

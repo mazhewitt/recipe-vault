@@ -284,6 +284,8 @@ test.describe('Spread modes', () => {
     skipOnPhone(page);
     const recipeId = await createLongRecipe(page, 'Contents Beside');
     await openRecipe(page, recipeId);
+    await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+    const rightBox = (await page.locator('#page-right-content').boundingBox())!;
 
     await selectMode(page, 'contents');
 
@@ -292,17 +294,14 @@ test.describe('Spread modes', () => {
     await expect(page.locator('#page-left-content .index-recipe-item.current'))
       .toHaveAttribute('data-recipe-id', recipeId);
 
-    // ...and the recipe is still on the right, whole: the ingredients went back
-    // to the page they were rendered on, in front of the method
-    await expect(page.locator('.recipe-title')).toBeVisible();
-    await expect(page.locator('.tab-panel[data-tab="ingredients"]')).toHaveCount(1);
-    await expect(page.locator('#page-right-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
-    const order = await page.locator('#page-right-content').evaluate(el => {
-      const ingredients = el.querySelector('.tab-panel[data-tab="ingredients"]')!;
-      const method = el.querySelector('.tab-panel[data-tab="method"]')!;
-      return ingredients.compareDocumentPosition(method);
-    });
-    expect(order & 4).toBe(4); // Node.DOCUMENT_POSITION_FOLLOWING
+    // ...and the right page is exactly as cook mode left it: title and method,
+    // no ingredients (they are parked off the page until Cook brings them back),
+    // and the same box
+    await expect(page.locator('#page-right-content .recipe-title')).toBeVisible();
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="method"]')).toBeVisible();
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="ingredients"]')).toHaveCount(0);
+    await expect(page.locator('.ingredients-list')).toHaveCount(0);
+    expect(boxDelta((await page.locator('#page-right-content').boundingBox())!, rightBox)).toBeLessThanOrEqual(1);
 
     // Cook takes it apart again
     await selectMode(page, 'cook');
@@ -339,10 +338,11 @@ test.describe('Spread modes', () => {
 
     // The thread takes the left page...
     await expect(page.locator('#page-left-content .notes-page .notes-thread')).toBeVisible();
-    // ...and the right page has the whole recipe back, both sections
-    await expect(page.locator('#page-right-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+    // ...and the right page keeps the method as cook mode showed it, with no
+    // ingredients on either page
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="ingredients"]')).toHaveCount(0);
     await expect(page.locator('#page-right-content .tab-panel[data-tab="method"]')).toBeVisible();
-    await expect(page.locator('.tab-panel[data-tab="ingredients"]')).toHaveCount(1);
+    await expect(page.locator('.tab-panel[data-tab="ingredients"]')).toHaveCount(0);
 
     // Exactly one input form in the document — it is repositioned, never copied
     expect(await page.evaluate(() => document.querySelectorAll('.note-input').length)).toBe(1);
@@ -358,6 +358,78 @@ test.describe('Spread modes', () => {
     const back = (await page.locator('.note-input').boundingBox())!;
     expect(back.x).toBe(input.x);
     expect(back.y).toBe(input.y);
+  });
+
+  test('switching modes does not touch the right page', async ({ page }) => {
+    skipOnPhone(page);
+    const recipeId = await createLongRecipe(page, 'Right Page Still');
+    await openRecipe(page, recipeId);
+    await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+
+    // A mid-method step in view, so a reflow of the method cannot hide in the
+    // part of the page nobody is reading
+    await page.locator('#page-right-content .prep-step[data-step="10"]').evaluate(el => {
+      const right = document.getElementById('page-right')!;
+      right.scrollTop += el.getBoundingClientRect().top - right.getBoundingClientRect().top - 40;
+    });
+
+    /** Every box the right page draws for the recipe, plus its scroll. */
+    const snapshot = () => page.evaluate(() => {
+      const right = document.getElementById('page-right-content')!;
+      const box = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      };
+      return {
+        scrollTop: document.getElementById('page-right')!.scrollTop,
+        title: box(right.querySelector('.recipe-title')!),
+        meta: box(right.querySelector('.recipe-meta-line')!),
+        steps: Array.from(right.querySelectorAll('.prep-step')).map(box),
+      };
+    });
+    const before = await snapshot();
+    expect(before.scrollTop).toBeGreaterThan(0);
+    expect(before.steps).toHaveLength(20);
+
+    for (const mode of ['notes', 'contents', 'cook'] as const) {
+      await selectMode(page, mode);
+      // Wait for the left page to finish drawing what the mode asks for
+      if (mode === 'notes') await expect(page.locator('#page-left-content .notes-thread')).toBeVisible();
+      if (mode === 'contents') await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
+      if (mode === 'cook') await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+
+      await expect(page.locator('#page-right-content .tab-panel[data-tab="ingredients"]'), mode).toHaveCount(0);
+      const after = await snapshot();
+      expect(Math.abs(after.scrollTop - before.scrollTop), `${mode}: scrollTop`).toBeLessThanOrEqual(1);
+      expect(boxDelta(after.title, before.title), `${mode}: title`).toBeLessThanOrEqual(1);
+      expect(boxDelta(after.meta, before.meta), `${mode}: meta line`).toBeLessThanOrEqual(1);
+      after.steps.forEach((step, i) => {
+        expect(boxDelta(step, before.steps[i]), `${mode}: step ${i + 1}`).toBeLessThanOrEqual(1);
+      });
+    }
+  });
+
+  test('the ingredients are relocated, never duplicated', async ({ page }) => {
+    skipOnPhone(page);
+    const recipeId = await createLongRecipe(page, 'One Panel');
+    await openRecipe(page, recipeId);
+    const leftPanel = page.locator('#page-left-content .tab-panel[data-tab="ingredients"]');
+    await expect(leftPanel).toBeVisible();
+    // Tag the node itself, so "the same panel" means the same node, not a re-render
+    await leftPanel.evaluate(el => { (el as HTMLElement).dataset.probe = 'original'; });
+
+    for (const mode of ['notes', 'contents'] as const) {
+      await selectMode(page, mode);
+      expect(await page.locator('.ingredients-list').count(), mode).toBeLessThanOrEqual(1);
+      // Not on screen on either page
+      await expect(page.locator('#page-left-content .ingredients-list'), mode).toHaveCount(0);
+      await expect(page.locator('#page-right-content .ingredients-list'), mode).toHaveCount(0);
+    }
+
+    await selectMode(page, 'cook');
+    await expect(page.locator('.ingredients-list')).toHaveCount(1);
+    await expect(leftPanel).toHaveAttribute('data-probe', 'original');
+    await expect(leftPanel).toContainText('ingredient number 1');
   });
 
   test('the slip keeps one position, so clicking it never moves it', async ({ page }) => {
@@ -529,9 +601,9 @@ test.describe('Spread modes', () => {
 
     await page.locator('.spread-tab[data-mode="contents"]').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'contents');
-    // The ingredients are back on the right page, waiting for a contents render
+    // The ingredients are parked off the page, waiting for a contents render
     // that has not landed and now never should
-    await expect(page.locator('#page-right-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+    await expect(page.locator('.tab-panel[data-tab="ingredients"]')).toHaveCount(0);
 
     await selectMode(page, 'cook');
     await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();

@@ -491,31 +491,28 @@ function syncContentsTabs() {
     });
 }
 
-/** The live ingredients panel, whichever page is currently holding it. */
-function ingredientsPanel() {
-    return document.querySelector('.tab-panel[data-tab="ingredients"]');
-}
-
 /**
- * Puts a relocated ingredients panel back on the right page, before the method
- * so document order is the order renderRecipe emitted. A move, never a copy:
- * applyStepHighlight and the tab machinery each use a single querySelector, so
- * the document must never hold two ingredients panels.
+ * Puts the ingredients panel where a mode other than cook wants it. Above
+ * 600px that is off the page altogether: the right page keeps title, meta and
+ * method in every mode, so a mode change cannot move the method being read.
+ * On a phone it goes back on the right page, before the method so document
+ * order is the order renderRecipe emitted, because the phone's Ingredients tab
+ * reads it there. A move, never a copy: applyStepHighlight and the tab
+ * machinery each use a single querySelector, so the document must never hold
+ * two ingredients panels.
  */
-function restoreIngredientsPanel() {
-    const panel = document.querySelector('#page-left-content .tab-panel[data-tab="ingredients"]');
-    const rightContent = document.getElementById('page-right-content');
-    if (!panel || !rightContent) return;
-
-    const method = rightContent.querySelector('.tab-panel[data-tab="method"]');
-    if (method) {
-        rightContent.insertBefore(panel, method);
-    } else {
-        // The right page has moved on to the contents or a meal plan, so the
-        // panel belongs to no recipe on screen. Dropping it keeps the document
-        // to one ingredients panel; the next renderRecipe emits a fresh one.
-        panel.remove();
+function stowIngredientsPanel() {
+    if (!RecipeDisplay.isMobile()) {
+        RecipeDisplay.parkIngredientsPanel();
+        return;
     }
+    const rightContent = document.getElementById('page-right-content');
+    // Null when the right page has moved on to the contents or a meal plan:
+    // the panel belongs to no recipe on screen, and the next renderRecipe
+    // emits a fresh one.
+    const panel = RecipeDisplay.takeIngredientsPanel();
+    if (!panel || !rightContent) return;
+    rightContent.insertBefore(panel, rightContent.querySelector('.tab-panel[data-tab="method"]'));
 }
 
 /**
@@ -565,7 +562,7 @@ function renderSpread(mode) {
     spreadGeneration++;
 
     if (mode === 'cook') {
-        const panel = ingredientsPanel();
+        const panel = RecipeDisplay.takeIngredientsPanel();
         // No recipe rendered yet: leave the left page alone. renderRecipe
         // re-asserts the mode when it does render, which lands back here.
         if (!panel) return;
@@ -574,9 +571,9 @@ function renderSpread(mode) {
         return;
     }
 
-    // Every other mode gives the right page its ingredients back first: the
-    // left page is about to be rewritten, and that would destroy the only copy.
-    restoreIngredientsPanel();
+    // Every other mode takes the ingredients off the left page first: it is
+    // about to be rewritten, and that would destroy the only copy.
+    stowIngredientsPanel();
 
     if (mode === 'notes') {
         // SAFE: static markup; renderThread fills the thread and keeps the

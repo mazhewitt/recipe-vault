@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe, useContentsMode } from './helpers';
+import { authenticate, createRecipe, openRecipe, useContentsMode, isPhone } from './helpers';
 
 test.describe('Recipe Display', () => {
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -30,28 +30,33 @@ test.describe('Recipe Display', () => {
     });
 
     await openRecipe(page, recipeId);
-    // A recipe opens in cook mode, which splits it across the spread. Contents
-    // mode is the arrangement asserted here: the whole recipe on the right page
-    // with the contents beside it. (The split itself is spread-modes.spec.ts.)
-    await useContentsMode(page);
 
-    // The whole recipe lives on the right page here, at every width
+    // The right page holds title and method at every width and in every mode
     const rightContent = page.locator('#page-right-content');
     await expect(rightContent.locator('.recipe-title')).toHaveText(title);
+    await expect(rightContent).toContainText('Mix flour and eggs');
+    await expect(rightContent).toContainText('Add milk');
+    await expect(rightContent).toContainText('Bake for 20 minutes');
 
-    const ingredientsSection = rightContent.locator('.ingredients-list');
+    // The recipe opens in cook mode: the ingredients on the left page (on the
+    // phone, the one page's Ingredients tab). The split itself is
+    // spread-modes.spec.ts's to assert.
+    const ingredientsSection = page.locator('.ingredients-list');
     await expect(ingredientsSection).toBeVisible();
     await expect(ingredientsSection).toContainText('1 cup flour');
     await expect(ingredientsSection).toContainText('2 eggs');
     await expect(ingredientsSection).toContainText('0.5 cup milk');
 
-    await expect(rightContent).toContainText('Mix flour and eggs');
-    await expect(rightContent).toContainText('Add milk');
+    // Contents mode gives the left page to the contents, with the open recipe
+    // marked, and leaves the right page as it was (a no-op on the phone)
+    await useContentsMode(page);
+    await expect(rightContent.locator('.recipe-title')).toHaveText(title);
     await expect(rightContent).toContainText('Bake for 20 minutes');
-    // ...and never on the left page, which holds the contents
-    await expect(page.locator('#page-left-content')).not.toContainText('Mix flour and eggs');
-    await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
-    await expect(page.locator('#page-left-content .index-recipe-item.current')).toContainText(title);
+    if (!isPhone(page)) {
+      await expect(page.locator('#page-left-content')).not.toContainText('Mix flour and eggs');
+      await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
+      await expect(page.locator('#page-left-content .index-recipe-item.current')).toContainText(title);
+    }
   });
 
   test('long recipe content scrolls', async ({ page }) => {
@@ -75,11 +80,9 @@ test.describe('Recipe Display', () => {
     });
 
     await openRecipe(page, recipeId);
-    // Contents mode puts the whole recipe on one scrolling page; cook mode's
-    // page-per-section scrolling is spread-modes.spec.ts's to assert
-    await useContentsMode(page);
-
-    // The recipe scrolls inside the right page
+    // The method scrolls inside the right page (on the phone, the Method tab:
+    // the page opens on Ingredients)
+    if (isPhone(page)) await page.locator('.page-tab[data-tab="method"]').click();
     const rightPage = page.locator('#page-right');
     await expect(rightPage).toBeVisible();
 
@@ -90,11 +93,11 @@ test.describe('Recipe Display', () => {
     const overflow = await rightPage.evaluate(el => el.scrollHeight - el.clientHeight);
     expect(overflow).toBeGreaterThan(50);
 
-    await expect(page.locator('#page-right-content .ingredients-list')).toContainText('Ingredient 1');
+    await expect(page.locator('#page-right-content .prep-step').first()).toBeVisible();
 
     await rightPage.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await expect.poll(() => rightPage.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
 
-    await expect(page.locator('#page-right-content .ingredients-list')).toContainText('Ingredient 30');
+    await expect(page.locator('#page-right-content .prep-step[data-step="30"]')).toBeInViewport();
   });
 });

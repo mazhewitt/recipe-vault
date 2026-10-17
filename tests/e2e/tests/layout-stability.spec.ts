@@ -109,8 +109,6 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
   });
 
   test('switching spread mode', async ({ page }) => {
-    // Red on 9f28329: chromium recipe-title dwidth=162 dheight=43, mid-step-5 dy=535 dwidth=162; ipad mid-step-5 dy=350.
-    failOn(['chromium', 'ipad'], 'fixed in group 4 (D2, after D3)');
     test.skip(isPhone(page), 'no spread modes at ≤600px');
     await openCookingRecipe(page);
     const anchors = await ANCHORS(page);

@@ -20,6 +20,38 @@ export function isMobile() {
     return window.matchMedia('(max-width: 600px)').matches;
 }
 
+// The open recipe's ingredients panel while it is on neither page. Above 600px
+// the right page holds title, meta and method in every spread mode, so in
+// `contents` and `notes` the panel has nowhere to be shown; it waits here,
+// detached, and cook mode (or a phone, which reads it on its own tab) puts the
+// same node back. One node, never a copy: the document must hold at most one
+// ingredients panel.
+let parkedIngredients = null;
+
+/** Takes the live ingredients panel, wherever it is, off the page and holds it. */
+export function parkIngredientsPanel() {
+    const live = document.querySelector('.tab-panel[data-tab="ingredients"]');
+    if (live) {
+        live.remove();
+        parkedIngredients = live;
+    }
+}
+
+/**
+ * Hands over the open recipe's ingredients panel: the one on a page if there
+ * is one, else the parked one. Null when the right page holds no recipe, so a
+ * panel parked for a recipe that has since left the page is never revived.
+ */
+export function takeIngredientsPanel() {
+    if (!document.querySelector('#page-right-content .tab-panel[data-tab="method"]')) {
+        parkedIngredients = null;
+        return null;
+    }
+    const panel = document.querySelector('.tab-panel[data-tab="ingredients"]') || parkedIngredients;
+    parkedIngredients = null;
+    return panel;
+}
+
 // The recipe lives on the right page; the left page holds the contents and is
 // never cleared by the loading or error states.
 export function showRecipeLoading() {
@@ -549,6 +581,7 @@ export function renderRecipe(recipe, options = {}) {
     // machinery each use a single querySelector).
     const relocatedIngredients = document.querySelector('#page-left-content .tab-panel[data-tab="ingredients"]');
     if (relocatedIngredients) relocatedIngredients.remove();
+    parkedIngredients = null;
 
     // Build ingredients list
     const ingredientsList = renderIngredients(recipe.ingredients || []);
@@ -711,10 +744,13 @@ export function renderRecipe(recipe, options = {}) {
     // mode and put the new ingredients back on the left page. Contents mode
     // needs nothing re-drawn (the contents are already there and the caller
     // re-renders them), so it is left alone rather than made to re-fetch the
-    // list on every render. force: a refresh can arrive mid page-turn, and the
-    // lock is there to reject the reader's tab clicks, not our own re-render.
+    // list on every render - only the fresh ingredients panel is taken off the
+    // right page, which shows title, meta and method alone in every mode.
+    // force: a refresh can arrive mid page-turn, and the lock is there to
+    // reject the reader's tab clicks, not our own re-render.
     const spreadMode = getSpreadMode();
     if (spreadMode !== 'contents') setSpreadMode(spreadMode, { force: true });
+    else if (!isMobile()) parkIngredientsPanel();
 }
 
 export async function fetchAndDisplayRecipe(recipeId) {

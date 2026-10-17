@@ -88,10 +88,8 @@ test.describe('Responsive Layout (book only)', () => {
   test('desktop shows the edge tabs, and the slip sits at the foot of the left page', async ({ page }) => {
     test.skip(isPhone(page), 'wide layout only');
     await seedAndOpen(page);
-    // Contents mode: the arrangement this case describes — the whole recipe on
-    // the right page, the contents on the left, the section strip on the outer
-    // edge. Cook mode splits the recipe and hides that strip
-    // (spread-modes.spec.ts).
+    // Contents mode: the contents on the left, the recipe's title and method
+    // on the right as in every mode, the ribbon strip on the outer edge.
     await useContentsMode(page);
 
     // Edge ribbons on the book's outer edge; the phone paper tabs stay hidden.
@@ -103,8 +101,11 @@ test.describe('Responsive Layout (book only)', () => {
     // Contents mode keeps the slip: it has one home in every mode
     await expect(page.locator('.note-input')).toBeVisible();
 
-    // The recipe is on the right page and the contents stay on the left
-    await expect(page.locator('#page-right-content')).toContainText('test ingredient');
+    // The recipe's title and method are on the right page, without the
+    // ingredients (cook mode's left page), and the contents are on the left
+    await expect(page.locator('#page-right-content .recipe-title')).toBeVisible();
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="method"]')).toBeVisible();
+    await expect(page.locator('#page-right-content')).not.toContainText('test ingredient');
     await expect(page.locator('#page-left-content .index-recipe-item.current')).toHaveCount(1);
 
     // Back in cook mode the slip is a pinned absolute over the foot of the LEFT

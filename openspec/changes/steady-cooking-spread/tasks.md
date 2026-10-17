@@ -166,25 +166,25 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
 
 ## 4. The right page stays put across modes (D2)
 
-- [ ] 4.1 `static/app.js` `renderSpread` (≈551-588) and `restoreIngredientsPanel` (≈497-511): in `notes` and `contents` modes, park the ingredients panel off-screen instead of re-inserting it before the method. Hold the node in a module variable or a hidden holder. `cook` puts the same node back on the left page. At ≤600px it still goes back into `#page-right-content` for the phone tabs.
+- [x] 4.1 `static/app.js` `renderSpread` (≈551-588) and `restoreIngredientsPanel` (≈497-511): in `notes` and `contents` modes, park the ingredients panel off-screen instead of re-inserting it before the method. Hold the node in a module variable or a hidden holder. `cook` puts the same node back on the left page. At ≤600px it still goes back into `#page-right-content` for the phone tabs.
   - book-spread-modes › Mode changes leave the right page alone (all)
   - book-spread-modes › Cook mode splits the recipe across the spread › Ingredients and method are both visible
   - book-spread-modes › Contents mode is reachable while a recipe is open › Returning the contents to the left page
   - book-spread-modes › Notes mode gives the conversation the left page › Conversation occupies the left page
   - family-recipe-ui › Recipe book displays as open two-page spread with leather cover › Left page shows ingredients, Right page shows preparation steps
-- [ ] 4.2 `static/styles.css` (≈1915-1922): force the method panel visible on the right page in every spread mode, not only `cook`. Confirm `#page-right-content`'s width is the same in all three modes.
-- [ ] 4.3 Rewrite the e2e assertions of the old contract:
+- [x] 4.2 `static/styles.css` (≈1915-1922): force the method panel visible on the right page in every spread mode, not only `cook`. Confirm `#page-right-content`'s width is the same in all three modes.
+- [x] 4.3 Rewrite the e2e assertions of the old contract:
   - `spread-modes.spec.ts`:
     - "the Contents tab brings the contents back beside the open recipe": the right page keeps title and method, with no ingredients panel and an unchanged box.
     - "notes mode gives the conversation the left page and takes the input with it": no ingredients on the right.
     - "a contents render still in flight cannot take the ingredients off the spread", "going back to the contents does not overwrite a mode chosen while the list loads" and "narrowing past 600px puts the contents back on the page the phone shows": re-check them.
   - `responsive.spec.ts` "desktop shows the edge tabs…": contents mode no longer shows "test ingredient" on the right.
   - Every `useContentsMode` caller that expects ingredients on the right page: `contents-filters.spec.ts:296,312`, `navigation.spec.ts:28,46`, `recipe-display.spec.ts:36,80`, `page-tabs.spec.ts:148,208,329`, `margin-notes.spec.ts`, `ui-improvements.spec.ts:143`.
-- [ ] 4.4 New cases in `spread-modes.spec.ts`:
+- [x] 4.4 New cases in `spread-modes.spec.ts`:
   - Switching modes does not touch the right page: the boxes of `.recipe-title`, `.recipe-meta-line` and each `.prep-step`, plus `#page-right.scrollTop`, are equal after each switch.
   - The ingredients are relocated, never duplicated.
-- [ ] 4.5 `layout-stability.spec.ts`: remove `test.fail` from "Switching spread mode".
-- [ ] 4.6 `make lint`, then `make test-e2e` green.
+- [x] 4.5 `layout-stability.spec.ts`: remove `test.fail` from "Switching spread mode".
+- [x] 4.6 `make lint`, then `make test-e2e` green.
 
 ## 5. Refreshing the recipe on the page keeps everything in place (D5)
 
