@@ -331,6 +331,18 @@ test.describe('Margin notes', () => {
       await route.continue();
     });
 
+    // The re-render is in place: record any skeleton it inserts, and the
+    // right page's scroll (the method is short, so the scroll is whatever the
+    // page allows - zero is still a place to keep)
+    await page.evaluate(() => {
+      const w = window as unknown as { __skeletons: number };
+      w.__skeletons = 0;
+      new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(n => {
+        if (n instanceof Element && (n.matches('.skeleton') || n.querySelector('.skeleton'))) w.__skeletons++;
+      }))).observe(document.getElementById('page-right-content')!, { childList: true, subtree: true });
+    });
+    const scrollBefore = await page.locator('#page-right').evaluate(el => el.scrollTop);
+
     // The mock LLM answers "halve" with an update_recipe call; the backend then
     // emits a recipe_artifact and the page re-fetches the edited recipe.
     await send(page, 'halve this recipe');
@@ -338,6 +350,9 @@ test.describe('Margin notes', () => {
     // Under the 3s difficulty-refresh delay, so only the artifact path can do this
     await expect(page.locator('.meta-serves')).toHaveText('serves 2', { timeout: 2500 });
     expect(fetches).toBeGreaterThanOrEqual(1);
+    // ...without a skeleton, and without moving the page
+    expect(await page.evaluate(() => (window as unknown as { __skeletons: number }).__skeletons)).toBe(0);
+    expect(Math.abs(await page.locator('#page-right').evaluate(el => el.scrollTop) - scrollBefore)).toBeLessThanOrEqual(1);
 
     const reply = page.locator('#page-margin .margin-note[data-kind="reply"]');
     await expect(reply).toHaveCount(1);

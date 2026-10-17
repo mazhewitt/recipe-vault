@@ -269,12 +269,21 @@ test.describe('Page tabs', () => {
 
     await openNotesView(page);
     await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
+    // Above 600px the method stays on the right page beside the thread; scroll
+    // it, so the refresh has a place to keep (the phone's Notes tab is short)
+    const scrollBefore = await page.locator('#page-right').evaluate(el => {
+      el.scrollTop = el.scrollHeight;
+      return el.scrollTop;
+    });
+    if (!isPhone(page)) expect(scrollBefore).toBeGreaterThan(0);
 
     // A refresh of the recipe already on the page — the path a photo upload and
     // an AI update_recipe both take — must leave the reader where they were and
     // refill the thread: on the phone that is the Notes tab, above 600px it is
     // notes spread mode.
     await openRecipe(page, recipeId);
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="method"]')).toHaveCount(1);
+    expect(Math.abs(await page.locator('#page-right').evaluate(el => el.scrollTop) - scrollBefore)).toBeLessThanOrEqual(1);
 
     if (isPhone(page)) {
       await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'notes');

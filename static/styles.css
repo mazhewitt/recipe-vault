@@ -864,6 +864,12 @@ body::before {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    /* A reserved slot: as wide and as tall empty as it is holding the label and
+       five dots (five 10px dots and four 3px gaps = 62px, plus the gap and
+       the label), so a difficulty that arrives late reflows nothing */
+    flex: none;
+    width: calc(3.2em + 68px);
+    min-height: 1.6em;
 }
 
 .meta-breakdown {
@@ -2022,6 +2028,8 @@ body[data-feature-meals] .contents-tab-meals {
         gap: 0;
         min-height: 0;
         overflow: hidden; /* Contain children within flex-allocated space */
+        width: 100%; /* never the width of whatever the page holds - a skeleton
+                        or a refresh must not change the book's width */
     }
 
     .section-label {

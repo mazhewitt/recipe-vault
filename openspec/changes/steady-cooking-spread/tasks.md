@@ -188,23 +188,23 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
 
 ## 5. Refreshing the recipe on the page keeps everything in place (D5)
 
-- [ ] 5.1 `static/recipe-display.js` `fetchAndDisplayRecipe` (≈720-735): when `isRefresh`, skip `showRecipeLoading()`. Save `#page-left.scrollTop`, `#page-right.scrollTop` and the active phone tab before `renderRecipe`, and restore them after it, including after `renderSpread` relocates the ingredients panel.
+- [x] 5.1 `static/recipe-display.js` `fetchAndDisplayRecipe` (≈720-735): when `isRefresh`, skip `showRecipeLoading()`. Save `#page-left.scrollTop`, `#page-right.scrollTop` and the active phone tab before `renderRecipe`, and restore them after it, including after `renderSpread` relocates the ingredients panel.
   - family-recipe-ui › Refreshing the open recipe keeps the reader's place › No skeleton on a refresh, Scroll positions are restored, The phone keeps its tab and its place, Opening a different recipe still shows the skeleton
   - book-spread-modes › Cook mode splits the recipe across the spread › Recipe refresh preserves the mode
   - web-chat › Recipe Artifact Event Handling › Parse recipe artifact event
   - web-chat › Notes and replies in the book › Display recipe artifact
-- [ ] 5.2 Route the other two refreshes through the same in-place path: `refreshDifficultyIfPending` (≈72-96), and the photo upload re-render in `static/app.js` (≈393-394).
-- [ ] 5.3 `static/recipe-display.js` meta line (≈555-625): always emit `.meta-difficulty`, empty when the difficulty is unknown. `static/styles.css`: give it a fixed width that fits the label plus five dots.
+- [x] 5.2 Route the other two refreshes through the same in-place path: `refreshDifficultyIfPending` (≈72-96), and the photo upload re-render in `static/app.js` (≈393-394).
+- [x] 5.3 `static/recipe-display.js` meta line (≈555-625): always emit `.meta-difficulty`, empty when the difficulty is unknown. `static/styles.css`: give it a fixed width that fits the label plus five dots.
   - family-recipe-ui › Recipe metadata displays with icons › The difficulty slot is reserved, Total time is omitted when unavailable
-- [ ] 5.4 `static/styles.css`, ≤600px block (≈2077-2082): set `.app-container { width: 100%; }`.
+- [x] 5.4 `static/styles.css`, ≤600px block (≈2077-2082): set `.app-container { width: 100%; }`.
   - family-recipe-ui › Refreshing the open recipe keeps the reader's place › The phone book keeps its width
   - family-recipe-ui › Main layout displays the recipe book alone › Phone layout
-- [ ] 5.5 Rewrite the e2e assertions of the old contract:
+- [x] 5.5 Rewrite the e2e assertions of the old contract:
   - `margin-notes.spec.ts` "halving a recipe re-renders the page…": add no-skeleton and scroll checks.
   - `spread-modes.spec.ts` "a recipe refresh keeps cook mode and the ingredients on the left page": add `scrollTop`.
   - `page-tabs.spec.ts` "a re-render keeps the open tab and refills the thread": add scroll.
   - `contents-page.spec.ts` "meta line formats hours and omits missing values": the line now holds an empty `.meta-difficulty`.
-- [ ] 5.6 New cases, in a new `refresh-in-place.spec.ts`:
+- [x] 5.6 New cases, in a new `refresh-in-place.spec.ts`:
   - A `MutationObserver` records any `.skeleton` insertion during each trigger:
     - `update_recipe` ("halve it");
     - a photo upload through the add-photo file input (as `contents-page.spec.ts` "entry shows a polaroid thumbnail after a photo upload" does);
@@ -212,8 +212,8 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - The phone `.app-container` width on every frame.
   - The skeleton still shows for a different, uncached recipe (delayed route).
   - The difficulty slot keeps the meta line's box when the value lands.
-- [ ] 5.7 `layout-stability.spec.ts`: remove `test.fail` from "Refreshing the recipe".
-- [ ] 5.8 `make lint`, then `make test-e2e` green.
+- [x] 5.7 `layout-stability.spec.ts`: remove `test.fail` from "Refreshing the recipe".
+- [x] 5.8 `make lint`, then `make test-e2e` green.
 
 ## 6. A kitchen timer (D6, D7, D8)
 

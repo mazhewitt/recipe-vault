@@ -114,7 +114,7 @@ async function refreshDifficultyIfPending(recipe, pageNumber) {
         try {
             const refreshed = await fetchRecipeFromApi(recipe.id);
             if (refreshed.difficulty != null) {
-                renderRecipe(refreshed, { pageNumber });
+                renderRecipeInPlace(refreshed, { pageNumber });
                 await state.fetchRecipeList(true);
                 state.updateNavigationState();
                 prefetchAdjacent(refreshed.id);
@@ -592,9 +592,7 @@ export function renderRecipe(recipe, options = {}) {
         ? Array(5).fill(0).map((_, i) =>
             `<span class="difficulty-dot${i < difficulty ? ' filled' : ''}"></span>`
           ).join('')
-        : Array(5).fill(0).map(() =>
-            `<span class="difficulty-dot"></span>`
-          ).join('');
+        : '';
 
     // Build preparation steps
     const stepsList = (recipe.steps || []).map((step, i) => {
@@ -640,8 +638,12 @@ export function renderRecipe(recipe, options = {}) {
         // SANITIZED: servings coerced to a number above
         metaParts.push(`<span class="meta-serves">serves ${servings}</span>`);
     }
+    // The slot is always there, empty until the difficulty is known, and as
+    // wide either way (styles.css), so a late difficulty reflows nothing
     if (difficulty) {
         metaParts.push(`<span class="meta-difficulty" title="Difficulty ${difficulty}/5"><span class="meta-label">difficulty</span> <span class="difficulty-dots">${difficultyDots}</span></span>`);
+    } else {
+        metaParts.push('<span class="meta-difficulty"></span>');
     }
     // Display-only tag chips, at most three, after the difficulty dots
     const tagChips = (Array.isArray(recipe.tags) ? recipe.tags : []).slice(0, 3);
@@ -653,9 +655,8 @@ export function renderRecipe(recipe, options = {}) {
     const breakdown = [];
     if (prepMinutes) breakdown.push(`prep ${prepMinutes}`);
     if (cookMinutes) breakdown.push(`cook ${cookMinutes}`);
-    const metaLine = metaParts.length
-        ? `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}${breakdown.length ? `<span class="meta-breakdown">(${breakdown.join(' · ')})</span>` : ''}</div>`
-        : '';
+    // Always rendered: it carries the difficulty slot
+    const metaLine = `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}${breakdown.length ? `<span class="meta-breakdown">(${breakdown.join(' · ')})</span>` : ''}</div>`;
 
     // Photo display
     const hasPhoto = recipe.photo_filename && recipe.photo_filename !== '';
@@ -753,6 +754,39 @@ export function renderRecipe(recipe, options = {}) {
     else if (!isMobile()) parkIngredientsPanel();
 }
 
+/** Both pages' scroll positions, which a refresh must hand back. */
+function readPageScroll() {
+    return {
+        left: document.getElementById('page-left')?.scrollTop ?? 0,
+        right: document.getElementById('page-right')?.scrollTop ?? 0,
+    };
+}
+
+function restorePageScroll(scroll) {
+    const left = document.getElementById('page-left');
+    const right = document.getElementById('page-right');
+    if (left) left.scrollTop = scroll.left;
+    if (right) right.scrollTop = scroll.right;
+}
+
+/**
+ * Re-renders the recipe already on the page without losing the reader's place:
+ * both pages' scroll positions are saved before the swap and restored after
+ * it - after renderRecipe has re-asserted the tab and the spread mode, so
+ * after the ingredients panel has been relocated too. The active tab is kept
+ * by renderRecipe itself. No skeleton: the old content stays until the new
+ * content replaces it, in the same task, so no frame shows anything between.
+ *
+ * @returns {{left: number, right: number}} the scroll that was restored, for a
+ *          caller that re-draws a page again afterwards
+ */
+function renderRecipeInPlace(recipe, options = {}) {
+    const scroll = readPageScroll();
+    renderRecipe(recipe, options);
+    restorePageScroll(scroll);
+    return scroll;
+}
+
 export async function fetchAndDisplayRecipe(recipeId) {
     // Opening a *different* recipe starts on Ingredients; a refresh of the
     // recipe already on the page (photo upload, an AI update_recipe, the
@@ -764,7 +798,8 @@ export async function fetchAndDisplayRecipe(recipeId) {
     // Record the id before any await so a timer_start arriving in the same
     // SSE turn as the recipe_artifact binds to this recipe, not the last one.
     state.currentRecipeId = recipeId;
-    showRecipeLoading();
+    // A refresh keeps the recipe on the page until the new one replaces it
+    if (!isRefresh) showRecipeLoading();
     try {
         // Check prefetch cache first
         const cached = getCachedRecipe(recipeId);
@@ -806,7 +841,12 @@ export async function fetchAndDisplayRecipe(recipeId) {
         const idx = list.findIndex(r => String(r.id) === String(recipe.id ?? recipeId));
         const pageNumber = idx >= 0 ? pageNumberFor(idx) : null;
 
-        renderRecipe(recipe, { pageNumber });
+        let restoredScroll = null;
+        if (isRefresh) {
+            restoredScroll = renderRecipeInPlace(recipe, { pageNumber });
+        } else {
+            renderRecipe(recipe, { pageNumber });
+        }
         // Opening a recipe always starts on Ingredients and in cook mode - the
         // cookbook spread, ingredients left and method right (renderRecipe has
         // already re-asserted the current tab and mode, which is what a refresh
@@ -832,6 +872,9 @@ export async function fetchAndDisplayRecipe(recipeId) {
         // navigation and the prefetch walk it either way.
         if (getSpreadMode() === 'contents') {
             renderIndex(fresh, { currentRecipeId: state.currentRecipeId, singleColumn: true, filter: state.contentsFilter });
+            // renderIndex scrolls the contents to the current entry; a refresh
+            // hands the reader back the place they had
+            if (restoredScroll) restorePageScroll(restoredScroll);
         }
         state.updateNavigationState();
         // Prefetch adjacent recipes for instant navigation

@@ -170,9 +170,6 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
   });
 
   test('refreshing the recipe', async ({ page }) => {
-    // Red on 9f28329: recipe-title and mid-step-5 dy=252 (ipad 382, mobile-chrome 689) and hidden 1 frame (skeleton);
-    // note-input dy=28; message-input dwidth 4-80px.
-    failOn(ALL, 'fixed in group 5 (D5)');
     const recipe = await openCookingRecipe(page);
     if (isPhone(page)) await openTab(page, 'method');
     const m = Math.ceil(recipe.steps / 2);

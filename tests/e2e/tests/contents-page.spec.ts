@@ -210,6 +210,12 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
       steps: [],
       cook_time_minutes: 75,
     });
+    // Not yet assessed, whatever the backend's background assessment has
+    // reached by now (it races the read: .scratch/recipe-create-spawns-two-racing-writers/)
+    await page.route(`**/api/recipes/${recipeId}`, async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), difficulty: null } });
+    });
 
     await page.evaluate((id) => {
       // @ts-ignore - fetchAndDisplayRecipe is defined in app.js
@@ -221,5 +227,8 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     await expect(meta.locator('.meta-total')).toHaveText('1h 15');
     await expect(meta.locator('.meta-serves')).toHaveCount(0);
     await expect(meta.locator('.meta-breakdown')).toHaveText('(cook 75)');
+    // The difficulty is not assessed yet, so its slot is there and empty
+    await expect(meta.locator('.meta-difficulty')).toHaveCount(1);
+    await expect(meta.locator('.meta-difficulty')).toBeEmpty();
   });
 });

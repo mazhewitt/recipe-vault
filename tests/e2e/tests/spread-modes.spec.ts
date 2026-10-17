@@ -800,10 +800,27 @@ test.describe('Spread modes', () => {
     const recipeId = await createLongRecipe(page, 'Refresh Cook');
     await openRecipe(page, recipeId);
     await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+    // Both pages scrolled, so keeping the place is something the refresh has to do
+    const scrolled = await page.evaluate(() => {
+      const left = document.getElementById('page-left')!;
+      const right = document.getElementById('page-right')!;
+      left.scrollTop = left.scrollHeight;
+      right.scrollTop = right.scrollHeight;
+      return { left: left.scrollTop, right: right.scrollTop };
+    });
+    expect(scrolled.left).toBeGreaterThan(0);
+    expect(scrolled.right).toBeGreaterThan(0);
 
     // A refresh of the recipe already on the page — the path a photo upload,
     // an update_recipe and the difficulty backfill all take
     await openRecipe(page, recipeId);
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="method"]')).toBeVisible();
+    const kept = await page.evaluate(() => ({
+      left: document.getElementById('page-left')!.scrollTop,
+      right: document.getElementById('page-right')!.scrollTop,
+    }));
+    expect(Math.abs(kept.left - scrolled.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(kept.right - scrolled.right)).toBeLessThanOrEqual(1);
 
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
     const leftIngredients = page.locator('#page-left-content .tab-panel[data-tab="ingredients"]');
