@@ -188,7 +188,6 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
 
   test('a timer starting, ticking and finishing', async ({ page }) => {
     // Red on 9f28329: mid-step-5 dy=23 (ipad 69, mobile-chrome 79) from .timer-active padding; note-input dy=28.
-    failOn(ALL, 'fixed in group 6 (D8)');
     await openCookingRecipe(page);
     if (isPhone(page)) await openTab(page, 'method');
     const anchors = await ANCHORS(page);

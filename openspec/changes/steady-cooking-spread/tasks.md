@@ -217,18 +217,18 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
 
 ## 6. A kitchen timer (D6, D7, D8)
 
-- [ ] 6.1 `static/styles.css` timer block (≈148-240):
+- [x] 6.1 `static/styles.css` timer block (≈148-240):
   - `.timer-widget` at the top centre (`left: 50%; transform: translateX(-50%)`), overhanging the cover's top edge as now.
   - The phone block (≈2116-2133) stays top right of the frame's header bar.
   - `.timer-cancel` gets a 44x44 `::before` hit area; the visual is unchanged.
   - family-recipe-ui › Timer widget displays as fixed speech bubble › Timer renders correctly, Timer does not overlap the user pill, Timer does not overlap the page arrows or the header, Close control is large enough, Compact pill on phone
-- [ ] 6.2 `static/timer.js` and `static/chat.html`:
+- [x] 6.2 `static/timer.js` and `static/chat.html`:
   - Split `#timer-text` into a label span and a time span. The time gets `font-variant-numeric: tabular-nums` and a `ch`-based `min-width`.
   - `#timer-text` keeps the full readable text for tests.
   - `#timer-widget` gets `data-state="running" | "done"`.
   - family-recipe-ui › Timer widget displays as fixed speech bubble › Pill width holds steady while counting
   - cooking-guidance › Frontend timer execution › Timer countdown display
-- [ ] 6.3 `static/timer.js` `onTimerComplete` (≈43-64):
+- [x] 6.3 `static/timer.js` `onTimerComplete` (≈43-64):
   - The finished state is "Done — <label>" in the leather red. Remove the 3s auto-hide (≈58-62). A click anywhere on the pill hides it.
   - Add `playChime()`: three oscillator notes through Web Audio, with no asset.
   - Call `navigator.vibrate?.([200, 100, 200])`.
@@ -238,24 +238,24 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - Leave `static/app.js:701-704` (the permission request on load) as it is.
   - cooking-guidance › Frontend timer execution › Timer completion notification, The finished state stays until tapped, Audio is unlocked by the first gesture, Single active timer, Timer manual cancellation
   - family-recipe-ui › Timer widget displays as fixed speech bubble › Pill is hidden when no timer runs
-- [ ] 6.4 `static/styles.css` `.prep-step.timer-active` (≈217-240):
+- [x] 6.4 `static/styles.css` `.prep-step.timer-active` (≈217-240):
   - Draw the highlight as a background band plus an inset `box-shadow`, with no margin or padding change.
   - Draw the clock mark and the "timer running" tag absolutely in the left gutter. Pick pseudo-elements that leave one free for group 8's step mark (for example `::before` for the tag and a background image for the clock), or use a child element.
   - cooking-guidance › Frontend timer execution › Step is highlighted while the timer runs
-- [ ] 6.5 Rewrite the e2e assertions of the old contract in `timer.spec.ts`:
+- [x] 6.5 Rewrite the e2e assertions of the old contract in `timer.spec.ts`:
   - "pill sits on the book cover and highlights the step":
     - Top centre within 1px of the spine on wide projects, and the header bar's top right on the phone.
     - No intersection with `#page-prev`, `#page-next`, `#recipe-book-header` or `.user-info`.
     - `expectHitArea('.timer-cancel')` replaces the 28px check.
   - "replacing a timer moves the highlight and completion clears it": "Done — Done" text, still shown after the old 3s (use `page.clock` to fast-forward 60s, or a real 4s wait if the clock stalls page turns), and a click hides it.
-- [ ] 6.6 New cases in `timer.spec.ts`:
+- [x] 6.6 New cases in `timer.spec.ts`:
   - Step 2's box is identical with and without `.timer-active`, and step 3 does not move.
   - The pill's box is steady across 10 ticks.
   - With the timer running, clicking `#page-next` turns the page.
   - A `page.addInitScript` stub `AudioContext` records three `OscillatorNode.start` calls at completion, and a `navigator.vibrate` spy receives `[200, 100, 200]`.
   - With `AudioContext` deleted, completion still shows "Done — …" and no `pageerror` fires.
-- [ ] 6.7 `layout-stability.spec.ts`: remove `test.fail` from "A timer starting, ticking and finishing".
-- [ ] 6.8 `make lint`, then `make test-e2e` green.
+- [x] 6.7 `layout-stability.spec.ts`: remove `test.fail` from "A timer starting, ticking and finishing".
+- [x] 6.8 `make lint`, then `make test-e2e` green.
 
 ## 7. Readable and tappable from the counter (D9)
 
