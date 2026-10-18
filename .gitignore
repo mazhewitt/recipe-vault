@@ -42,3 +42,6 @@ tests/e2e/test-results/
 
 # Usability audit run state (tests/usability/README.md)
 tests/usability/runs/
+
+# Live model eval run state
+tests/model-eval/runs/

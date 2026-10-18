@@ -11,7 +11,7 @@ use std::convert::Infallible;
 use uuid::Uuid;
 
 use crate::ai::{ContentBlock, ImageSource, Message, MealPlanEntry};
-use crate::chat::{ChatError, ChatState};
+use crate::chat::{ChatError, ChatState, SessionStore};
 
 #[derive(Debug, Deserialize)]
 pub struct ImageAttachment {
@@ -87,6 +87,33 @@ impl SseEvent {
 }
 
 /// POST /api/chat - Send a message and receive a streaming response
+/// Record the user message in the session and return the conversation id plus the
+/// conversation to send to the LLM. A lost-history notice is prepended only when the
+/// request named a conversation the server no longer holds.
+pub async fn prepare_conversation(
+    sessions: &SessionStore,
+    requested_id: Option<String>,
+    user_message: Message,
+) -> (String, Vec<Message>) {
+    let resuming = requested_id.is_some();
+    let conversation_id = requested_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    let (mut conversation, is_new_session) = sessions
+        .append_user_message(&conversation_id, user_message)
+        .await;
+
+    if resuming && is_new_session {
+        let notice = Message::User {
+            content: vec![ContentBlock::Text {
+                text: "[System] This session has no prior history. Briefly explain to the user that the conversation was reset and you'll continue from here.".to_string(),
+            }],
+        };
+        conversation.insert(0, notice);
+    }
+
+    (conversation_id, conversation)
+}
+
 pub async fn chat(
     State(state): State<ChatState>,
     extensions: axum::http::Extensions,
@@ -100,11 +127,6 @@ pub async fn chat(
 
     // Ensure agent is running with the authenticated user's context
     state.get_or_create_agent(&user_email).await?;
-
-    // Get or create conversation
-    let conversation_id = request
-        .conversation_id
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     // Build content blocks for the user message
     let mut content_blocks = Vec::new();
@@ -154,24 +176,14 @@ pub async fn chat(
     }
 
     // Add user message to history and capture the conversation snapshot
-    let (mut conversation, is_new_session) = state
-        .sessions()
-        .append_user_message(
-            &conversation_id,
-            Message::User {
-                content: content_blocks,
-            },
-        )
-        .await;
-
-    if is_new_session {
-        let notice = Message::User {
-            content: vec![ContentBlock::Text {
-                text: "[System] This session has no prior history. Briefly explain to the user that the conversation was reset and you'll continue from here.".to_string(),
-            }],
-        };
-        conversation.insert(0, notice);
-    }
+    let (conversation_id, conversation) = prepare_conversation(
+        state.sessions(),
+        request.conversation_id,
+        Message::User {
+            content: content_blocks,
+        },
+    )
+    .await;
     let conv_id = conversation_id.clone();
 
     // Create SSE stream

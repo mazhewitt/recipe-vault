@@ -77,6 +77,7 @@ pub fn create_test_config(
         ai_model: "test-model".to_string(),
         difficulty_provider: LlmProviderKind::Anthropic,
         difficulty_model: "test-model".to_string(),
+        gemini_options: Default::default(),
         mock_llm: true,
         mock_recipe_id: None,
         families_config,

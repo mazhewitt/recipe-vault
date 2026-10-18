@@ -10,6 +10,10 @@ pub enum LlmError {
     ApiError(String),
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
+    /// The model finished without usable content (cut off, blocked or
+    /// malformed). The message names the reason and never carries content.
+    #[error("{0}")]
+    Incomplete(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +23,46 @@ pub enum LlmProviderType {
     Mock,
 }
 
+/// Default `generationConfig.maxOutputTokens` for Gemini. On Gemini 3 and
+/// later the budget is shared by thinking and visible output.
+pub const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS: u32 = 16384;
+
+/// Gemini 3+ `thinkingConfig.thinkingLevel`. `minimal` is deliberately absent:
+/// 3.8 Flash rejects it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeminiThinkingLevel {
+    Low,
+    Medium,
+    High,
+}
+
+impl GeminiThinkingLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+}
+
+/// Gemini-only request settings, taken from `GEMINI_MAX_OUTPUT_TOKENS` and
+/// `GEMINI_THINKING_LEVEL`. Ignored by the other providers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeminiOptions {
+    pub max_output_tokens: u32,
+    pub thinking_level: Option<GeminiThinkingLevel>,
+}
+
+impl Default for GeminiOptions {
+    fn default() -> Self {
+        Self {
+            max_output_tokens: DEFAULT_GEMINI_MAX_OUTPUT_TOKENS,
+            thinking_level: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LlmProvider {
     provider_type: LlmProviderType,
@@ -26,6 +70,7 @@ pub struct LlmProvider {
     model: String,
     client: reqwest::Client,
     mock_recipe_id: Option<String>,
+    gemini_options: GeminiOptions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +87,10 @@ pub struct ToolCall {
     pub arguments: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thought_signature: Option<String>,
+    /// True when the model sent no id and `id` was invented to pair the call
+    /// with its result. Such ids are never echoed back to Gemini.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub synthetic_id: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,6 +217,46 @@ fn mock_current_recipe_id(messages: &[Message]) -> Option<String> {
     })
 }
 
+/// One usage line per Gemini response, for cost tracking. Counts and the
+/// finish reason only, never content; missing counts are 0.
+fn gemini_usage_line(model: &str, response: &serde_json::Value) -> String {
+    let usage = response.get("usageMetadata");
+    let count = |field: &str| {
+        usage
+            .and_then(|u| u.get(field))
+            .and_then(|n| n.as_u64())
+            .unwrap_or(0)
+    };
+    format!(
+        "gemini usage model={} prompt_tokens={} output_tokens={} thoughts_tokens={} cached_tokens={} finish_reason={}",
+        model,
+        count("promptTokenCount"),
+        count("candidatesTokenCount"),
+        count("thoughtsTokenCount"),
+        count("cachedContentTokenCount"),
+        gemini_finish_reason(response).unwrap_or("UNKNOWN")
+    )
+}
+
+fn gemini_finish_reason(response: &serde_json::Value) -> Option<&str> {
+    response
+        .get("candidates")
+        .and_then(|c| c.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|candidate| candidate.get("finishReason"))
+        .and_then(|r| r.as_str())
+}
+
+/// Finish reasons that mean the model refused or failed to produce a reply.
+const GEMINI_BLOCKED_FINISH_REASONS: &[&str] = &[
+    "SAFETY",
+    "RECITATION",
+    "PROHIBITED_CONTENT",
+    "BLOCKLIST",
+    "SPII",
+    "MALFORMED_FUNCTION_CALL",
+];
+
 impl LlmProvider {
     pub fn new(provider_type: LlmProviderType, api_key: String, model: String, http_client: Option<reqwest::Client>) -> Self {
         Self {
@@ -176,7 +265,14 @@ impl LlmProvider {
             model,
             client: http_client.unwrap_or_else(reqwest::Client::new),
             mock_recipe_id: None,
+            gemini_options: GeminiOptions::default(),
         }
+    }
+
+    /// Set the Gemini request options; a no-op for other providers.
+    pub fn with_gemini_options(mut self, options: GeminiOptions) -> Self {
+        self.gemini_options = options;
+        self
     }
 
     pub fn anthropic(api_key: String, model: String) -> Self {
@@ -194,6 +290,7 @@ impl LlmProvider {
             model: String::new(),
             client: reqwest::Client::new(),
             mock_recipe_id,
+            gemini_options: GeminiOptions::default(),
         }
     }
 
@@ -272,6 +369,7 @@ impl LlmProvider {
                                             "recipes": recipe_entries
                                         }),
                                         thought_signature: None,
+                                        synthetic_id: false,
                                     }]);
                                 }
                             }
@@ -340,6 +438,7 @@ impl LlmProvider {
                 name: "list_recipes".to_string(),
                 arguments: serde_json::json!({}),
                 thought_signature: None,
+                synthetic_id: false,
             }])
         } else if lower_message.contains("timer") {
             // Start a short timer attached to method step 2 so e2e tests can assert
@@ -353,6 +452,7 @@ impl LlmProvider {
                     "step_number": 2
                 }),
                 thought_signature: None,
+                synthetic_id: false,
             }])
         } else if (lower_message.contains("halve") || lower_message.contains("update"))
             && let Some(recipe_id) = mock_current_recipe_id(messages).or_else(|| self.mock_recipe_id.clone())
@@ -367,6 +467,7 @@ impl LlmProvider {
                     "servings": 2
                 }),
                 thought_signature: None,
+                synthetic_id: false,
             }])
         } else if lower_message.contains("list") {
             // Return list_recipes tool call; the agent loop will execute the tool,
@@ -376,6 +477,7 @@ impl LlmProvider {
                 name: "list_recipes".to_string(),
                 arguments: serde_json::json!({}),
                 thought_signature: None,
+                synthetic_id: false,
             }])
         } else if lower_message.contains("show") || lower_message.contains("display") {
             // Return display_recipe tool call
@@ -391,6 +493,7 @@ impl LlmProvider {
                     "recipe_id": recipe_id
                 }),
                 thought_signature: None,
+                synthetic_id: false,
             }])
         } else {
             // Default response for other queries
@@ -567,6 +670,7 @@ impl LlmProvider {
                         name,
                         arguments,
                         thought_signature: None,
+                        synthetic_id: false,
                     });
                 }
                 _ => {}
@@ -610,6 +714,7 @@ impl LlmProvider {
         }
 
         let response_json: serde_json::Value = response.json().await?;
+        tracing::info!("{}", gemini_usage_line(&self.model, &response_json));
         self.parse_gemini_response(response_json)
     }
 
@@ -619,15 +724,35 @@ impl LlmProvider {
         tools: &[ToolDefinition],
         system_prompt: Option<&str>,
     ) -> serde_json::Value {
+        // Ids the app invented; they pair calls with results but are never sent
+        let synthetic_ids: std::collections::HashSet<&str> = messages
+            .iter()
+            .filter_map(|m| match m {
+                Message::Assistant { tool_calls: Some(calls), .. } => Some(calls),
+                _ => None,
+            })
+            .flatten()
+            .filter(|call| call.synthetic_id)
+            .map(|call| call.id.as_str())
+            .collect();
+
         let mut body = serde_json::json!({
             "contents": messages
                 .iter()
-                .map(|m| self.message_to_gemini(m))
+                .map(|m| self.message_to_gemini(m, &synthetic_ids))
                 .collect::<Vec<_>>(),
             "generationConfig": {
-                "maxOutputTokens": 4096
+                "maxOutputTokens": self.gemini_options.max_output_tokens
             }
         });
+
+        // thinkingLevel is rejected by Gemini 2.5, so only 3+ models get it
+        if let Some(level) = self.gemini_options.thinking_level
+            && (self.model.starts_with("gemini-3") || self.model.starts_with("gemini-4")) {
+                body["generationConfig"]["thinkingConfig"] = serde_json::json!({
+                    "thinkingLevel": level.as_str()
+                });
+            }
 
         if let Some(system) = system_prompt {
             body["systemInstruction"] = serde_json::json!({
@@ -681,7 +806,11 @@ impl LlmProvider {
         }
     }
 
-    fn message_to_gemini(&self, message: &Message) -> serde_json::Value {
+    fn message_to_gemini(
+        &self,
+        message: &Message,
+        synthetic_ids: &std::collections::HashSet<&str>,
+    ) -> serde_json::Value {
         match message {
             Message::User { content } => {
                 let parts: Vec<serde_json::Value> = content
@@ -717,6 +846,11 @@ impl LlmProvider {
                                 "args": call.arguments
                             }
                         });
+                        // Echo the part as the model returned it: no invented id
+                        if call.synthetic_id
+                            && let Some(function_call) = part["functionCall"].as_object_mut() {
+                                function_call.remove("id");
+                            }
                         if let Some(signature) = &call.thought_signature {
                             part["thoughtSignature"] = serde_json::json!(signature);
                         }
@@ -733,7 +867,7 @@ impl LlmProvider {
                 let parts: Vec<serde_json::Value> = tool_results
                     .iter()
                     .map(|result| {
-                        serde_json::json!({
+                        let mut part = serde_json::json!({
                             "functionResponse": {
                                 "id": result.tool_use_id,
                                 "name": result.name.as_deref().unwrap_or(&result.tool_use_id),
@@ -742,7 +876,12 @@ impl LlmProvider {
                                     "is_error": result.is_error
                                 }
                             }
-                        })
+                        });
+                        if synthetic_ids.contains(result.tool_use_id.as_str())
+                            && let Some(function_response) = part["functionResponse"].as_object_mut() {
+                                function_response.remove("id");
+                            }
+                        part
                     })
                     .collect();
 
@@ -755,21 +894,24 @@ impl LlmProvider {
     }
 
     fn parse_gemini_response(&self, response: serde_json::Value) -> Result<LlmResponse, LlmError> {
+        let finish_reason = gemini_finish_reason(&response);
+        let block_reason = response
+            .get("promptFeedback")
+            .and_then(|f| f.get("blockReason"))
+            .and_then(|r| r.as_str());
+        let empty = Vec::new();
         let parts = response
             .get("candidates")
             .and_then(|c| c.as_array())
             .and_then(|arr| arr.first())
             .and_then(|candidate| candidate.get("content"))
             .and_then(|content| content.get("parts"))
-            .and_then(|parts| parts.as_array())
-            .ok_or_else(|| {
-                LlmError::InvalidResponse("Missing candidates[0].content.parts".to_string())
-            })?;
+            .and_then(|parts| parts.as_array());
 
         let mut text_parts: Vec<String> = Vec::new();
         let mut tool_calls: Vec<ToolCall> = Vec::new();
 
-        for (index, part) in parts.iter().enumerate() {
+        for (index, part) in parts.unwrap_or(&empty).iter().enumerate() {
             if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                 text_parts.push(text.to_string());
             }
@@ -782,11 +924,12 @@ impl LlmProvider {
                         LlmError::InvalidResponse("Gemini functionCall missing name".to_string())
                     })?
                     .to_string();
-                let id = function_call
+                let model_id = function_call
                     .get("id")
                     .and_then(|i| i.as_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| format!("gemini_call_{}", index));
+                    .map(|s| s.to_string());
+                let synthetic_id = model_id.is_none();
+                let id = model_id.unwrap_or_else(|| format!("gemini_call_{}", index));
                 let arguments = function_call
                     .get("args")
                     .cloned()
@@ -801,11 +944,47 @@ impl LlmProvider {
                     name,
                     arguments,
                     thought_signature,
+                    synthetic_id,
                 });
             }
         }
 
         let text = text_parts.join("");
+        let has_content = !text.is_empty() || !tool_calls.is_empty();
+
+        // Reasons are logged and returned by name only, never with content
+        if let Some(reason) = block_reason
+            && !has_content {
+                tracing::warn!("gemini prompt blocked: block_reason={}", reason);
+                return Err(LlmError::Incomplete(format!(
+                    "The AI service blocked this request ({})",
+                    reason
+                )));
+            }
+        match finish_reason {
+            Some("MAX_TOKENS") => {
+                tracing::warn!("gemini reply hit the output budget: finish_reason=MAX_TOKENS");
+                if !has_content {
+                    return Err(LlmError::Incomplete(
+                        "The AI reply was cut off before it finished (MAX_TOKENS)".to_string(),
+                    ));
+                }
+            }
+            Some(reason) if GEMINI_BLOCKED_FINISH_REASONS.contains(&reason) && !has_content => {
+                tracing::warn!("gemini reply stopped without content: finish_reason={}", reason);
+                return Err(LlmError::Incomplete(format!(
+                    "The AI service did not return a usable reply ({})",
+                    reason
+                )));
+            }
+            _ => {}
+        }
+        if parts.is_none() {
+            return Err(LlmError::InvalidResponse(
+                "Missing candidates[0].content.parts".to_string(),
+            ));
+        }
+
         if tool_calls.is_empty() {
             Ok(LlmResponse::Text(text))
         } else if text.is_empty() {
@@ -881,6 +1060,7 @@ mod tests {
                         name: "list_recipes".to_string(),
                         arguments: serde_json::json!({}),
                         thought_signature: Some("sig-1".to_string()),
+                        synthetic_id: false,
                     }]),
                 },
                 Message::Tool {
@@ -1011,6 +1191,254 @@ mod tests {
             }
             other => panic!("Unexpected response: {:?}", other),
         }
+    }
+
+    fn provider_for(model: &str, options: GeminiOptions) -> LlmProvider {
+        LlmProvider::gemini("test-key".to_string(), model.to_string()).with_gemini_options(options)
+    }
+
+    fn user(text: &str) -> Message {
+        Message::User {
+            content: vec![ContentBlock::Text { text: text.to_string() }],
+        }
+    }
+
+    #[test]
+    fn test_gemini_request_default_output_budget() {
+        let body = provider().build_gemini_request(&[user("hi")], &[], None);
+        assert_eq!(body["generationConfig"]["maxOutputTokens"], 16384);
+    }
+
+    #[test]
+    fn test_gemini_request_output_budget_override() {
+        let llm = provider_for(
+            "gemini-3.8-flash",
+            GeminiOptions { max_output_tokens: 32768, thinking_level: None },
+        );
+        let body = llm.build_gemini_request(&[user("hi")], &[], None);
+        assert_eq!(body["generationConfig"]["maxOutputTokens"], 32768);
+    }
+
+    #[test]
+    fn test_gemini_request_thinking_level_unset_sends_no_thinking_config() {
+        let llm = provider_for("gemini-3.8-flash", GeminiOptions::default());
+        let body = llm.build_gemini_request(&[user("hi")], &[], None);
+        assert!(body["generationConfig"].get("thinkingConfig").is_none());
+    }
+
+    #[test]
+    fn test_gemini_request_thinking_level_sent_to_gemini_3_and_4() {
+        for model in ["gemini-3.8-flash", "gemini-4-argon"] {
+            let llm = provider_for(
+                model,
+                GeminiOptions { thinking_level: Some(GeminiThinkingLevel::Low), ..GeminiOptions::default() },
+            );
+            let body = llm.build_gemini_request(&[user("hi")], &[], None);
+            assert_eq!(
+                body["generationConfig"]["thinkingConfig"],
+                serde_json::json!({"thinkingLevel": "low"}),
+                "model {}",
+                model
+            );
+        }
+    }
+
+    #[test]
+    fn test_gemini_request_thinking_level_not_sent_to_gemini_2_5() {
+        let llm = provider_for(
+            "gemini-2.5-pro",
+            GeminiOptions { thinking_level: Some(GeminiThinkingLevel::Low), ..GeminiOptions::default() },
+        );
+        let body = llm.build_gemini_request(&[user("hi")], &[], None);
+        assert!(body["generationConfig"].get("thinkingConfig").is_none());
+        assert_eq!(body["generationConfig"]["maxOutputTokens"], 16384);
+    }
+
+    #[test]
+    fn test_gemini_usage_line_with_all_counts() {
+        let response = serde_json::json!({
+            "candidates": [{"content": {"parts": [{"text": "secret recipe text"}]}, "finishReason": "STOP"}],
+            "usageMetadata": {
+                "promptTokenCount": 1200,
+                "candidatesTokenCount": 85,
+                "thoughtsTokenCount": 410,
+                "cachedContentTokenCount": 1024,
+                "totalTokenCount": 1695
+            }
+        });
+        let line = gemini_usage_line("gemini-3.8-flash", &response);
+        assert_eq!(
+            line,
+            "gemini usage model=gemini-3.8-flash prompt_tokens=1200 output_tokens=85 thoughts_tokens=410 cached_tokens=1024 finish_reason=STOP"
+        );
+        assert!(!line.contains("secret"));
+    }
+
+    #[test]
+    fn test_gemini_usage_line_missing_counts_and_reason() {
+        let response = serde_json::json!({
+            "candidates": [{"content": {"parts": [{"text": "x"}]}}],
+            "usageMetadata": {"promptTokenCount": 7, "candidatesTokenCount": 3}
+        });
+        assert_eq!(
+            gemini_usage_line("gemini-2.5-pro", &response),
+            "gemini usage model=gemini-2.5-pro prompt_tokens=7 output_tokens=3 thoughts_tokens=0 cached_tokens=0 finish_reason=UNKNOWN"
+        );
+    }
+
+    #[test]
+    fn test_parse_gemini_stop_parses_as_before() {
+        let llm = provider();
+        let response = serde_json::json!({
+            "candidates": [{
+                "content": {"parts": [
+                    {"text": "Checking."},
+                    {"functionCall": {"id": "c1", "name": "list_recipes", "args": {}}}
+                ]},
+                "finishReason": "STOP"
+            }]
+        });
+        match llm.parse_gemini_response(response).unwrap() {
+            LlmResponse::TextWithToolUse { text, tool_calls } => {
+                assert_eq!(text, "Checking.");
+                assert_eq!(tool_calls[0].id, "c1");
+                assert!(!tool_calls[0].synthetic_id);
+            }
+            other => panic!("Unexpected response: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_gemini_max_tokens_without_content_is_cut_off_error() {
+        let llm = provider();
+        let response = serde_json::json!({
+            "candidates": [{"content": {"role": "model"}, "finishReason": "MAX_TOKENS"}]
+        });
+        let err = llm.parse_gemini_response(response).unwrap_err();
+        assert!(matches!(err, LlmError::Incomplete(_)), "got {:?}", err);
+        assert!(err.to_string().contains("cut off"), "got {}", err);
+    }
+
+    #[test]
+    fn test_parse_gemini_max_tokens_with_partial_text_returns_text() {
+        let llm = provider();
+        let response = serde_json::json!({
+            "candidates": [{"content": {"parts": [{"text": "Preheat the oven to"}]}, "finishReason": "MAX_TOKENS"}]
+        });
+        match llm.parse_gemini_response(response).unwrap() {
+            LlmResponse::Text(text) => assert_eq!(text, "Preheat the oven to"),
+            other => panic!("Unexpected response: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_gemini_blocked_finish_reasons_name_the_reason() {
+        let llm = provider();
+        for reason in ["SAFETY", "RECITATION", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "MALFORMED_FUNCTION_CALL"] {
+            let response = serde_json::json!({
+                "candidates": [{"finishReason": reason, "finishMessage": "leaked model content"}]
+            });
+            let err = llm.parse_gemini_response(response).unwrap_err();
+            assert!(matches!(err, LlmError::Incomplete(_)), "{}: got {:?}", reason, err);
+            let message = err.to_string();
+            assert!(message.contains(reason), "{}: got {}", reason, message);
+            assert!(!message.contains("leaked"), "{}: got {}", reason, message);
+        }
+    }
+
+    #[test]
+    fn test_parse_gemini_prompt_block_reason_names_the_reason() {
+        let llm = provider();
+        let response = serde_json::json!({
+            "promptFeedback": {"blockReason": "SAFETY"}
+        });
+        let err = llm.parse_gemini_response(response).unwrap_err();
+        assert!(matches!(err, LlmError::Incomplete(_)), "got {:?}", err);
+        assert!(err.to_string().contains("SAFETY"), "got {}", err);
+    }
+
+    #[test]
+    fn test_parse_gemini_missing_id_is_marked_synthetic() {
+        let llm = provider();
+        let response = serde_json::json!({
+            "candidates": [{"content": {"parts": [
+                {"functionCall": {"name": "list_recipes", "args": {}}, "thoughtSignature": "sig-9"}
+            ]}, "finishReason": "STOP"}]
+        });
+        match llm.parse_gemini_response(response).unwrap() {
+            LlmResponse::ToolUse(calls) => {
+                assert!(calls[0].synthetic_id);
+                assert!(!calls[0].id.is_empty());
+            }
+            other => panic!("Unexpected response: {:?}", other),
+        }
+    }
+
+    fn echo_body(call: ToolCall) -> serde_json::Value {
+        let tool_use_id = call.id.clone();
+        provider().build_gemini_request(
+            &[
+                user("list"),
+                Message::Assistant { content: None, tool_calls: Some(vec![call]) },
+                Message::Tool {
+                    tool_results: vec![ToolResult {
+                        tool_use_id,
+                        name: Some("list_recipes".to_string()),
+                        content: "{}".to_string(),
+                        is_error: false,
+                    }],
+                },
+            ],
+            &[],
+            None,
+        )
+    }
+
+    #[test]
+    fn test_gemini_echo_model_supplied_id_on_both_parts() {
+        let body = echo_body(ToolCall {
+            id: "abc".to_string(),
+            name: "list_recipes".to_string(),
+            arguments: serde_json::json!({}),
+            thought_signature: Some("sig-1".to_string()),
+            synthetic_id: false,
+        });
+        assert_eq!(body["contents"][1]["parts"][0]["functionCall"]["id"], "abc");
+        assert_eq!(body["contents"][1]["parts"][0]["thoughtSignature"], "sig-1");
+        assert_eq!(body["contents"][2]["parts"][0]["functionResponse"]["id"], "abc");
+    }
+
+    #[test]
+    fn test_gemini_echo_omits_synthetic_id_on_both_parts() {
+        let body = echo_body(ToolCall {
+            id: "gemini_call_0".to_string(),
+            name: "list_recipes".to_string(),
+            arguments: serde_json::json!({}),
+            thought_signature: Some("sig-2".to_string()),
+            synthetic_id: true,
+        });
+        let part = &body["contents"][1]["parts"][0];
+        assert_eq!(
+            *part,
+            serde_json::json!({
+                "functionCall": {"name": "list_recipes", "args": {}},
+                "thoughtSignature": "sig-2"
+            })
+        );
+        let response = &body["contents"][2]["parts"][0]["functionResponse"];
+        assert!(response.get("id").is_none(), "got {}", response);
+        assert_eq!(response["name"], "list_recipes");
+    }
+
+    #[test]
+    fn test_tool_call_without_synthetic_flag_deserialises_as_model_supplied() {
+        let call: ToolCall = serde_json::from_value(serde_json::json!({
+            "id": "toolu_1",
+            "name": "list_recipes",
+            "arguments": {}
+        }))
+        .unwrap();
+        assert!(!call.synthetic_id);
     }
 }
 
