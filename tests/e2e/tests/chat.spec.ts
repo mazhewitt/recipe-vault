@@ -112,3 +112,98 @@ test.describe('Notes and replies', () => {
     await expect(notesThread(page)).toHaveAttribute('data-empty', 'true');
   });
 });
+
+/**
+ * web-chat › A turn keeps the slip still and the input live: the send button
+ * shows when it cannot send, and a follow-up typed meanwhile waits for the cook.
+ */
+test.describe('The send button during a turn', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  /** Holds every /api/chat open until `release()`, counting the POSTs. */
+  async function holdChat(page: Page) {
+    const held: Array<() => Promise<void>> = [];
+    let posts = 0;
+    await page.route('**/api/chat', route => {
+      posts++;
+      held.push(() => route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+        body: 'event: chunk\ndata: {"text":"Done."}\n\nevent: done\ndata: {"conversation_id":"held"}\n\n',
+      }));
+    });
+    return {
+      posts: () => posts,
+      release: async () => { while (held.length) await held.shift()!(); },
+    };
+  }
+
+  function sendLook(page: Page) {
+    return page.locator('#send-button').evaluate(el => {
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return { opacity: parseFloat(cs.opacity), cursor: cs.cursor, box: { x: r.x, y: r.y, width: r.width, height: r.height } };
+    });
+  }
+
+  test('the send button looks unavailable during a turn', async ({ page }) => {
+    const chat = await holdChat(page);
+    await openRecipe(page, (await createRecipe(page, {
+      title: `Dim Send ${Date.now()}`,
+      ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
+      steps: [{ step_number: 1, instruction: 'Mix' }],
+      servings: 4,
+      difficulty: 3,
+    })));
+    const idle = await sendLook(page);
+    expect(idle.opacity).toBe(1);
+    expect(idle.cursor).toBe('pointer');
+
+    await sendNote(page, 'how long?');
+    await expect(page.locator('#send-button')).toHaveAttribute('aria-disabled', 'true');
+    await expect.poll(async () => (await sendLook(page)).opacity).toBeLessThanOrEqual(0.5);
+    const busy = await sendLook(page);
+    expect(busy.cursor).toBe('not-allowed');
+    for (const k of ['x', 'y', 'width', 'height'] as const) {
+      expect(Math.abs(busy.box[k] - idle.box[k]), `send button ${k} moved`).toBeLessThanOrEqual(1);
+    }
+    // Hovering it changes nothing while it cannot send
+    await page.locator('#send-button').hover();
+    await page.waitForTimeout(300);
+    expect((await sendLook(page)).opacity).toBeLessThanOrEqual(0.5);
+
+    await chat.release();
+    await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
+    await expect.poll(async () => (await sendLook(page)).opacity).toBe(1);
+    expect((await sendLook(page)).cursor).toBe('pointer');
+  });
+
+  test('a follow-up typed during a turn is kept, not sent', async ({ page }) => {
+    const chat = await holdChat(page);
+    await openRecipe(page, (await createRecipe(page, {
+      title: `Kept Follow-up ${Date.now()}`,
+      ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
+      steps: [{ step_number: 1, instruction: 'Mix' }],
+      servings: 4,
+      difficulty: 3,
+    })));
+    await sendNote(page, 'first');
+    await expect(page.locator('#send-button')).toHaveAttribute('aria-disabled', 'true');
+    const input = page.locator('#message-input');
+    await input.pressSequentially('and the oven?');
+    await input.press('Enter');
+    await expect(input).toHaveValue('and the oven?');
+
+    await chat.release();
+    await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
+    await page.waitForTimeout(500);
+    await expect(input).toHaveValue('and the oven?');
+    expect(chat.posts()).toBe(1);
+
+    await input.press('Enter');
+    await expect.poll(() => chat.posts()).toBe(2);
+    await chat.release();
+  });
+});

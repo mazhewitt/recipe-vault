@@ -54,6 +54,14 @@ let spreadRenderer = null;
 // a newly opened view, so even a same-mode re-assert starts it at the top.
 let leftScroll = {};
 let freshView = true;
+// The newest thread entry on the notes page when notes was last left
+let notesSeen = null;
+
+/** The id of the last entry of the left page's thread, or null. */
+function newestThreadNote(pageLeft) {
+    const entries = pageLeft.querySelectorAll('.notes-thread .thread-note');
+    return entries.length ? entries[entries.length - 1].dataset.noteId : null;
+}
 
 /**
  * Forgets every mode's left-page scroll: a recipe or meal plan has been opened,
@@ -62,6 +70,7 @@ let freshView = true;
 export function resetLeftScroll() {
     leftScroll = {};
     freshView = true;
+    notesSeen = null;
 }
 
 /** Whether the left page keeps a scroll per mode: only beside an open recipe or meal plan. */
@@ -125,6 +134,7 @@ export function setSpreadMode(mode, options = {}) {
     const outgoing = getSpreadMode();
     const restore = keepsLeftScroll() && pageLeft && (outgoing !== mode || freshView);
     if (restore && outgoing !== mode && !freshView) leftScroll[outgoing] = pageLeft.scrollTop;
+    if (restore && outgoing === 'notes' && mode !== 'notes') notesSeen = newestThreadNote(pageLeft);
     // A mode not yet visited in this view is drawn fresh (the contents then
     // scroll the current row into view themselves)
     const saved = restore ? leftScroll[mode] : undefined;
@@ -136,6 +146,12 @@ export function setSpreadMode(mode, options = {}) {
     if (restore) {
         pageLeft.scrollTop = saved ?? 0;
         freshView = false;
+    }
+    // Notes opens at the newest entry when there is one the cook has not had
+    // on screen (first visit in this view, or a note added since notes was
+    // left); otherwise notes' own restored position stands
+    if (mode === 'notes' && pageLeft && (!restore || saved === undefined || newestThreadNote(pageLeft) !== notesSeen)) {
+        pageLeft.scrollTop = pageLeft.scrollHeight;
     }
 
     return true;

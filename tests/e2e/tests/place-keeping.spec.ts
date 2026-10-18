@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createCookingRecipe, isPhone, openRecipe, openTab } from './helpers';
+import { authenticate, createCookingRecipe, expectHitArea, isPhone, openRecipe, openTab } from './helpers';
 
 /**
  * cooking-guidance › The cook can keep their place in a recipe, and
@@ -135,11 +135,34 @@ test.describe('Keeping your place', () => {
     const two = step(page, 2);
     await two.scrollIntoViewIfNeeded();
     const before = await boxOf(two);
+    const unmarkedBg = await two.evaluate(el => getComputedStyle(el).backgroundColor);
     await tap(page, two);
     await expect(two).toHaveAttribute('aria-current', 'step');
     expectSameBox(await boxOf(two), before, 'marked step');
-    const bracket = await two.evaluate(el => getComputedStyle(el, '::after').content);
-    expect(bracket).not.toBe('none');
+    // A 4px leather-red bar spanning the step, and a tint behind it
+    const mark = await two.evaluate(el => {
+      const after = getComputedStyle(el, '::after');
+      const leather = getComputedStyle(document.documentElement).getPropertyValue('--color-leather').trim();
+      const probe = document.createElement('span');
+      probe.style.color = leather;
+      document.body.appendChild(probe);
+      const leatherRgb = getComputedStyle(probe).color;
+      probe.remove();
+      return {
+        content: after.content,
+        width: parseFloat(after.width),
+        height: parseFloat(after.height),
+        colour: after.backgroundColor,
+        leatherRgb,
+        stepHeight: el.getBoundingClientRect().height,
+        bg: getComputedStyle(el).backgroundColor,
+      };
+    });
+    expect(mark.content).not.toBe('none');
+    expect(mark.width).toBe(4);
+    expect(mark.colour).toBe(mark.leatherRgb);
+    expect(mark.height).toBeGreaterThan(mark.stepHeight - 8);
+    expect(mark.bg).not.toBe(unmarkedBg);
 
     await tap(page, step(page, 3));
     await expect(step(page, 3)).toHaveAttribute('aria-current', 'step');
@@ -163,12 +186,30 @@ test.describe('Keeping your place', () => {
     await tap(page, two);
     await expect(two).toHaveAttribute('aria-current', 'step');
     await expect(two).toHaveClass(/timer-active/);
-    const marks = await two.evaluate(el => ({
-      tag: getComputedStyle(el, '::before').content,
-      bracket: getComputedStyle(el, '::after').content,
-    }));
+    const marks = await two.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      const tag = getComputedStyle(el, '::before');
+      const bar = getComputedStyle(el, '::after');
+      const tagRight = r.right - parseFloat(tag.right);
+      const barLeft = r.left + parseFloat(bar.left);
+      // The page clips at its padding box: the bar must lie inside it
+      const page = el.closest('#page-right')!.getBoundingClientRect();
+      return {
+        tag: tag.content,
+        bar: bar.content,
+        tagLeft: tagRight - parseFloat(tag.width),
+        tagRight,
+        barLeft,
+        barRight: barLeft + parseFloat(bar.width),
+        pageLeft: page.left,
+      };
+    });
     expect(marks.tag).not.toBe('none');
-    expect(marks.bracket).not.toBe('none');
+    expect(marks.bar).not.toBe('none');
+    // Side by side, not one under the other
+    expect(marks.barRight <= marks.tagLeft || marks.barLeft >= marks.tagRight,
+      `bar ${marks.barLeft}-${marks.barRight} under tag ${marks.tagLeft}-${marks.tagRight}`).toBe(true);
+    expect(marks.barLeft).toBeGreaterThanOrEqual(marks.pageLeft);
     await page.evaluate(() => {
       // @ts-ignore - cancelTimer is exposed by app.js
       cancelTimer();
@@ -213,7 +254,7 @@ test.describe('Keeping your place', () => {
     await expect(step(page, 4)).toHaveAttribute('aria-current', 'step');
   });
 
-  test('clear ticks removes the ticks, the mark and the stored place', async ({ page }) => {
+  test('clearing the ticks keeps the step mark, with a 44px hit area', async ({ page }) => {
     const r = await createCookingRecipe(page);
     // A recipe after it, so the phone's next-recipe strip is live (it takes no
     // taps on the last page)
@@ -226,6 +267,7 @@ test.describe('Keeping your place', () => {
     const headerHeight = (await header.boundingBox())!.height;
 
     await tap(page, ingredient(page, 0));
+    await tap(page, ingredient(page, 2));
     await expect(clear).toBeVisible();
     expect(Math.abs((await header.boundingBox())!.height - headerHeight)).toBeLessThanOrEqual(1);
 
@@ -233,18 +275,57 @@ test.describe('Keeping your place', () => {
     await tap(page, step(page, 2));
     await toIngredients(page);
     await clear.scrollIntoViewIfNeeded();
-    // Nothing (the phone's edge-nav strips) takes the tap meant for it
-    const reachable = await clear.evaluate(el => {
-      const r = el.getBoundingClientRect();
-      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-      return !!hit && el.contains(hit);
-    });
-    expect(reachable, '.clear-ticks is covered at its centre').toBe(true);
+    await expectHitArea(page, '.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks');
     await clear.click();
 
     await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(0);
-    await expect(page.locator('.prep-step[aria-current="step"]')).toHaveCount(0);
+    await expect(page.locator('.prep-step[aria-current="step"]')).toHaveCount(1);
+    await expect(step(page, 2)).toHaveAttribute('aria-current', 'step');
+    expect(JSON.parse((await stored(page, r.id))!)).toEqual({ ticked: [], step: 2 });
+  });
+
+  test('clear ticks is hidden while nothing is ticked, even with a step marked', async ({ page }) => {
+    const r = await createCookingRecipe(page);
+    await openCooking(page, r.id);
+    const clear = page.locator('.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks');
+    await toMethod(page);
+    await tap(page, step(page, 2));
+    await expect(step(page, 2)).toHaveAttribute('aria-current', 'step');
+    await toIngredients(page);
     await expect(clear).toBeHidden();
+  });
+
+  test('a clear can be undone for 6 seconds, then it stands', async ({ page }) => {
+    await page.clock.install();
+    const r = await createCookingRecipe(page);
+    await createCookingRecipe(page);
+    await authenticate(page);
+    await openCooking(page, r.id);
+    const clear = page.locator('.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks');
+
+    await tap(page, ingredient(page, 1));
+    await tap(page, ingredient(page, 3));
+    await clear.scrollIntoViewIfNeeded();
+    await expect(clear).toHaveText('clear ticks');
+    const clearBox = await boxOf(clear);
+    await clear.click();
+    await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(0);
+    await expect(clear).toHaveText('Undo');
+    expectSameBox(await boxOf(clear), clearBox, 'Undo');
+    await page.clock.runFor(5000);
+    await clear.click();
+    await expect(ingredient(page, 1)).toHaveAttribute('data-ticked', 'true');
+    await expect(ingredient(page, 3)).toHaveAttribute('data-ticked', 'true');
+    await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(2);
+    expect(JSON.parse((await stored(page, r.id))!)).toEqual({ ticked: [1, 3], step: null });
+    await expect(clear).toHaveText('clear ticks');
+
+    // Cleared again and left alone: after 6s the control goes and the clear stands
+    await clear.click();
+    await expect(clear).toHaveText('Undo');
+    await page.clock.runFor(6100);
+    await expect(clear).toBeHidden();
+    await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(0);
     expect(await stored(page, r.id)).toBeNull();
   });
 

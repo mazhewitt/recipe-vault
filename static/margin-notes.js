@@ -56,6 +56,8 @@ function normalizeRecipeId(recipeId) {
  * @returns {object} The stored thread entry
  */
 export function addNote(text, kind = 'reply', recipeId = null) {
+    // The cook's own note brings an on-screen thread to its end
+    if (kind === 'user') followOwnSend = true;
     const note = {
         id: nextId++,
         kind,
@@ -348,11 +350,72 @@ function updateStickyClearance(container, host) {
  */
 function refreshOpenThread() {
     const pageRight = document.getElementById('page-right');
+    const ownSend = followOwnSend;
+    followOwnSend = false;
     if (pageRight && pageRight.dataset.tab === 'notes') {
-        renderThread(document.querySelector('#page-right-content .notes-thread'));
+        followThread(document.querySelector('#page-right-content .notes-thread'), pageRight, ownSend);
     }
     const leftThread = document.querySelector('#page-left-content .notes-thread');
-    if (leftThread) renderThread(leftThread);
+    if (leftThread) followThread(leftThread, document.getElementById('page-left'), ownSend);
+}
+
+/** How close to its end (px) a thread's container counts as pinned. */
+const PIN_SLACK = 48;
+
+/** Set by the cook's own note: the next re-render scrolls to the end regardless. */
+let followOwnSend = false;
+
+/**
+ * Per thread (key as `dismissed`), the id of the newest entry the cook has had
+ * on screen in the phone's Notes tab: opening the tab again shows the newest
+ * entry only if something was added since.
+ */
+const seenOnTab = new Map();
+
+function newestId() {
+    const notes = threadForDisplayedRecipe();
+    return notes.length ? notes[notes.length - 1].id : 0;
+}
+
+function scrollToEnd(scroller) {
+    scroller.scrollTop = scroller.scrollHeight;
+}
+
+/**
+ * Re-renders an on-screen thread and keeps the newest entry in view: the
+ * container scrolls to its end if it was pinned (within PIN_SLACK of the end)
+ * just before the update, or the update is the cook's own send. A cook who
+ * has scrolled up to read is left where they are.
+ */
+function followThread(container, scroller, ownSend) {
+    if (!container) return;
+    if (!scroller) {
+        renderThread(container);
+        return;
+    }
+    const top = scroller.scrollTop;
+    const pinned = scroller.scrollHeight - top - scroller.clientHeight <= PIN_SLACK;
+    renderThread(container);
+    if (pinned || ownSend) scrollToEnd(scroller);
+    else scroller.scrollTop = top;
+    if (scroller.id === 'page-right') seenOnTab.set(threadKey(displayedRecipeId()), newestId());
+}
+
+/**
+ * Renders the thread into the phone's Notes tab as it opens. It shows the
+ * newest entry on the tab's first opening for this recipe, or when an entry
+ * was added since the tab was last left; otherwise the scroll is left to the
+ * tab's own saved position.
+ * @param {Element|null} container - `#page-right-content .notes-thread`
+ */
+export function openThreadTab(container) {
+    if (!container) return;
+    renderThread(container);
+    const key = threadKey(displayedRecipeId());
+    const newest = newestId();
+    const pageRight = document.getElementById('page-right');
+    if (pageRight && (!seenOnTab.has(key) || seenOnTab.get(key) !== newest)) scrollToEnd(pageRight);
+    seenOnTab.set(key, newest);
 }
 
 /**

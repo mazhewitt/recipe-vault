@@ -359,5 +359,38 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     });
     expectAnchorsStill(stepResult);
     await expect(page.locator(stepSel)).toHaveAttribute('aria-current', 'step');
+
+    // "Clear ticks" then "Undo" moves no anchor, nor the header and its lines
+    if (isPhone(page)) {
+      await openTab(page, 'ingredients');
+      await expect.poll(() => page.evaluate(async () => {
+        // @ts-ignore - module path served by the app
+        const M = await import('/static/page-transitions.js');
+        return M.isAnimating();
+      })).toBe(false);
+    }
+    const headerSel = '.tab-panel[data-tab="ingredients"] .section-header:visible';
+    const clear = page.locator(`${headerSel} .clear-ticks`);
+    await clear.scrollIntoViewIfNeeded();
+    const clearAnchors = [
+      ...(await ANCHORS(page)),
+      { name: 'ingredients-header', selector: await page.locator(headerSel).evaluate(el => {
+        el.setAttribute('data-layout-probe', 'header');
+        return '[data-layout-probe="header"]';
+      }) },
+      { name: 'ingredient-0', selector: await page.locator('.ingredient-item:visible').first().evaluate(el => {
+        el.setAttribute('data-layout-probe', 'first-ingredient');
+        return '[data-layout-probe="first-ingredient"]';
+      }) },
+      { name: 'tapped-ingredient', selector: '[data-layout-probe="ingredient"]' },
+    ];
+    const clearResult = await trackAnchors(page, clearAnchors, async () => {
+      await clear.click();
+      await expect(clear).toHaveText('Undo');
+      await clear.click();
+      await expect(clear).toHaveText('clear ticks');
+    });
+    expectAnchorsStill(clearResult);
+    await expect(tappedIngredient).toHaveAttribute('data-ticked', 'true');
   });
 });

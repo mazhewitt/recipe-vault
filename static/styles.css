@@ -434,6 +434,21 @@ body::before {
     cursor: not-allowed;
 }
 
+/* A turn is in flight (chat.js sets aria-disabled): dimmed, and neither a
+   hover nor a press makes it look as if it would send */
+.note-send[aria-disabled="true"],
+.note-send[aria-disabled="true"]:hover,
+.note-send[aria-disabled="true"]:active {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.note-send[aria-disabled="true"]:hover {
+    background: #fff;
+    border-color: var(--color-border);
+}
+
 .note-page-number {
     flex-shrink: 0;
     /* A fixed width, so "p. 1" becoming "p. 13" on opening a recipe cannot
@@ -994,24 +1009,34 @@ body::before {
     pointer-events: none;
 }
 
-/* A pencil bracket down the step's left margin. ::before is the timer's
+/* "You are here": a leather-red bar in the step's left margin and a faint
+   warm tint behind the step, with no box change. ::before is the timer's
    "timer running" tag (just left of the step), so with a timer on this step
-   the bracket stands further out and both show. */
+   the bar stands further out and both show. */
+.prep-step[aria-current="step"] {
+    background-color: rgba(139, 45, 26, 0.07);
+    border-radius: var(--radius-sm);
+}
+
 .prep-step[aria-current="step"]::after {
     content: "";
     position: absolute;
     left: -10px;
-    top: 3px;
-    bottom: 3px;
-    width: 5px;
-    border: 2px solid var(--color-pencil);
-    border-right: none;
-    border-radius: 3px 0 0 3px;
+    top: 2px;
+    bottom: 2px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--color-leather);
     pointer-events: none;
 }
 
 .prep-step.timer-active[aria-current="step"]::after {
     left: -21px;
+}
+
+/* The timer's band stays the background of a marked step it belongs to */
+.prep-step.timer-active[aria-current="step"] {
+    background-color: var(--color-timer-band);
 }
 
 /* "clear ticks" sits in the ingredients header, absolutely, so showing it
@@ -1024,15 +1049,29 @@ body::before {
     position: absolute;
     right: 0;
     bottom: 4px;
+    /* One width for "clear ticks" and "Undo", so the swap moves nothing */
+    width: 72px;
     padding: 0;
     border: none;
     background: none;
     font-family: var(--font-handwritten);
     font-size: 14px;
     line-height: 1;
+    text-align: right;
     color: var(--color-biro);
     text-decoration: underline;
     cursor: pointer;
+}
+
+/* The 44px hit area, as for the other small controls */
+.clear-ticks::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(calc(100% + 2px), 46px);
+    height: 46px;
+    transform: translate(-50%, -50%);
 }
 
 .clear-ticks[hidden] {
@@ -1270,11 +1309,6 @@ body::before {
     letter-spacing: 0.5px;
     pointer-events: none;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.25);
-}
-
-.edge-tab[data-tab="method"] {
-    background: var(--color-accent-brown);
-    color: var(--color-paper-cream);
 }
 
 .edge-tab[data-tab="notes"] {
@@ -2469,11 +2503,14 @@ body[data-feature-meals] .contents-tab-meals {
         right: 44px;
     }
 
-    /* The page's 16px padding is all the margin there is: the bracket beside
-       a timer's tag stays inside it */
+    /* The page's 16px padding is all the margin there is: the bar beside
+       a timer's tag stays inside it, and the tag steps 1px in to clear it */
     .prep-step.timer-active[aria-current="step"]::after {
         left: -16px;
-        width: 2px;
+    }
+
+    .prep-step.timer-active[aria-current="step"]::before {
+        right: calc(100% + 1px);
     }
 
     .phone-footer {
@@ -2515,6 +2552,11 @@ body[data-feature-meals] .contents-tab-meals {
         background: var(--color-leather);
         border-color: var(--color-leather);
         color: var(--color-paper-cream);
+    }
+
+    .note-send[aria-disabled="true"]:hover {
+        background: var(--color-leather);
+        border-color: var(--color-leather);
     }
 
     .note-page-number {

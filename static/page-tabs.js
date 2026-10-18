@@ -8,7 +8,7 @@
  */
 
 import { crossfadeElement, isAnimating } from './page-transitions.js';
-import { renderThread } from './margin-notes.js';
+import { openThreadTab } from './margin-notes.js';
 
 // 'notes' stays legal on every viewport: the phone's paper tabs still offer it
 // and #page-right[data-tab="notes"] still means the thread. Only the desktop
@@ -71,14 +71,15 @@ export function setActiveTab(tab, options = {}) {
     const apply = () => {
         pageRight.dataset.tab = tab;
 
-        document.querySelectorAll('[role="tab"][data-tab]').forEach(el => {
+        // The edge ribbons are plain page edges: nothing is drawn as selected
+        document.querySelectorAll('[role="tab"][data-tab]:not(.edge-tab)').forEach(el => {
             const selected = el.dataset.tab === tab;
             el.classList.toggle('active', selected);
             el.setAttribute('aria-selected', String(selected));
         });
 
         if (tab === 'notes') {
-            renderThread(document.querySelector('#page-right-content .notes-thread'));
+            openThreadTab(document.querySelector('#page-right-content .notes-thread'));
         }
 
         // Desktop/tablet: ingredients and method share one scrolling page, so

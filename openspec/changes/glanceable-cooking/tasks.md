@@ -80,26 +80,26 @@ Stop the server you started (`kill $(cat tests/usability/runs/3036/server.pid)`)
 
 ## 3. Notes and place marks (G8, G9, G10, G11)
 
-- [ ] 3.1 The Notes thread follows the conversation (G8).
+- [x] 3.1 The Notes thread follows the conversation (G8).
   - Files: `static/margin-notes.js` `renderThread` (≈328) and `setInFlight` (≈180). Before each re-render of an on-screen thread, record whether its container (`#page-left` in `notes` mode, `#page-right` on the phone Notes tab) is pinned (within 48px of the bottom). Afterwards scroll to the end if it was pinned, or if the update is the cook's own send.
   - `static/spread-modes.js`: entering `notes` scrolls to the newest entry. This overrides group 1.3's restored `notes` position; agree the order with group 1 when merging, as `notes` restore then newest.
   - On the phone, coexist with `safe-page-navigation` N3: show the newest entry only when an entry was added since the Notes tab was left, or on its first opening for this recipe.
   - Test first, in `margin-notes.spec.ts`: web-chat › The Notes thread follows the conversation, one case per scenario. Seed a thread longer than the page with `paceChat` sends; the "not pinned" case scrolls up 200px, then streams a reply.
   - Red-check: on `e35a58c` the latest reply is hidden after the 3rd and 4th sends (ask `notes-thread-no-autoscroll`). Removing the scroll call turns the cases red.
-- [ ] 3.2 Place marks you can see (G9).
+- [x] 3.2 Place marks you can see (G9).
   - Files: `static/styles.css`. `.prep-step[aria-current="step"]::after` (≈945-966, and the phone ≈2405) becomes a 4px `--leather` bar in the left gutter plus a tinted background. Change no padding, margin or border width. Keep it clear of the `timer-active` tag.
   - Test first, in `place-keeping.spec.ts`: cooking-guidance › The cook can keep their place in a recipe › Marking the current step (pseudo-element width 4px, colour, background differs, box unchanged) and The mark and the timer highlight coexist (bar not under the tag: compare the `::after` rect from `getComputedStyle` with the tag's rect).
   - Red-check: on `e35a58c` the mark is a 2px pencil bracket and the background is unchanged, so the case fails.
-- [ ] 3.3 Clear ticks only when there are ticks, with undo (G9).
+- [x] 3.3 Clear ticks only when there are ticks, with undo (G9).
   - Files: `static/place-keeping.js`, the `.clear-ticks` sync (≈73) and click (≈106). Show the control only while at least one tick exists. Clear only ticks, keeping `place.step`. Then show "Undo" for 6s, which restores the cleared set.
   - `static/styles.css` `.clear-ticks` (≈968-985, phone ≈2399): a `::before` 44px hit area, one fixed width for "clear ticks" and "Undo", and no change to the header height.
   - Test first, in `place-keeping.spec.ts`: Clearing the ticks, Clear ticks is hidden while nothing is ticked, and A clear can be undone, with `page.clock` for the 6s and `expectHitArea(page, '.clear-ticks')`. In `layout-stability.spec.ts`, add the Clear/Undo clause of "Ticking an ingredient and marking a step".
   - Red-check: on `e35a58c` the control is 60×14 (15/25 misses), shows with only a mark, and clears the mark (cook `clear-ticks-small-and-destructive`). Restoring the mark clear turns "Clearing the ticks" red.
-- [ ] 3.4 The send button shows when it cannot send (G10).
+- [x] 3.4 The send button shows when it cannot send (G10).
   - Files: `static/styles.css`, `.note-send` (≈370-399, ≈1379, phone ≈2441). Add `.note-send[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }`, overriding `:hover` and `:active`. `static/chat.js` `setTurnInFlight` (≈66) already sets the attribute. Confirm it does not auto-send the follow-up.
   - Test first, in `chat.spec.ts`: web-chat › A turn keeps the slip still and the input live › The send button looks unavailable during a turn, and A follow-up typed during a turn is kept, not sent. Hold the turn open by routing `/api/chat` and fulfilling late.
   - Red-check: on `e35a58c` the style during a turn is identical to idle (ask `inflight-send-silent`).
-- [ ] 3.5 The ribbons are plain ribbons (G11).
+- [x] 3.5 The ribbons are plain ribbons (G11).
   - Files: `static/chat.html` (≈59-61): empty the two `.edge-tab` buttons' text, and drop `aria-selected="true"`. Keep `role="tab"`, `aria-hidden`, `tabindex="-1"` and `data-tab`, which `contents-filters.spec.ts` counts.
   - `static/styles.css` `.edge-tab` (≈1203-1230): one colour for both, with no `active` look. `static/page-tabs.js`: stop toggling `active` and `aria-selected` on `.edge-tab`.
   - Test first, in `page-tabs.spec.ts` "desktop: the edge ribbons are inert": add family-recipe-ui › Right page edge ribbons › Ribbons render on a recipe (empty `innerText`, equal computed styles, no `active`, same rects as on `e35a58c`, measured first).
