@@ -104,10 +104,18 @@ test.describe("A step's duration starts its timer", () => {
     for (const k of ['x', 'y', 'width', 'height'] as const) {
       expect(Math.abs(confirmBox[k] - box[k]), `pill ${k}`).toBeLessThanOrEqual(1);
     }
-    // The prompt is readable in full: the label gets the pill to itself
+    // The prompt is readable in full: the label gets the pill to itself.
+    // Linux and Android Chrome set Kalam about 13% wider than macOS (CI: 136px
+    // of text where this Mac sets 120px), so on a Mac it must fit with 15% to
+    // spare, and elsewhere fit as set.
     await expect(page.locator('#timer-widget .timer-time')).toHaveCount(0);
-    const fit = await label(page).evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
-    expect(fit.scroll, `"Tap again to replace" is cut off: ${JSON.stringify(fit)}`).toBeLessThanOrEqual(fit.client);
+    const fit = await label(page).evaluate((el) => {
+      const text = document.createRange();
+      text.selectNodeContents(el);
+      return { text: text.getBoundingClientRect().width, client: el.clientWidth };
+    });
+    const spare = process.platform === 'darwin' ? 1.15 : 1;
+    expect(fit.client, `"Tap again to replace" is cut off: ${JSON.stringify(fit)}`).toBeGreaterThanOrEqual(fit.text * spare);
 
     // A second tap within the window replaces it
     await chip(page, 3).click();

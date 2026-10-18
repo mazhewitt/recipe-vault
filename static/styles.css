@@ -2586,6 +2586,14 @@ body[data-feature-meals] .contents-tab-meals {
         height: 14px;
     }
 
+    /* "Tap again to replace" (a running pill showing no time) has the pill to
+       itself here: the clock steps aside too, for 20px more. Android and Linux
+       Chrome set Kalam about 13% wider than macOS, and beside the clock the
+       prompt was cut off (136px of text in 126px). The pill keeps its box. */
+    .timer-widget[data-state="running"]:not(:has(.timer-time)) .timer-icon {
+        display: none;
+    }
+
     .user-info {
         position: static;
         width: 100%;

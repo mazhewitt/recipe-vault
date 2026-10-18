@@ -702,7 +702,7 @@ A cream pill clipped to the top edge of the recipe book cover, **centred over th
 | Height | 48px | 44px |
 | Padding | `4px 8px 4px 14px` | `2px 6px 2px 10px` |
 | Text | Two spans in `.timer-text`: `.timer-label` (Kalam 16px, `flex: 1 1 auto`, ellipsizes) and `.timer-time` (26px, tabular numerals, right-aligned, `flex: none`). No text sits between them; the " · " is the time's `::before`, drawn in its 18px left margin, so the pill reads "Step 2 · 7:42". The label is "Step N" for a step's timer, "Step N · {label}" for an assistant timer on step N, "{label}" with no step. At zero `"Done · {label}"`, no time | Label 14px, time 22px with a 14px margin |
-| Clock icon | 18px | 14px |
+| Clock icon | 18px | 14px; hidden while the pill reads "Tap again to replace" (a running pill with no time), so the prompt fits: Android and Linux Chrome set Kalam about 13% wider than macOS |
 | Close target | 28 × 28px visual, a 46 × 46px transparent `::before` hit area | Same |
 | Background / border | `--color-paper-cream`, `2px solid --color-ink-dark`, `--radius-pill`, `--shadow-soft` | Same |
 | z-index | 11 (above `.page-nav`, 10) | Same |
