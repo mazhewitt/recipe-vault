@@ -460,27 +460,6 @@ function setupShareButton() {
     });
 }
 
-function setupMobileEdgeNavigation() {
-    const prevEdge = document.getElementById('mobile-edge-prev');
-    const nextEdge = document.getElementById('mobile-edge-next');
-
-    if (prevEdge) {
-        prevEdge.addEventListener('click', () => {
-            if (!prevEdge.classList.contains('disabled')) {
-                Navigation.loadPrevRecipe();
-            }
-        });
-    }
-
-    if (nextEdge) {
-        nextEdge.addEventListener('click', () => {
-            if (!nextEdge.classList.contains('disabled')) {
-                Navigation.loadNextRecipe();
-            }
-        });
-    }
-}
-
 /**
  * Mirrors the active filter onto the tab strip. Scoped to the filter buttons:
  * the strip also holds the spread tabs, which wear the same .contents-tab face
@@ -690,7 +669,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupTextareaAutoResize();
     setupNoteInput();
     setupNavigationButtons();
-    setupMobileEdgeNavigation();
     setupRecipePhotoUpload();
     setupShareButton();
     setupContentsTabs();

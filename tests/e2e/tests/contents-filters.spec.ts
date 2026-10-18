@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone, openRecipe, useContentsMode } from './helpers';
+import { authenticate, createRecipe, isPhone, line, openRecipe, touchGesture, useContentsMode } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -235,7 +235,13 @@ test.describe('Contents filter tabs', () => {
 
     // Apple Crumble is a dessert and not on this tab, but it is still page 3 —
     // and it is first in the book because the beforeEach sweep emptied it
-    await page.locator(isPhone(page) ? '#mobile-edge-next' : '#page-next').click();
+    // The phone's chevrons are hidden on the contents, so turn with a swipe left there
+    if (isPhone(page)) {
+      const w = await page.evaluate(() => document.querySelector('.pages-container')!.getBoundingClientRect().width);
+      await touchGesture(page, 320, 420, line(10, -0.45 * w, 0));
+    } else {
+      await page.locator('#page-next').click();
+    }
     await expect(page.locator('.recipe-title')).toContainText(`Apple Crumble ${suffix}`);
   });
 

@@ -1,6 +1,6 @@
 /**
  * Navigation Module
- * Handles recipe navigation state (arrows, edge chevrons, phone footer links)
+ * Handles recipe navigation state (arrows, phone gutter chevrons, phone footer links)
  */
 
 import { animatePageTurn, isAnimating } from './page-transitions.js';
@@ -22,8 +22,8 @@ function findIndexById(list, id) {
 export async function updateNavigationState() {
     const prevBtn = document.getElementById('page-prev');
     const nextBtn = document.getElementById('page-next');
-    const prevEdge = document.getElementById('mobile-edge-prev');
-    const nextEdge = document.getElementById('mobile-edge-next');
+    const prevGutter = document.getElementById('gutter-prev');
+    const nextGutter = document.getElementById('gutter-next');
 
     const list = await state.fetchRecipeList();
 
@@ -55,9 +55,9 @@ export async function updateNavigationState() {
     if (prevBtn) prevBtn.disabled = prevDisabled;
     if (nextBtn) nextBtn.disabled = nextDisabled;
 
-    // Update mobile edge navigation
-    if (prevEdge) prevEdge.classList.toggle('disabled', prevDisabled);
-    if (nextEdge) nextEdge.classList.toggle('disabled', nextDisabled);
+    // Update the phone gutter chevrons in the tab row
+    if (prevGutter) prevGutter.disabled = prevDisabled;
+    if (nextGutter) nextGutter.disabled = nextDisabled;
 
     // Update the phone footer links, which recipe-display re-creates on every render
     document.querySelectorAll('.footer-prev').forEach(btn => { btn.disabled = prevDisabled; });
@@ -154,7 +154,7 @@ let footerBound = false;
 /**
  * Binds one delegated click listener for the phone footer links
  * (.footer-prev / .footer-next), which recipe-display re-creates on every
- * render. Clicks on a disabled link are ignored; loadPrevRecipe /
+ * render, and the phone gutter chevrons (#gutter-prev / #gutter-next). Clicks on a disabled link are ignored; loadPrevRecipe /
  * loadNextRecipe already bail while a page turn or crossfade is running.
  */
 export function initFooterNav() {
@@ -162,12 +162,12 @@ export function initFooterNav() {
     footerBound = true;
 
     document.addEventListener('click', (e) => {
-        const prev = e.target.closest('.footer-prev');
+        const prev = e.target.closest('.footer-prev, #gutter-prev');
         if (prev) {
             if (!prev.disabled) loadPrevRecipe();
             return;
         }
-        const next = e.target.closest('.footer-next');
+        const next = e.target.closest('.footer-next, #gutter-next');
         if (next) {
             if (!next.disabled) loadNextRecipe();
         }

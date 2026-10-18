@@ -5,8 +5,8 @@ import { authenticate, seedRecipes, openRecipe, useContentsMode } from './helper
 function getNavSelectors(page: any) {
   const isMobile = page.viewportSize()!.width <= 600;
   return {
-    prev: isMobile ? '#mobile-edge-prev' : '#page-prev',
-    next: isMobile ? '#mobile-edge-next' : '#page-next'
+    prev: isMobile ? '#gutter-prev' : '#page-prev',
+    next: isMobile ? '#gutter-next' : '#page-next'
   };
 }
 
@@ -79,10 +79,11 @@ test.describe('Recipe Navigation', () => {
     const nav = getNavSelectors(page);
     const isMobile = page.viewportSize()!.width <= 600;
 
-    // Previous button should be disabled on index (page zero)
+    // Previous button should be disabled on index (page zero). The phone's
+    // chevrons live in the recipe page's tab row, so the contents hides them.
     if (isMobile) {
-      await expect(page.locator(nav.prev)).toHaveClass(/disabled/);
-      await expect(page.locator(nav.next)).not.toHaveClass(/disabled/);
+      await expect(page.locator(nav.prev)).toBeHidden();
+      await expect(page.locator(nav.next)).toBeHidden();
     } else {
       await expect(page.locator(nav.prev)).toBeDisabled();
       await expect(page.locator(nav.next)).not.toBeDisabled();
@@ -107,13 +108,8 @@ test.describe('Recipe Navigation', () => {
     await expect(page.locator('.recipe-title')).toBeVisible();
 
     // Previous button should be ENABLED on first recipe (goes back to index)
-    if (isMobile) {
-      await expect(page.locator(nav.prev)).not.toHaveClass(/disabled/);
-      await expect(page.locator(nav.next)).not.toHaveClass(/disabled/);
-    } else {
-      await expect(page.locator(nav.prev)).not.toBeDisabled();
-      await expect(page.locator(nav.next)).not.toBeDisabled();
-    }
+    await expect(page.locator(nav.prev)).toBeEnabled();
+    await expect(page.locator(nav.next)).toBeEnabled();
 
     // Navigate to last recipe (we know we have 3 recipes)
     const recipeCount = recipes.length;
@@ -138,12 +134,8 @@ test.describe('Recipe Navigation', () => {
     }
 
     // Next button should be disabled on last recipe
-    if (isMobile) {
-      await expect(page.locator(nav.next)).toHaveClass(/disabled/);
-      await expect(page.locator(nav.prev)).not.toHaveClass(/disabled/);
-    } else {
-      await expect(page.locator(nav.next)).toBeDisabled();
-      await expect(page.locator(nav.prev)).not.toBeDisabled();
-    }
+    await expect(page.locator(nav.next)).toBeVisible();
+    await expect(page.locator(nav.next)).toBeDisabled();
+    await expect(page.locator(nav.prev)).toBeEnabled();
   });
 });

@@ -130,9 +130,9 @@ test.describe('Contents page (Journal 2.0)', () => {
     await page.locator(`.index-recipe-item[data-recipe-id="${target}"]`).click();
     await expect(page.locator('.recipe-title')).toContainText('Apple Pie');
 
-    // Back to the contents page: the header is hidden on phones, so use the edge nav there
+    // Back to the contents page: the header is hidden on phones, so use the gutter chevron there
     if (page.viewportSize()!.width <= 600) {
-      await page.click('#mobile-edge-prev');
+      await page.click('#gutter-prev');
     } else {
       await page.click('#recipe-book-header');
     }

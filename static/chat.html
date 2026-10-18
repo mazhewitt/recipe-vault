@@ -41,18 +41,6 @@
                 <button id="page-prev" class="page-nav prev" aria-label="Previous recipe" disabled>&lt;</button>
                 <button id="page-next" class="page-nav next" aria-label="Next recipe" disabled>&gt;</button>
 
-                <!-- Mobile Edge Navigation -->
-                <div class="mobile-edge-nav mobile-edge-prev" id="mobile-edge-prev" aria-label="Previous recipe">
-                    <svg viewBox="0 0 24 24" class="edge-chevron">
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                </div>
-                <div class="mobile-edge-nav mobile-edge-next" id="mobile-edge-next" aria-label="Next recipe">
-                    <svg viewBox="0 0 24 24" class="edge-chevron">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </div>
-
                 <!-- Desktop / tablet edge ribbons (inert furniture), on the right outer edge of the book.
                      Sibling of .pages-container so they neither scroll with the page
                      nor take part in the #page-right grid. -->
@@ -107,6 +95,17 @@
                             <button type="button" class="page-tab active" role="tab" data-tab="ingredients" aria-selected="true" aria-controls="page-right-content">Ingredients</button>
                             <button type="button" class="page-tab" role="tab" data-tab="method" aria-selected="false" aria-controls="page-right-content">Method</button>
                             <button type="button" class="page-tab" role="tab" data-tab="notes" aria-selected="false" aria-controls="page-right-content">Notes</button>
+                            <!-- Phone page turns, at the end of the tab row (not tabs: no role, no data-tab) -->
+                            <button type="button" id="gutter-prev" class="gutter-chevron prev" aria-label="Previous recipe">
+                                <svg viewBox="0 0 24 24" class="edge-chevron" aria-hidden="true">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            <button type="button" id="gutter-next" class="gutter-chevron next" aria-label="Next recipe">
+                                <svg viewBox="0 0 24 24" class="edge-chevron" aria-hidden="true">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
                         </div>
                         <div class="page-content" id="page-right-content"></div>
                     </div>

@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone } from './helpers';
+import { authenticate, createRecipe, isPhone, line, touchGesture } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -43,8 +43,8 @@ async function clearRecipes(page: Page) {
 function getNavSelectors(page: Page) {
   const isMobile = page.viewportSize()!.width <= 600;
   return {
-    prev: isMobile ? '#mobile-edge-prev' : '#page-prev',
-    next: isMobile ? '#mobile-edge-next' : '#page-next'
+    prev: isMobile ? '#gutter-prev' : '#page-prev',
+    next: isMobile ? '#gutter-next' : '#page-next'
   };
 }
 
@@ -153,9 +153,16 @@ test.describe('Recipe Index', () => {
 
     await page.reload();
 
-    // Click next arrow
-    const nav = getNavSelectors(page);
-    await page.locator(nav.next).click();
+    // Turn forward: the arrow, or on the phone (whose chevrons the contents
+    // hide) a swipe left
+    if (isPhone(page)) {
+      await expect(page.locator('.index-recipe-item').first()).toBeVisible();
+      const w = await page.evaluate(() => document.querySelector('.pages-container')!.getBoundingClientRect().width);
+      await touchGesture(page, 320, 420, line(10, -0.45 * w, 0));
+    } else {
+      const nav = getNavSelectors(page);
+      await page.locator(nav.next).click();
+    }
 
     // Verify first recipe loaded
     await expect(page.locator('.recipe-title')).toContainText(`AA Apple ${uniqueSuffix}`);

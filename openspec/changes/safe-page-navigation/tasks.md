@@ -52,19 +52,19 @@ Satisfies: `swipe-navigation` "Swipe gesture triggers recipe navigation on mobil
 Files: `static/chat.html`, `static/styles.css`, `static/app.js`, `static/navigation.js`. In `styles.css` that means the `.mobile-edge-nav` block, the phone `.recipe-title-row { padding-right: 40px }` rule, the `.mobile-edge-nav` z-index comments, and the phone `.pages-container` margin. In `app.js`, `setupMobileEdgeNavigation` and its call. In `navigation.js`, `updateNavigationState` and the click binding.
 Satisfies: `swipe-navigation` "Taps on the page never turn it" (all scenarios); `family-recipe-ui` "Phone gutter chevrons turn the page" (all scenarios).
 
-- [ ] 3.1 Delete both `.mobile-edge-nav` elements, their CSS block and `setupMobileEdgeNavigation`, and remove the `prevEdge`/`nextEdge` handling from `updateNavigationState`.
-- [ ] 3.2 Add `<button type="button" id="gutter-prev" class="gutter-chevron prev" aria-label="Previous recipe">` and `#gutter-next` ("Next recipe") at the right-hand end of the phone `.page-tabs` row, after the Notes tab (lead decision Q3; see design.md "Answers from the lead"). They are hidden above 600px and on the contents and meal plans. Reuse the `.edge-chevron` SVGs.
-- [ ] 3.3 CSS: hide the chevrons above 600px and whenever `body[data-view-mode]` is not `recipe`. At 600px or narrower in recipe view, position them absolutely in the leather frame at the page's vertical centre, each 44x44.
+- [x] 3.1 Delete both `.mobile-edge-nav` elements, their CSS block and `setupMobileEdgeNavigation`, and remove the `prevEdge`/`nextEdge` handling from `updateNavigationState`.
+- [x] 3.2 Add `<button type="button" id="gutter-prev" class="gutter-chevron prev" aria-label="Previous recipe">` and `#gutter-next` ("Next recipe") at the right-hand end of the phone `.page-tabs` row, after the Notes tab (lead decision Q3; see design.md "Answers from the lead"). They are hidden above 600px and on the contents and meal plans. Reuse the `.edge-chevron` SVGs.
+- [x] 3.3 CSS: hide the chevrons above 600px and whenever `body[data-view-mode]` is not `recipe`. At 600px or narrower in recipe view, position them absolutely in the leather frame at the page's vertical centre, each 44x44.
   - The frame is 4px wide today (`.pages-container { margin: 40px 4px 4px }`), and the page has 16px of padding. A 44px box that ends before `#page-right-content` therefore needs a side frame of at least 28px.
   - Keep that frame width the same on the contents page and the recipe page, so opening a recipe does not resize the paper (steady-cooking-spread's rule).
   - See design Open question 3: if the lead decides differently, follow that.
-- [ ] 3.4 `navigation.js`: bind the chevrons next to `initFooterNav` (one guarded binding) to `loadPrevRecipe`/`loadNextRecipe`, ignoring clicks on a disabled chevron. In `updateNavigationState`, set their `disabled` property exactly as for `.footer-prev`/`.footer-next`: previous is enabled on the first recipe and returns to the contents; next is disabled on the last recipe.
-- [ ] 3.5 Remove the phone `.recipe-title-row { padding-right: 40px }` rule if steady-cooking-spread has not already replaced the title row. Its only reason was the edge overlay.
-- [ ] 3.6 Update the e2e specs that drive the old zones (grep `mobile-edge` under `tests/e2e/tests` again first):
+- [x] 3.4 `navigation.js`: bind the chevrons next to `initFooterNav` (one guarded binding) to `loadPrevRecipe`/`loadNextRecipe`, ignoring clicks on a disabled chevron. In `updateNavigationState`, set their `disabled` property exactly as for `.footer-prev`/`.footer-next`: previous is enabled on the first recipe and returns to the contents; next is disabled on the last recipe.
+- [x] 3.5 Remove the phone `.recipe-title-row { padding-right: 40px }` rule if steady-cooking-spread has not already replaced the title row. Its only reason was the edge overlay.
+- [x] 3.6 Update the e2e specs that drive the old zones (grep `mobile-edge` under `tests/e2e/tests` again first):
   - `navigation.spec.ts` and `index.spec.ts` `getNavSelectors`: use `#gutter-prev`/`#gutter-next` on the phone, and assert with `toBeDisabled()`/`toBeEnabled()` instead of `toHaveClass(/disabled/)`. On the contents page the phone chevrons are hidden, so the "disabled on the index" assertions become `toBeHidden()` there.
   - `contents-page.spec.ts:135`: use `#gutter-prev` on the phone.
   - `contents-filters.spec.ts:238` taps `#mobile-edge-next` on the contents page. On the phone, use `touchGesture` from group 2 (swipe left) instead, since the chevrons are hidden on the contents page.
-- [ ] 3.7 New `tests/e2e/tests/phone-navigation.spec.ts`:
+- [x] 3.7 New `tests/e2e/tests/phone-navigation.spec.ts`:
   - No `.mobile-edge-nav`, `#mobile-edge-prev` or `#mobile-edge-next` exists, on every project.
   - Phone:
     - The chevrons are visible `<button>`s, at least 44x44, and centred within 22px of `#page-right`'s vertical centre.
@@ -75,8 +75,9 @@ Satisfies: `swipe-navigation` "Taps on the page never turn it" (all scenarios); 
     - Tapping the 3rd `.ingredient-qty` 6px inside its left edge keeps the recipe.
     - Tapping the 3rd row's `.index-page-number` opens that row's `data-recipe-id`.
   - `chromium` and `ipad`: the chevrons are hidden.
-- [ ] 3.8 Red-check: put the old 60px overlay back and confirm the overlap, the quantity-tap and the page-number tests go red.
-- [ ] 3.9 Gate: `make lint`, `npx playwright test tests/phone-navigation.spec.ts tests/navigation.spec.ts tests/index.spec.ts tests/contents-page.spec.ts tests/contents-filters.spec.ts`, `make test-e2e`.
+- [x] 3.8 Red-check: put the old 60px overlay back and confirm the overlap, the quantity-tap and the page-number tests go red.
+- [x] 3.9 Gate: `make lint`, `npx playwright test tests/phone-navigation.spec.ts tests/navigation.spec.ts tests/index.spec.ts tests/contents-page.spec.ts tests/contents-filters.spec.ts`, `make test-e2e`.
+  - Done: lint clean; targeted specs 87 passed, 21 skipped, 0 failed. Lead Q3 overrides 3.3: the chevrons sit at the right-hand end of `.page-tabs` (46px boxes), not in the frame; the frame stays 4px. The overlap test clips content boxes to the part of `#page-right` visible below the sticky tab row, since scrolled content passes under it. Red-check: with the old overlay back, the zones-gone, overlap, quantity-tap and page-number tests went red (4 failed); restored. The full `make test-e2e` ran once after group 5.
 
 ## 4. Each phone tab keeps its own scroll position (design N3)
 

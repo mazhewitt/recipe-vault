@@ -158,7 +158,7 @@ body::before {
     top: -10px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 11; /* above .page-nav and .mobile-edge-nav (10) so the close target is tappable */
+    z-index: 11; /* above .page-nav (10) so the close target is tappable */
     height: 36px;
     background: var(--color-paper-cream);
     border: 2px solid var(--color-ink-dark);
@@ -1272,6 +1272,39 @@ body::before {
     outline-offset: -2px;
 }
 
+/* Phone page turns at the end of the tab row. They live inside .page-tabs, so
+   they show only where it does: on the phone's recipe page. Not tabs - no
+   role="tab", no data-tab - so page-tabs.js never sees them. */
+.gutter-chevron {
+    /* 46px: a 44px hit area with a pixel to spare on each side */
+    flex: 0 0 46px;
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.gutter-chevron .edge-chevron {
+    width: 28px;
+    height: 28px;
+    pointer-events: none;
+}
+
+.gutter-chevron:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.gutter-chevron:focus-visible {
+    outline: 2px solid var(--color-ink-dark);
+    outline-offset: -2px;
+}
+
 /* ==================== CONTENTS FILTER TABS ==================== */
 /* All / Mains / Sweets (+ the gated Meals) on the left page's outer edge.
    Static markup in chat.html, a sibling of #page-left-content so a contents
@@ -1409,7 +1442,7 @@ body[data-feature-meals] .contents-tab-meals {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    /* keeps the links' hit areas clear of the 60px .mobile-edge-nav strips */
+    /* keeps the links' hit areas off the page's edges */
     padding-left: 16px;
     padding-right: 16px;
     margin-top: var(--space-lg);
@@ -2268,7 +2301,7 @@ body[data-feature-meals] .contents-tab-meals {
         transform: none;
         width: min(200px, calc(100% - 130px));
         box-sizing: border-box;
-        z-index: 11; /* above .mobile-edge-nav */
+        z-index: 11;
         height: 30px;
         padding: 2px 6px 2px 10px;
         gap: 6px;
@@ -2350,7 +2383,7 @@ body[data-feature-meals] .contents-tab-meals {
     }
 
     /* The reply sticky overlays the foot of the page, directly above the input
-       bar (margin-notes.js measures the bar's top), above the edge strips. */
+       bar (margin-notes.js measures the bar's top). */
     .page-margin {
         left: 8px;
         right: 8px;
@@ -2394,8 +2427,7 @@ body[data-feature-meals] .contents-tab-meals {
         font-size: 17px;
     }
 
-    /* Clear of the .mobile-edge-nav strip, which takes taps 60px in from the
-       book's right edge */
+    /* Off the page's right edge */
     .clear-ticks {
         right: 44px;
     }
@@ -2573,53 +2605,11 @@ body[data-feature-meals] .contents-tab-meals {
         display: none;
     }
 
-    /* Keep the polaroid, and the share and add-photo buttons at the end of
-       the meta line, clear of the mobile edge nav overlay (60px from the
-       book's edge), so a tap on them is not taken for "next recipe" */
-    .recipe-title-row {
-        padding-right: 40px;
-    }
-
+    /* Keep the share and add-photo buttons at the end of the meta line off
+       the page's right edge */
     .recipe-meta-line {
         padding-right: 44px;
     }
-}
-
-/* Mobile Edge Navigation */
-.mobile-edge-nav {
-    display: none; /* Hidden by default, shown only on mobile */
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 60px;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 3px;
-    z-index: 10;
-    cursor: pointer;
-    opacity: 0.2;
-    transition: opacity 0.2s ease;
-}
-
-.mobile-edge-nav:active {
-    opacity: 0.5;
-}
-
-.mobile-edge-nav.disabled {
-    opacity: 0.1;
-    pointer-events: none;
-}
-
-.mobile-edge-prev {
-    left: 0;
-    justify-content: flex-start;
-    padding-left: 8px;
-}
-
-.mobile-edge-next {
-    right: 0;
-    justify-content: flex-end;
-    padding-right: 8px;
 }
 
 .edge-chevron {
@@ -2630,22 +2620,6 @@ body[data-feature-meals] .contents-tab-meals {
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
-}
-
-@media (max-width: 600px) {
-    /* The overlay spans the whole book and sits above .pages-container's
-       stacking context, so it must start below the leather strip - and below
-       the paper tabs in recipe view - or it swallows their taps. Its chevrons
-       then land on the paper, where they read. */
-    .mobile-edge-nav {
-        display: flex;
-        padding-top: 48px;
-    }
-
-    body[data-view-mode="recipe"] .mobile-edge-nav {
-        top: 108px; /* 40 strip + 4 margin + 16 padding + 48 tabs */
-        padding-top: 8px;
-    }
 }
 
 /* ==================== MOBILE VIEW TRANSITIONS ==================== */
