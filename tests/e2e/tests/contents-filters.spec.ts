@@ -373,7 +373,7 @@ test.describe('Recipe tag chips', () => {
     await authenticate(page);
   });
 
-  test('the meta line shows at most three tags after the difficulty dots', async ({ page }) => {
+  test('the "⋯" popover shows at most three tags after the difficulty dots', async ({ page }) => {
     const suffix = Date.now().toString();
     const recipeId = await createRecipe(page, {
       title: `Tagged Recipe ${suffix}`,
@@ -390,26 +390,22 @@ test.describe('Recipe tag chips', () => {
     }, recipeId);
     await expect(page.locator('.recipe-title')).toContainText('Tagged Recipe');
 
-    const chips = page.locator('.recipe-meta-line .recipe-tag');
+    // No chip on the meta line: they are in the header's "⋯" popover
+    await expect(page.locator('.recipe-meta-line .recipe-tag')).toHaveCount(0);
+    await page.locator('#page-right-content button.recipe-more').click();
+    const panel = page.locator('#page-right-content .recipe-more-panel');
+    await expect(panel).toBeVisible();
+    const chips = panel.locator('.recipe-tags .recipe-tag');
     await expect(chips).toHaveCount(3);
     await expect(chips.nth(0)).toHaveText('main');
+    await expect(chips.nth(0)).toBeVisible();
 
-    // The chips follow the difficulty dots on the same line
-    const after = await page.locator('.recipe-meta-line').evaluate(el => {
-      const dots = el.querySelector('.meta-difficulty');
-      const tags = el.querySelector('.recipe-tags');
-      return dots && tags ? dots.compareDocumentPosition(tags) : 0;
+    // The chips follow the difficulty dots, and share and add-photo follow them
+    const order = await panel.evaluate(el => {
+      const at = (sel: string) => el.querySelector(sel)!;
+      const following = (a: string, b: string) => (at(a).compareDocumentPosition(at(b)) & 4) === 4; // Node.DOCUMENT_POSITION_FOLLOWING
+      return { tagsAfterDots: following('.meta-difficulty', '.recipe-tags'), shareAfterTags: following('.recipe-tags', '.share-btn'), photoLast: following('.share-btn', '.add-photo-btn') };
     });
-    expect(after & 4).toBe(4); // Node.DOCUMENT_POSITION_FOLLOWING
-
-    // ...and share and add-photo end the line, after the chips
-    const tail = await page.locator('.recipe-meta-line').evaluate(el => {
-      const kids = Array.from(el.children);
-      return {
-        last: kids.slice(-2).map(c => c.className),
-        tagsFirst: kids.indexOf(el.querySelector('.recipe-tags')!) < kids.indexOf(el.querySelector('.share-btn')!),
-      };
-    });
-    expect(tail).toEqual({ last: ['share-btn', 'add-photo-btn'], tagsFirst: true });
+    expect(order).toEqual({ tagsAfterDots: true, shareAfterTags: true, photoLast: true });
   });
 });

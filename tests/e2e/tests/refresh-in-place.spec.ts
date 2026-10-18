@@ -65,8 +65,8 @@ async function stopWatch(page: Page): Promise<Watch> {
 }
 
 /** Scrolls both pages to a mid-method place (the Method tab on the phone) and returns the scroll. */
-async function scrollToMidMethod(page: Page): Promise<{ left: number; right: number }> {
-  if (isPhone(page)) await openTab(page, 'method');
+async function scrollToMidMethod(page: Page, opts: { tab?: boolean } = {}): Promise<{ left: number; right: number }> {
+  if (isPhone(page) && opts.tab !== false) await openTab(page, 'method');
   await page.locator('#page-right-content .prep-step[data-step="5"]').evaluate(el => {
     const right = document.getElementById('page-right')!;
     right.scrollTop += el.getBoundingClientRect().top - right.getBoundingClientRect().top - 40;
@@ -155,11 +155,13 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
     await expect(page.locator('#page-right-content .recipe-photo')).toHaveCount(0);
     await scrollToMidMethod(page);
 
-    // The add-photo button opens the hidden file input, as the cook would.
-    // Reaching it scrolls the page up to the meta line, so the place to keep
-    // is the one the page has when the upload starts, not step 5.
+    // The add-photo button, in the "⋯" popover, opens the hidden file input,
+    // as the cook would. Reaching "⋯" scrolls the page up to the header, so
+    // the place to keep is the one the page has when the upload starts, not
+    // step 5.
     const chooser = page.waitForEvent('filechooser');
-    await page.locator('#page-right-content .add-photo-btn').click();
+    await page.locator('#page-right-content button.recipe-more').click();
+    await page.locator('#page-right-content .recipe-more-panel .add-photo-btn').click();
     const fileChooser = await chooser;
     await page.locator('#page-right').evaluate(el => { el.scrollTop += 120; });
     const scroll = await readScroll(page);
@@ -172,56 +174,67 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
     await expectInPlace(page, await stopWatch(page), scroll);
   });
 
-  test('a late difficulty lands in its reserved slot without a refresh skeleton', async ({ page }) => {
-    const recipe = await createCookingRecipe(page);
-    // The page's first read says the difficulty is not assessed yet, and every
-    // later read (the 3s poll) says it is. Not the backend's backfill, which
-    // races: see .scratch/recipe-create-spawns-two-racing-writers/.
-    let reads = 0;
-    await page.route(`**/api/recipes/${recipe.id}`, async (route) => {
-      if (route.request().method() !== 'GET') return route.continue();
-      const response = await route.fetch();
-      const body = await response.json();
-      body.difficulty = reads++ === 0 ? null : 3;
-      await route.fulfill({ response, json: body });
+  for (const popover of ['closed', 'open'] as const) {
+    test(`a late difficulty lands in its reserved slot without a refresh skeleton (popover ${popover})`, async ({ page }) => {
+      const recipe = await createCookingRecipe(page);
+      // The page's first read says the difficulty is not assessed yet, and every
+      // later read (the 3s poll) says it is. Not the backend's backfill, which
+      // races: see .scratch/recipe-create-spawns-two-racing-writers/.
+      let reads = 0;
+      await page.route(`**/api/recipes/${recipe.id}`, async (route) => {
+        if (route.request().method() !== 'GET') return route.continue();
+        const response = await route.fetch();
+        const body = await response.json();
+        body.difficulty = reads++ === 0 ? null : 3;
+        await route.fulfill({ response, json: body });
+      });
+      await openRecipe(page, recipe.id);
+
+      // The slot is in the "⋯" popover, there and empty
+      await expect(page.locator('#page-right-content .recipe-meta-line .meta-difficulty')).toHaveCount(0);
+      const slot = page.locator('#page-right-content .recipe-more-panel .meta-difficulty');
+      await expect(slot).toHaveCount(1);
+      await expect(slot.locator('.difficulty-dot')).toHaveCount(0);
+      // On the phone the Method tab first: a tap on a tab with the popover open
+      // would only close it
+      if (isPhone(page)) await openTab(page, 'method');
+      if (popover === 'open') {
+        await page.locator('#page-right-content button.recipe-more').click();
+        await expect(slot).toBeVisible();
+      }
+      const scroll = await scrollToMidMethod(page, { tab: false });
+
+      const boxes = () => page.evaluate(() => {
+        const right = document.getElementById('page-right-content')!;
+        const box = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          return [r.x, r.y, r.width, r.height];
+        };
+        return {
+          title: box(right.querySelector('.recipe-title-row')!),
+          line: box(right.querySelector('.recipe-meta-line')!),
+          slot: box(right.querySelector('.recipe-more-panel .meta-difficulty')!),
+          steps: Array.from(right.querySelectorAll('.prep-step')).map(box),
+        };
+      });
+      const before = await boxes();
+
+      await startWatch(page);
+      await expect(slot.locator('.difficulty-dot.filled')).toHaveCount(3, { timeout: 10000 });
+      await page.waitForTimeout(300);
+      await expectInPlace(page, await stopWatch(page), scroll);
+
+      const after = await boxes();
+      const delta = (a: number[], b: number[]) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+      expect(delta(after.title, before.title), 'title line box').toBeLessThanOrEqual(1);
+      expect(delta(after.line, before.line), 'meta line box').toBeLessThanOrEqual(1);
+      expect(delta(after.slot, before.slot), 'difficulty slot box').toBeLessThanOrEqual(1);
+      after.steps.forEach((b, i) => expect(delta(b, before.steps[i]), `step ${i + 1}`).toBeLessThanOrEqual(1));
+      // A refresh keeps the popover as the cook left it
+      if (popover === 'open') await expect(slot).toBeVisible();
+      else await expect(slot).toBeHidden();
     });
-    await openRecipe(page, recipe.id);
-
-    // The slot is there, empty, and as wide as a full one
-    const slot = page.locator('#page-right-content .recipe-meta-line .meta-difficulty');
-    await expect(slot).toHaveCount(1);
-    await expect(slot.locator('.difficulty-dot')).toHaveCount(0);
-    const scroll = await scrollToMidMethod(page);
-
-    const boxes = () => page.evaluate(() => {
-      const right = document.getElementById('page-right-content')!;
-      const box = (el: Element) => {
-        const r = el.getBoundingClientRect();
-        return [r.x, r.y, r.width, r.height];
-      };
-      const line = right.querySelector('.recipe-meta-line')!;
-      return {
-        line: box(line),
-        slot: box(line.querySelector('.meta-difficulty')!),
-        others: Array.from(line.children).filter(el => !el.matches('.meta-difficulty')).map(box),
-        steps: Array.from(right.querySelectorAll('.prep-step')).map(box),
-      };
-    });
-    const before = await boxes();
-
-    await startWatch(page);
-    await expect(slot.locator('.difficulty-dot.filled')).toHaveCount(3, { timeout: 10000 });
-    await page.waitForTimeout(300);
-    await expectInPlace(page, await stopWatch(page), scroll);
-
-    const after = await boxes();
-    const delta = (a: number[], b: number[]) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
-    expect(delta(after.line, before.line), 'meta line box').toBeLessThanOrEqual(1);
-    expect(delta(after.slot, before.slot), 'difficulty slot box').toBeLessThanOrEqual(1);
-    expect(after.others).toHaveLength(before.others.length);
-    after.others.forEach((b, i) => expect(delta(b, before.others[i]), `meta item ${i}`).toBeLessThanOrEqual(1));
-    after.steps.forEach((b, i) => expect(delta(b, before.steps[i]), `step ${i + 1}`).toBeLessThanOrEqual(1));
-  });
+  }
 
   test('opening a different, uncached recipe still shows the skeleton', async ({ page }) => {
     const first = await createCookingRecipe(page);

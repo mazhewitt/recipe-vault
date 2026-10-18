@@ -522,6 +522,81 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// --- The header's "⋯" popover and the meta line's place ---
+
+function moreParts() {
+    return {
+        button: document.querySelector('#page-right-content .recipe-more'),
+        panel: document.querySelector('#page-right-content .recipe-more-panel'),
+    };
+}
+
+function isMoreOpen() {
+    const { panel } = moreParts();
+    return !!panel && !panel.hidden;
+}
+
+function setMoreOpen(open) {
+    const { button, panel } = moreParts();
+    if (!button || !panel) return;
+    // Anchored just under the button, whatever height the title line has
+    if (open) panel.style.top = `${button.offsetTop + button.offsetHeight + 4}px`;
+    panel.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+}
+
+/** Closes the "⋯" popover, if it is open (a page turn, a mode change, share or add-photo). */
+export function closeMorePanel() {
+    if (isMoreOpen()) setMoreOpen(false);
+}
+
+/**
+ * Puts the meta line where this width reads it: under the title line above
+ * 600px, the first row of the Ingredients tab on the phone. One node, moved.
+ */
+export function placeMetaLine(root = document.getElementById('page-right-content')) {
+    const meta = root?.querySelector('.recipe-meta-line') || document.querySelector('.recipe-meta-line');
+    if (!meta) return;
+    if (isMobile()) {
+        const panel = root?.querySelector('.tab-panel[data-tab="ingredients"]')
+            || document.querySelector('.tab-panel[data-tab="ingredients"]');
+        if (panel && panel.firstElementChild !== meta) panel.prepend(meta);
+    } else {
+        const header = document.querySelector('#page-right-content .recipe-header');
+        if (header && header.nextElementSibling !== meta) header.after(meta);
+    }
+}
+
+let moreBound = false;
+
+/**
+ * One capture-phase click listener for the popover: "⋯" toggles it, and while
+ * it is open a tap anywhere outside it only closes it - it never reaches the
+ * page underneath, so it ticks no ingredient and marks no step. Escape closes
+ * it too. Safe to call more than once.
+ */
+export function initRecipeMore() {
+    if (moreBound) return;
+    moreBound = true;
+    document.addEventListener('click', (e) => {
+        const target = e.target;
+        // The cook's taps only: a click the code dispatches (the add-photo
+        // file input's) is not a tap outside
+        if (!e.isTrusted || !target || typeof target.closest !== 'function') return;
+        if (target.closest('#page-right-content .recipe-more')) {
+            setMoreOpen(!isMoreOpen());
+            return;
+        }
+        if (!isMoreOpen() || target.closest('.recipe-more-panel')) return;
+        closeMorePanel();
+        e.stopPropagation();
+        e.preventDefault();
+    }, true);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeMorePanel();
+    });
+}
+
 /** Longest plain-text ingredient that may share a line with other ingredients. */
 const INGREDIENT_PACK_CHARS = 24;
 /** Most ingredients packed onto a single .ingredient-line. */
@@ -644,31 +719,32 @@ export function renderRecipe(recipe, options = {}) {
     const cookMinutes = getMinutesField(recipe, 'cook_time');
     const servings = recipe.servings ? Number(recipe.servings) : null;
 
-    // Single handwritten meta line: total · serves · difficulty (prep · cook)
+    // The meta line under the title: the servings stepper · the total time.
+    // Everything else about the recipe is in the "⋯" popover.
     const metaParts = [];
-    if (totalTimeMinutes) {
-        metaParts.push(`<span class="meta-total">${formatDuration(totalTimeMinutes)}</span>`);
-    }
     if (servings) {
         // The stepper (servings.js): the count is set to the session's value
         // once the markup is on the page, and the buttons' disabled state with it
         // SANITIZED: servings coerced to a number above
         metaParts.push(`<span class="meta-serves">serves <button type="button" class="servings-step" data-step="-1" aria-label="Fewer servings">−</button><output class="servings-count" aria-live="polite">${servings}</output><button type="button" class="servings-step" data-step="+1" aria-label="More servings">+</button></span>`);
     }
+    const totalHtml = totalTimeMinutes
+        ? `<span class="meta-total">${formatDuration(totalTimeMinutes)}</span>`
+        : '';
+    // On the phone the total time is in the popover instead (styles.css)
+    if (totalHtml) metaParts.push(totalHtml);
+
     // The slot is always there, empty until the difficulty is known, and as
     // wide either way (styles.css), so a late difficulty reflows nothing
-    if (difficulty) {
-        metaParts.push(`<span class="meta-difficulty" title="Difficulty ${difficulty}/5"><span class="meta-label">difficulty</span> <span class="difficulty-dots">${difficultyDots}</span></span>`);
-    } else {
-        metaParts.push('<span class="meta-difficulty"></span>');
-    }
-    // Display-only tag chips, at most three, after the difficulty dots
+    const difficultyHtml = difficulty
+        ? `<span class="meta-difficulty" title="Difficulty ${difficulty}/5"><span class="meta-label">difficulty</span> <span class="difficulty-dots">${difficultyDots}</span></span>`
+        : '<span class="meta-difficulty"></span>';
+    // Display-only tag chips, at most three
     const tagChips = (Array.isArray(recipe.tags) ? recipe.tags : []).slice(0, 3);
-    if (tagChips.length) {
-        // SANITIZED: tag names are user input
-        const chips = tagChips.map(tag => `<span class="recipe-tag">${escapeHtml(String(tag))}</span>`).join('');
-        metaParts.push(`<span class="recipe-tags">${chips}</span>`);
-    }
+    // SANITIZED: tag names are user input
+    const tagsHtml = tagChips.length
+        ? `<span class="recipe-tags">${tagChips.map(tag => `<span class="recipe-tag">${escapeHtml(String(tag))}</span>`).join('')}</span>`
+        : '';
     const breakdown = [];
     if (prepMinutes) breakdown.push(`prep ${prepMinutes}`);
     if (cookMinutes) breakdown.push(`cook ${cookMinutes}`);
@@ -692,6 +768,7 @@ export function renderRecipe(recipe, options = {}) {
                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
             </svg>
         </button>`;
+    // A small tilted thumbnail on the title line; a tap opens the full preview
     const photoHtml = hasPhoto
         // SANITIZED: recipe.title used in alt attribute
         ? `<span class="recipe-polaroid">
@@ -704,10 +781,21 @@ export function renderRecipe(recipe, options = {}) {
            </span>`
         : '';
 
-    // Always rendered: it carries the difficulty slot and, at its end, the
-    // share and add-photo buttons - out of the title row, so the title takes
-    // the width of the page
-    const metaLine = `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}${breakdown.length ? `<span class="meta-breakdown">(${breakdown.join(' · ')})</span>` : ''}${shareIcon}${addPhotoIcon}</div>`;
+    // Always rendered, one line tall even when empty, so a recipe without
+    // servings or a time keeps the method where it would be
+    const metaLine = `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}</div>`;
+
+    // The "⋯" popover, overlaid under its button so opening it moves nothing.
+    // A late difficulty lands in its reserved slot here, never on the page.
+    const morePanel = `<div class="recipe-more-panel" role="dialog" aria-label="More about this recipe" hidden>
+            ${totalHtml ? `<div class="more-row more-total">${totalHtml}</div>` : ''}
+            <div class="more-row">${difficultyHtml}</div>
+            ${tagsHtml ? `<div class="more-row">${tagsHtml}</div>` : ''}
+            ${breakdown.length ? `<div class="more-row"><span class="meta-breakdown">(${breakdown.join(' · ')})</span></div>` : ''}
+            <div class="more-row more-actions">${shareIcon}${addPhotoIcon}</div>
+        </div>`;
+    // A refresh of the recipe on the page keeps the popover as the cook left it
+    const keepMoreOpen = isMoreOpen() && rightContent.querySelector('.recipe-more')?.dataset.recipeId === String(recipe.id);
 
     // The phone footer is emitted on every viewport and hidden by CSS above
     // 600px, so a resize across the breakpoint needs no re-render.
@@ -715,9 +803,13 @@ export function renderRecipe(recipe, options = {}) {
 
     // SANITIZED: every recipe-derived string above went through escapeHtml
     rightContent.innerHTML = `
-        <div class="recipe-title-row">
-            ${photoHtml}
-            <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
+        <div class="recipe-header">
+            <div class="recipe-title-row">
+                <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
+                ${photoHtml}
+                <button type="button" class="recipe-more" data-recipe-id="${recipe.id}" aria-haspopup="dialog" aria-expanded="false" aria-label="More about this recipe">⋯</button>
+            </div>
+            ${morePanel}
         </div>
         ${metaLine}
 
@@ -752,6 +844,9 @@ export function renderRecipe(recipe, options = {}) {
         </div>
     `;
 
+    // The meta line is the first row of the Ingredients tab on the phone
+    placeMetaLine(rightContent);
+
     // Re-apply any running timer's step highlight for this recipe
     applyStepHighlight(recipe.id);
     // ...and the cook's ticks and step mark, to the markup just written (the
@@ -776,6 +871,8 @@ export function renderRecipe(recipe, options = {}) {
     const spreadMode = getSpreadMode();
     if (spreadMode !== 'contents') setSpreadMode(spreadMode, { force: true });
     else if (!isMobile()) parkIngredientsPanel();
+    // Last: re-asserting the mode closes the popover, as a real mode change does
+    if (keepMoreOpen) setMoreOpen(true);
 }
 
 /** Both pages' scroll positions, which a refresh must hand back. */

@@ -122,15 +122,19 @@ test.describe('Keeping your place', () => {
     await tap(page, item);
     await expect(item).toHaveAttribute('data-ticked', 'true');
     expectSameBox(await boxOf(item), before, 'ticked ingredient');
-    // Struck through, faded, and a pencil tick drawn in the margin
+    // Struck through, faded but readable at arm's length (opacity ≥ 0.6), and
+    // a check mark drawn in the gutter, out of the row's box
     const look = await item.evaluate(el => ({
       deco: getComputedStyle(el).textDecorationLine,
       opacity: parseFloat(getComputedStyle(el).opacity),
       tick: getComputedStyle(el, '::before').content,
+      tickPosition: getComputedStyle(el, '::before').position,
     }));
     expect(look.deco).toContain('line-through');
     expect(look.opacity).toBeLessThan(1);
+    expect(look.opacity).toBeGreaterThanOrEqual(0.6);
     expect(look.tick).not.toBe('none');
+    expect(look.tickPosition).toBe('absolute');
 
     await tap(page, item);
     await expect(item).not.toHaveAttribute('data-ticked', 'true');
@@ -234,9 +238,10 @@ test.describe('Keeping your place', () => {
 
     await tap(page, ingredient(page, 1));
     await tap(page, ingredient(page, 3));
+    // The stepper is on the Ingredients tab on the phone
+    await moreServings(page, 2);
     await toMethod(page);
     await tap(page, step(page, 4));
-    await moreServings(page, 2);
     expect(JSON.parse((await stored(page, a.id))!)).toEqual({ ticked: [1, 3], step: 4, servings: 6 });
 
     // A spread mode switch keeps them
@@ -308,9 +313,10 @@ test.describe('Keeping your place', () => {
     await expect(clear).toBeVisible();
     expect(Math.abs((await header.boundingBox())!.height - headerHeight)).toBeLessThanOrEqual(1);
 
+    // The stepper is on the Ingredients tab on the phone
+    await moreServings(page, 3);
     await toMethod(page);
     await tap(page, step(page, 2));
-    await moreServings(page, 3);
     await toIngredients(page);
     await clear.scrollIntoViewIfNeeded();
     await expectHitArea(page, '.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks');

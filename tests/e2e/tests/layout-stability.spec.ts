@@ -316,6 +316,27 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     expectSameBoxes(await boxes(), afterTaps, 'servings_set');
   });
 
+  test('opening the "⋯" popover', async ({ page }) => {
+    await openCookingRecipe(page);
+    const anchors = [
+      ...(await ANCHORS(page)),
+      { name: 'meta-line', selector: '#page-right-content .recipe-meta-line' },
+      { name: 'step-1', selector: '#page-right-content .prep-step[data-step="1"]' },
+      { name: 'ingredient-0', selector: '.ingredient-item[data-index="0"]' },
+    ].filter(a => a.name !== 'step-1' || !isPhone(page));
+    const more = page.locator('#page-right-content button.recipe-more');
+    const panel = page.locator('#page-right-content .recipe-more-panel');
+    const result = await trackAnchors(page, anchors, async () => {
+      await more.click();
+      await expect(panel).toBeVisible();
+      // A tap outside, on the title
+      const t = (await page.locator('#page-right-content .recipe-title').boundingBox())!;
+      await page.mouse.click(t.x + t.width / 2, t.y + t.height / 2);
+      await expect(panel).toBeHidden();
+    });
+    expectAnchorsStill(result);
+  });
+
   test('a timer starting, ticking and finishing', async ({ page }) => {
     // Red on 9f28329: mid-step-5 dy=23 (ipad 69, mobile-chrome 79) from .timer-active padding; note-input dy=28.
     await openCookingRecipe(page);

@@ -69,16 +69,17 @@ Before/after measurement: the explorer folders `tests/usability/runs/audit-post-
 
 ## 3. A compact header and tappable rows (P3, P4)
 
-- [ ] 3.1 The compact header.
+- [x] 3.1 The compact header.
   - Files: `static/recipe-display.js` (≈640-720): `.recipe-title-row` = title, thumbnail polaroid, `button.recipe-more`; `.recipe-meta-line` = stepper · total time (phone: the meta line is the first row of the Ingredients tab panel, total time moves into the popover); `.recipe-more-panel[role="dialog"][hidden]` holding `.meta-difficulty` (keep the reserved-width slot), `.recipe-tags`, `.meta-breakdown`, `.share-btn`, `.add-photo-btn`. `static/app.js` (share handler ≈417, add-photo handler) keeps working from inside the panel and closes it once the flow starts. A small open/close controller (outside tap, Escape, page turn via `navigation.js` / `page-transitions.js`, mode change via `spread-modes.js`); an outside tap that closes it must not reach place-keeping. `static/styles.css`: `.recipe-title-row` (≈788), `.recipe-meta-line` (≈1098, and the share/photo rules ≈806), `.recipe-polaroid` (≈1176) as a ~44px thumbnail keeping its tilt, the phone block.
   - Test first: family-recipe-ui › Recipe metadata displays with icons, every scenario, in `recipe-display.spec.ts`; › The header leaves room for the method (Wide viewports on chromium and ipad; add a `page.setViewportSize(1080×810)` case; Phone on mobile-chrome) with `createCookingRecipe` and a Lemon-Drizzle-like short recipe; layout-stability › Opening the "⋯" popover; recipe-tags › Course Tag Vocabulary › Tag chips on the recipe page.
   - Rewrite, don't delete, every test that finds share, add-photo, difficulty or tags on the meta line so it opens "⋯" first: `counter-readability.spec.ts` (≈124-210), `contents-filters.spec.ts` (≈393-413), `contents-page.spec.ts` (≈201-246), `refresh-in-place.spec.ts` (≈160, ≈189-205: the late difficulty, popover open and closed), `url-state.spec.ts` (≈156, ≈336), `ui-improvements.spec.ts` (≈62 `.recipe-title-row > .recipe-polaroid`, ≈94-347 photo preview through the thumbnail), `spread-modes.spec.ts` (≈386).
   - Red-check: on `e924ecc` step 1 is at 367/350px (counter `header-block-before-method`) and the 180px case is red. Then put `.share-btn` back on the meta line and the meta-line case goes red; make the panel `position: static` and the popover anchor case goes red.
-- [ ] 3.2 Tappable rows.
+- [x] 3.2 Tappable rows.
   - Files: `static/styles.css` `.ingredient-item` (≈996-1020, ≈1206, the cook-mode rule ≈2272, the phone rule ≈2563): `min-height: 38px` (36px ≤600px) from vertical padding, `display: flex; align-items: center` or equivalent, no margins; the ticked look: strike-through, a gutter check mark drawn by `::before` absolutely positioned (no change to the box), text opacity ≥ 0.6. Check the packed `.ingredient-line` (several short items per line in cook mode, `renderIngredients` ≈530-540) still gives each item the full row height.
   - Test first, in `place-keeping.spec.ts` or `counter-readability.spec.ts`: family-recipe-ui › Ingredient rows are tall enough to tick, the first, second and fourth scenarios (height, edge taps, no gap, lasagne fits at 810×1080 with `createCookingRecipe` at 19 ingredients); cooking-guidance › The cook can keep their place… › Ticking an ingredient (opacity ≥ 0.6, box unchanged).
   - Red-check: on `e924ecc` rows are 31px (29px on the phone) and the height case is red; set the ticked opacity back to the old value and the tick case goes red; use margin instead of padding and the edge-tap case goes red.
-- [ ] 3.3 `make lint`, then the full suite on port 3002, green.
+- [x] 3.3 `make lint`, then the full suite on port 3002, green.
+  - Done: `make lint` clean, `cargo test` green, full suite 829 passed, 179 skipped, 0 failed. Open for the lead: the phone target (first ingredient ≤200px) is `test.fixme` in `recipe-display.spec.ts`. The book chrome alone puts the first content row at 162px, so the header cannot reach 200px; measured 301px (368 before).
 
 ## 4. Verification
 

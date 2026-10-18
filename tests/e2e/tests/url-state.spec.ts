@@ -153,7 +153,8 @@ test.describe('The open recipe in the URL', () => {
     const before = { len: await histLen(page), search: await search(page) };
     const RED_DOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
     const chooser = page.waitForEvent('filechooser');
-    await page.locator('#page-right-content .add-photo-btn').click();
+    await page.locator('#page-right-content button.recipe-more').click();
+    await page.locator('#page-right-content .recipe-more-panel .add-photo-btn').click();
     await (await chooser).setFiles({ name: 'dot.png', mimeType: 'image/png', buffer: RED_DOT });
     await expect(page.locator('#page-right-content .recipe-photo')).toHaveCount(1, { timeout: 10000 });
     await page.waitForTimeout(300);
@@ -333,7 +334,8 @@ test.describe('The open recipe in the URL', () => {
     await waitForTurn(page);
     const RED_DOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
     const chooser = page.waitForEvent('filechooser');
-    await page.locator('#page-right-content .add-photo-btn').click();
+    await page.locator('#page-right-content button.recipe-more').click();
+    await page.locator('#page-right-content .recipe-more-panel .add-photo-btn').click();
     await (await chooser).setFiles({ name: 'dot.png', mimeType: 'image/png', buffer: RED_DOT });
     await expect(page.locator('#page-right-content .recipe-photo')).toHaveCount(1, { timeout: 10000 });
   });
