@@ -13,6 +13,7 @@ import * as MealPlanDisplay from './meal-plan-display.js';
 import * as MarginNotes from './margin-notes.js';
 import * as PageTabs from './page-tabs.js';
 import * as SpreadModes from './spread-modes.js';
+import * as PlaceKeeping from './place-keeping.js';
 
 // Global state
 let conversationId = null;
@@ -570,6 +571,8 @@ function renderSpread(mode) {
         if (!panel) return;
         leftContent.innerHTML = '';
         leftContent.appendChild(panel);
+        // Ticks or a step mark set while the panel was parked off the page
+        if (currentRecipeId != null) PlaceKeeping.applyPlace(currentRecipeId);
         return;
     }
 
@@ -695,6 +698,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     PageTabs.initPageTabs();
     SpreadModes.initSpreadModes();
     Navigation.initFooterNav();
+    PlaceKeeping.initPlaceKeeping();
 
     // Initialize swipe gestures for mobile page-turn navigation
     const pagesContainer = document.querySelector('.pages-container');

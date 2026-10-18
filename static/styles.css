@@ -31,6 +31,7 @@
     --color-accent-brown: #6b4423;
     --color-timer-band: #fff4c2;
     --color-biro: #1f3d8a;
+    --color-pencil: #77706a; /* the cook's own marks: ticks and the step bracket */
     --color-sticky: #fbe9a0;
 
     /* Typography */
@@ -901,6 +902,86 @@ body::before {
     font-style: italic;
     color: var(--color-ink-light);
     font-size: 13px;
+}
+
+/* ==================== KEEPING YOUR PLACE ==================== */
+/* The cook's ticks and "you are here" mark (place-keeping.js). Both are
+   drawn without touching a box - no margin, padding, border or size change -
+   so nothing on the page moves when the cook taps a line. */
+.ingredient-item[data-index],
+.prep-step[data-step] {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ingredient-item {
+    position: relative;
+}
+
+.ingredient-item[data-ticked="true"] {
+    text-decoration: line-through;
+    text-decoration-color: var(--color-pencil);
+    text-decoration-thickness: 1.5px;
+    opacity: 0.55;
+}
+
+/* A pencil tick in the margin, left of the line */
+.ingredient-item[data-ticked="true"]::before {
+    content: "\2713";
+    position: absolute;
+    left: -16px;
+    top: 0;
+    font-family: var(--font-handwritten);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: inherit;
+    color: var(--color-pencil);
+    pointer-events: none;
+}
+
+/* A pencil bracket down the step's left margin. ::before is the timer's
+   "timer running" tag (just left of the step), so with a timer on this step
+   the bracket stands further out and both show. */
+.prep-step[aria-current="step"]::after {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 3px;
+    bottom: 3px;
+    width: 5px;
+    border: 2px solid var(--color-pencil);
+    border-right: none;
+    border-radius: 3px 0 0 3px;
+    pointer-events: none;
+}
+
+.prep-step.timer-active[aria-current="step"]::after {
+    left: -21px;
+}
+
+/* "clear ticks" sits in the ingredients header, absolutely, so showing it
+   cannot grow the header */
+.tab-panel[data-tab="ingredients"] .section-header {
+    position: relative;
+}
+
+.clear-ticks {
+    position: absolute;
+    right: 0;
+    bottom: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: var(--font-handwritten);
+    font-size: 14px;
+    line-height: 1;
+    color: var(--color-biro);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.clear-ticks[hidden] {
+    display: none;
 }
 
 /* ==================== RECIPE METADATA ==================== */
@@ -2311,6 +2392,19 @@ body[data-feature-meals] .contents-tab-meals {
     .ingredients-list,
     .prep-list {
         font-size: 17px;
+    }
+
+    /* Clear of the .mobile-edge-nav strip, which takes taps 60px in from the
+       book's right edge */
+    .clear-ticks {
+        right: 44px;
+    }
+
+    /* The page's 16px padding is all the margin there is: the bracket beside
+       a timer's tag stays inside it */
+    .prep-step.timer-active[aria-current="step"]::after {
+        left: -16px;
+        width: 2px;
     }
 
     .phone-footer {

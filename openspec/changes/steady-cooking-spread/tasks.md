@@ -296,8 +296,8 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
 
 ## 8. Keeping your place (D10)
 
-- [ ] 8.0 Add `specs/frontend-modules/spec.md` (MODIFIED, following the current `openspec/specs/frontend-modules/spec.md`) so the module list includes `place-keeping.js` and its responsibility (lead answer Q5). Re-run `openspec validate steady-cooking-spread --strict`.
-- [ ] 8.1 New `static/place-keeping.js`, initialised from `app.js`:
+- [x] 8.0 Add `specs/frontend-modules/spec.md` (MODIFIED, following the current `openspec/specs/frontend-modules/spec.md`) so the module list includes `place-keeping.js` and its responsibility (lead answer Q5). Re-run `openspec validate steady-cooking-spread --strict`.
+- [x] 8.1 New `static/place-keeping.js`, initialised from `app.js`:
   - `applyPlace(recipeId)` is called after every `renderRecipe`, refreshes included.
   - One delegated `click` listener on `#page-left-content` and `#page-right-content` handles `.ingredient-item` and `.prep-step`. It ignores clicks inside buttons and links, and ignores everything while `isAnimating()`.
   - State lives in `sessionStorage['rv-place:<id>']` as `{ ticked: [index…], step: n | null }`, every access in `try`/`catch`.
@@ -305,20 +305,20 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - Never use `touchstart`.
   - `static/recipe-display.js` `renderIngredients` (≈496-531): give each `.ingredient-item` a stable `data-index` if it has none.
   - cooking-guidance › The cook can keep their place in a recipe (all)
-- [ ] 8.2 `static/styles.css`:
+- [x] 8.2 `static/styles.css`:
   - `.ingredient-item[data-ticked="true"]`: line-through, faded, and a pencil tick drawn absolutely in the margin.
   - `.prep-step[aria-current="step"]`: a pencil bracket drawn absolutely in the left margin, on a pseudo-element group 6 left free.
   - Neither may change the box.
   - Give `.clear-ticks` a line-height that cannot grow the header.
-- [ ] 8.3 Wake lock, in `place-keeping.js` or a small `wake-lock` section of it:
+- [x] 8.3 Wake lock, in `place-keeping.js` or a small `wake-lock` section of it:
   - Acquire on recipe and meal-plan display: at the end of `fetchAndDisplayRecipe` and in the meal-plan display path.
   - Keep it while paging.
   - Release in `Navigation.showIndex`.
   - Re-acquire on `visibilitychange` to visible.
   - Feature-detect, and swallow rejections.
   - cooking-guidance › The screen stays awake while cooking (all)
-- [ ] 8.4 `place-keeping.js` is a new module. frontend-modules › ES Module Structure › Module files exist lists every module. See design.md open question 5: the lead decides whether this change adds a frontend-modules delta.
-- [ ] 8.5 New cases, in a new `place-keeping.spec.ts`:
+- [x] 8.4 `place-keeping.js` is a new module. frontend-modules › ES Module Structure › Module files exist lists every module. See design.md open question 5: the lead decides whether this change adds a frontend-modules delta.
+- [x] 8.5 New cases, in a new `place-keeping.spec.ts`:
   - Tick and untick, with the box unchanged.
   - One step mark, cleared by tapping it again and moved by tapping another step.
   - The mark and the timer highlight coexist (`startTimer(1, 'x', 2)` plus a click on step 2).
@@ -328,13 +328,13 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - A touch drag that starts on an item ticks nothing. Use CDP `Input.dispatchTouchEvent`, as `drag()` in `tests/usability/remeasure/cook.cjs` does, on mobile-chrome and ipad.
   - A click during a page turn is ignored: click next, then click an item at once.
   - The phone tabs work too.
-- [ ] 8.6 New wake-lock cases in `place-keeping.spec.ts`:
+- [x] 8.6 New wake-lock cases in `place-keeping.spec.ts`:
   - Use a `page.addInitScript` stub of `navigator.wakeLock` that counts requests and releases.
   - One request on open, no new request on next, a release on the header return.
   - Another request after dispatching `visibilitychange` with `document.visibilityState` stubbed to `visible`.
   - With `navigator.wakeLock` deleted, no `pageerror` and no console error.
-- [ ] 8.7 `layout-stability.spec.ts`: remove `test.fail` from "Ticking an ingredient and marking a step".
-- [ ] 8.8 `make lint`, then `make test-e2e` green.
+- [x] 8.7 `layout-stability.spec.ts`: remove `test.fail` from "Ticking an ingredient and marking a step".
+- [x] 8.8 `make lint`, then `make test-e2e` green.
 
 ## 9. Verification and documentation
 

@@ -6,6 +6,7 @@
 import { escapeHtml } from './utils.js';
 import { getCachedRecipe, prefetchAdjacent, animatePageTurn } from './page-transitions.js';
 import { applyStepHighlight } from './timer.js';
+import { applyPlace, holdWakeLock } from './place-keeping.js';
 import { setActiveTab } from './page-tabs.js';
 import { getSpreadMode, setSpreadMode } from './spread-modes.js';
 
@@ -529,7 +530,7 @@ function renderIngredients(ingredients) {
     const lines = [];
     let openLine = null;
 
-    ingredients.forEach(ing => {
+    ingredients.forEach((ing, index) => {
         // SANITIZED: quantity, unit, name and notes are user input
         const qtyText = [ing.quantity, ing.unit]
             .filter(v => v !== null && v !== undefined && v !== '')
@@ -541,7 +542,9 @@ function renderIngredients(ingredients) {
 
         const qty = qtyText ? `<span class="ingredient-qty">${escapeHtml(qtyText)}</span> ` : '';
         const notes = ing.notes ? ` <span class="step-note">(${escapeHtml(ing.notes)})</span>` : '';
-        const item = `<span class="ingredient-item">${qty}${escapeHtml(name)}${notes}</span>`;
+        // data-index: the ingredient's position in the recipe, which is what a
+        // tick is remembered by (place-keeping.js)
+        const item = `<span class="ingredient-item" data-index="${index}">${qty}${escapeHtml(name)}${notes}</span>`;
 
         const packable = plainText.length <= INGREDIENT_PACK_CHARS;
         if (packable && openLine && openLine.length < INGREDIENT_PACK_MAX) {
@@ -705,7 +708,7 @@ export function renderRecipe(recipe, options = {}) {
         ${metaLine}
 
         <section class="tab-panel" data-tab="ingredients">
-            <div class="section-header">ingredients:</div>
+            <div class="section-header">ingredients: <button type="button" class="clear-ticks" hidden>clear ticks</button></div>
             <div class="ingredients-list">
                 ${ingredientsList}
             </div>
@@ -736,6 +739,9 @@ export function renderRecipe(recipe, options = {}) {
 
     // Re-apply any running timer's step highlight for this recipe
     applyStepHighlight(recipe.id);
+    // ...and the cook's ticks and step mark, to the markup just written (the
+    // ingredients panel may be parked off the page below)
+    applyPlace(recipe.id, rightContent);
 
     // Re-assert the active tab so a re-render (difficulty refresh, photo
     // upload, update_recipe) keeps the user's tab and re-fills .notes-thread.
@@ -878,6 +884,8 @@ export async function fetchAndDisplayRecipe(recipeId) {
             if (restoredScroll) restorePageScroll(restoredScroll);
         }
         state.updateNavigationState();
+        // A recipe is on the page: keep the screen on while it is cooked
+        holdWakeLock();
         // Prefetch adjacent recipes for instant navigation
         prefetchAdjacent(state.currentRecipeId);
         refreshDifficultyIfPending(recipe, pageNumber);

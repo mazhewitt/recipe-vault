@@ -67,6 +67,7 @@ The guiding rule, already stated by book-spread-modes R1 after manual testing an
 - `family-recipe-ui`: note input position; timer pill position, ✕ size and completion; title row layout; touch-target and cook-mode text sizes.
 - `web-chat`: tool status lines become cook-language status in the reply slot; reply placement; focus kept across a turn.
 - `cooking-guidance`: timer completion is persistent and audible; the step highlight does not change layout; wake lock; ingredient ticks and the current step.
+- `frontend-modules`: the module list gains `place-keeping.js` (ticks, the step mark and the wake lock).
 
 ## Impact
 

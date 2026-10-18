@@ -6,6 +6,7 @@
  */
 
 import { escapeHtml } from './utils.js';
+import { holdWakeLock } from './place-keeping.js';
 
 // Import global state accessors (will be set by app.js)
 export let state = null;
@@ -67,6 +68,9 @@ export function renderMealPlan(mealPlan) {
             </div>
         </div>
     `;
+
+    // A meal plan is cooked from too: keep the screen on
+    holdWakeLock();
 
     // Register global handler for recipe link clicks (avoids inline eval)
     window._mealPlanOpenRecipe = function (recipeId) {

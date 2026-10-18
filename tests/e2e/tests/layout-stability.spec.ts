@@ -222,8 +222,7 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
   });
 
   test('ticking an ingredient and marking a step', async ({ page }) => {
-    // Red on 9f28329: no anchor moved on the ingredient tap, but the feature is absent: data-ticked is never set.
-    failOn(ALL, 'fixed in group 8 (D10)');
+    // Red on 9f28329 (no anchor moved, but data-ticked was never set); fixed in group 8 (D10).
     const recipe = await openCookingRecipe(page);
     const m = Math.ceil(recipe.steps / 2);
     const ingredientSel = '.ingredient-item:visible >> nth=2';
@@ -245,7 +244,16 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     expectAnchorsStill(ingResult);
     await expect(tappedIngredient).toHaveAttribute('data-ticked', 'true');
 
-    if (isPhone(page)) await openTab(page, 'method');
+    if (isPhone(page)) {
+      await openTab(page, 'method');
+      // A tap inside the tab crossfade is ignored by design (cooking-guidance ›
+      // Ignored while a page turns), so let the lock go first
+      await expect.poll(() => page.evaluate(async () => {
+        // @ts-ignore - module path served by the app
+        const M = await import('/static/page-transitions.js');
+        return M.isAnimating();
+      })).toBe(false);
+    }
     await page.locator(stepSel).scrollIntoViewIfNeeded();
     const stepAnchors = [...(await ANCHORS(page)), { name: 'tapped-step', selector: stepSel }];
     const stepPos = await tapPoint(page, stepSel);

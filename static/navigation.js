@@ -6,6 +6,7 @@
 import { animatePageTurn, isAnimating } from './page-transitions.js';
 import { setNotePageNumber } from './recipe-display.js';
 import { setSpreadMode } from './spread-modes.js';
+import { releaseWakeLock } from './place-keeping.js';
 
 // Import global state accessors (will be set by app.js)
 export let state = null;
@@ -122,6 +123,8 @@ export async function loadPrevRecipe() {
 
 export async function showIndex() {
     state.viewMode = 'index';
+    // Nothing is being cooked from the contents: let the screen sleep
+    releaseWakeLock();
     state.currentRecipeId = null;
     state.currentRecipeTitle = null;
     // Back at the contents, the contents take the left page again and the strip
