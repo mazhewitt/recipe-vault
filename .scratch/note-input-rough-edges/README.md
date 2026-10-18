@@ -55,3 +55,5 @@ Options for the owner:
 - accept the wrap: the slip is capped at three lines and grows upward only while the cook types, which is their own action.
 
 The lead's default, if nobody decides: accept the wrap.
+
+**Decision (owner, 2026-10-18): accept the wrap.** The 40-character question on the tablet slip wraps to a second line while the cook types; the slip stays capped at three lines and grows upward only on the cook's own action. Neither the paperclip move nor a wider slip is wanted. Items 1-3 above are still open.
