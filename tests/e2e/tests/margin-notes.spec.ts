@@ -312,7 +312,7 @@ test.describe('Margin notes', () => {
     expect((await threadEntries(page)).map(n => n.kind)).toEqual(['user', 'reply']);
   });
 
-  test('halving a recipe re-renders the page and adds a one-line note', async ({ page }) => {
+  test('updating a recipe re-renders the page and adds a one-line note', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createRecipe(page, {
       title: `Halve Recipe ${Date.now()}`,
@@ -325,7 +325,7 @@ test.describe('Margin notes', () => {
       difficulty: 3,
     } as Parameters<typeof createRecipe>[1]);
     await openRecipe(page, recipeId);
-    await expect(page.locator('.meta-serves')).toHaveText('serves 4');
+    await expect(page.locator('.servings-count')).toHaveText('4');
 
     // Count re-fetches of this recipe triggered after the message is sent
     let fetches = 0;
@@ -346,12 +346,15 @@ test.describe('Margin notes', () => {
     });
     const scrollBefore = await page.locator('#page-right').evaluate(el => el.scrollTop);
 
-    // The mock LLM answers "halve" with an update_recipe call; the backend then
-    // emits a recipe_artifact and the page re-fetches the edited recipe.
-    await send(page, 'halve this recipe');
+    // The mock LLM answers "update" with an update_recipe call (servings: 2);
+    // the backend then emits a recipe_artifact and the page re-fetches the
+    // edited recipe. ("halve" only scales the page, with set_servings.)
+    await send(page, 'update this recipe');
 
-    // Under the 3s difficulty-refresh delay, so only the artifact path can do this
-    await expect(page.locator('.meta-serves')).toHaveText('serves 2', { timeout: 2500 });
+    // Under the 3s difficulty-refresh delay, so only the artifact path can do
+    // this; no "Scaled for" note, so it is the saved servings, not the stepper
+    await expect(page.locator('.servings-count')).toHaveText('2', { timeout: 2500 });
+    await expect(page.locator('.servings-note')).toHaveText('');
     expect(fetches).toBeGreaterThanOrEqual(1);
     // ...without a skeleton, and without moving the page
     expect(await page.evaluate(() => (window as unknown as { __skeletons: number }).__skeletons)).toBe(0);

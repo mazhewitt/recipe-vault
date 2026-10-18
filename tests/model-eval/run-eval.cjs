@@ -38,14 +38,19 @@ async function chat(message, { conversation_id, current_recipe, image } = {}) {
   return {
     status: res.status, ms: Date.now() - t0, firstTextMs: tFirstText, text,
     tools: events.filter(e => e.ev === 'tool_use').map(e => `${e.d.tool}:${e.d.status}`),
-    artifacts: events.filter(e => ['recipe_artifact', 'meal_artifact', 'timer_start'].includes(e.ev)).map(e => ({ ev: e.ev, ...e.d })),
+    artifacts: events.filter(e => ['recipe_artifact', 'meal_artifact', 'timer_start', 'servings_set'].includes(e.ev)).map(e => ({ ev: e.ev, ...e.d })),
     errors: events.filter(e => e.ev === 'error').map(e => e.d),
     conversation_id: done?.d?.conversation_id,
   };
 }
 const get = async (id) => (await fetch(`${BASE}/api/recipes/${id}`, { headers: KEY })).json();
 const list = async () => { const d = await (await fetch(`${BASE}/api/recipes`, { headers: KEY })).json(); return Array.isArray(d) ? d : d.recipes; };
-const cur = (k, title) => ({ recipe_id: ids[k], title });
+// The page's servings go with the open recipe (cook-from-the-page: page_servings)
+const cur = (k, title, servings) => ({ recipe_id: ids[k], title, servings });
+const setTo = (r, k, n) => r.artifacts.some(a => a.ev === 'servings_set' && a.recipe_id === ids[k] && a.servings === n);
+// An instruction comes before any question: the text up to the first "?" holds one
+const instructionFirst = (text, re) => { const q = text.indexOf('?'); return re.test(q < 0 ? text : text.slice(0, q)); };
+const offersToSave = (t) => /\b(save|update|keep)\b[^.?!]{0,80}(book|recipe|change|version|it|this)/i.test(t);
 const ingQty = (r, re) => r.ingredients?.find(i => re.test(i.name))?.quantity;
 
 const SCENARIOS = [
@@ -63,17 +68,14 @@ const SCENARIOS = [
       return { turns: [r], checks: { timer_started: !!t, timer_90min: !!t && Math.abs(t.duration_minutes - 90) < 1, timer_step4: !!t && t.step_number === 4 } };
   } },
   { id: 'halve-current', run: async () => {
-      // The prompt allows either presenting the scaled list or saving it; both must be right.
-      const r = await chat('Can you halve this recipe? Just two of us tonight.', { current_recipe: cur('curry', 'Thai Green Curry') });
+      // cook-from-the-page: scaling is done on the page (set_servings); the book is not saved
+      const r = await chat('Can you halve this recipe? Just two of us tonight.', { current_recipe: cur('curry', 'Thai Green Curry', 4) });
       const after = await get(ids.curry);
-      const saved = after.servings === 2;
-      const t = r.text.toLowerCase().replace(/\s+/g, ' ');
-      return { turns: [r], saved, checks: {
-        coconut_200ml: saved ? Math.abs((ingQty(after, /coconut/i) ?? 0) - 200) < 1 : /200 ?ml/.test(t),
-        chicken_250g: saved ? Math.abs((ingQty(after, /chicken/i) ?? 0) - 250) < 1 : /250 ?g/.test(t),
-        beans_75g: saved ? Math.abs((ingQty(after, /bean/i) ?? 0) - 75) < 1 : /75 ?g/.test(t),
+      return { turns: [r], checks: {
+        set_servings_2: setTo(r, 'curry', 2),
+        no_update_recipe: !wrote(r),
+        book_unchanged: after.servings === 4 && Math.abs((ingQty(after, /chicken/i) ?? 0) - 500) < 1,
         nothing_dropped: after.ingredients?.length === 9 && after.steps?.length === 5,
-        consistent_servings: saved ? true : after.servings === 4,
       } };
   } },
   { id: 'image-to-recipe', run: async () => {
@@ -128,10 +130,12 @@ const SCENARIOS = [
       } };
   } },
   { id: 'guided-cooking-2-turns', run: async () => {
-      const a = await chat("I'm about to make this. What do I need to do first?", { current_recipe: cur('drizzle', 'Lemon Drizzle Cake') });
-      const b = await chat('Done. The butter and sugar are creamed. Next?', { conversation_id: a.conversation_id, current_recipe: cur('drizzle', 'Lemon Drizzle Cake') });
+      const a = await chat("I'm about to make this. What do I need to do first?", { current_recipe: cur('drizzle', 'Lemon Drizzle Cake', 8) });
+      const b = await chat('Done. The butter and sugar are creamed. Next?', { conversation_id: a.conversation_id, current_recipe: cur('drizzle', 'Lemon Drizzle Cake', 8) });
       return { turns: [a, b], checks: {
         first_mentions_oven: /oven|preheat|180/i.test(a.text), next_mentions_eggs: /egg/i.test(b.text),
+        instruction_before_question: instructionFirst(a.text, /oven|preheat|180|grease|line|cream|beat/i),
+        no_write: !wrote(a) && !wrote(b),
         concise_first: a.text.length < 900, concise_next: b.text.length < 900,
       } };
   } },
@@ -158,14 +162,16 @@ const SCENARIOS = [
       }, created: full ? { title: full.title, ingredients: full.ingredients.map(i => [i.quantity, i.unit, i.name, i.notes]), steps: full.steps.map(s => [s.instruction, s.duration_minutes, s.temperature_value, s.temperature_unit]) } : null };
   } },
   { id: 'hard-substitute-and-scale', run: async () => {
-      const r = await chat("I've got no coconut milk, only double cream. Swap it in and make it for 6 people.", { current_recipe: cur('curry', 'Thai Green Curry') });
-      const after = await get(ids.curry); const saved = after.servings === 6;
+      // cook-from-the-page: the page is scaled to 6, the swap is told and offered for saving, nothing saved unasked
+      const r = await chat("I've got no coconut milk, only double cream. Swap it in and make it for 6 people.", { current_recipe: cur('curry', 'Thai Green Curry', 4) });
+      const after = await get(ids.curry);
       const t = r.text.toLowerCase();
-      return { turns: [r], saved, checks: {
-        cream_used: saved ? (after.ingredients || []).some(i => /cream/i.test(i.name)) : /cream/.test(t),
-        coconut_gone: saved ? !(after.ingredients || []).some(i => /coconut/i.test(i.name)) : true,
-        chicken_750: saved ? Math.abs((ingQty(after, /chicken/i) ?? 0) - 750) < 1 : /750 ?g/.test(t),
-        beans_225: saved ? Math.abs((ingQty(after, /bean/i) ?? 0) - 225) < 1 : /225 ?g/.test(t),
+      return { turns: [r], checks: {
+        set_servings_6: setTo(r, 'curry', 6),
+        cream_told: /cream/.test(t),
+        offers_to_save: offersToSave(r.text),
+        no_update_recipe: !wrote(r),
+        book_unchanged: after.servings === 4 && (after.ingredients || []).some(i => /coconut/i.test(i.name)),
         still_9_ingredients: (after.ingredients?.length || 0) === 9,
       } };
   } },
@@ -179,12 +185,13 @@ const SCENARIOS = [
       } };
   } },
   { id: 'hard-guided-5-turns', run: async () => {
-      const c = cur('lasagne', "Granny's Beef Lasagne");
+      const c = cur('lasagne', "Granny's Beef Lasagne", 6);
       const msgs = ["Let's cook this together. I'm at the stove, what first?", 'Veg is soft.', 'Mince is browned now.', "Wine's bubbled off.", 'Tomatoes, stock and oregano are in.'];
       const turns = []; let conv;
       for (const m of msgs) { const r = await chat(m, { conversation_id: conv, current_recipe: c }); conv = r.conversation_id; turns.push(r); }
       const timers = turns.flatMap(t => t.artifacts.filter(a => a.ev === 'timer_start'));
       return { turns, checks: {
+        instruction_before_question: instructionFirst(turns[0].text, /oil|heat|onion|carrot|celery|soften|chop|casserole/i),
         simmer_timer_90: timers.some(x => Math.abs(x.duration_minutes - 90) < 1),
         timer_not_premature: !turns.slice(0, 3).some(t => t.artifacts.some(a => a.ev === 'timer_start' && Math.abs(a.duration_minutes - 90) < 1)),
         concise: turns.every(t => t.text.length < 700),
@@ -227,7 +234,7 @@ const SCENARIOS = [
 (async () => {
   const out = { label: LABEL, port: PORT, scenarios: [] };
   for (const s of SCENARIOS) {
-    if (FILTER && !s.id.includes(FILTER)) continue;
+    if (FILTER && !FILTER.split(',').some(f => s.id.includes(f))) continue;
     const t0 = Date.now();
     try {
       const res = await s.run();

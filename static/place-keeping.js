@@ -40,22 +40,36 @@ function readPlace(recipeId) {
         return {
             ticked: Array.isArray(parsed?.ticked) ? parsed.ticked.filter(Number.isInteger) : [],
             step: Number.isInteger(parsed?.step) ? parsed.step : null,
+            servings: Number.isInteger(parsed?.servings) ? parsed.servings : null,
         };
     } catch {
-        return { ticked: [], step: null };
+        return { ticked: [], step: null, servings: null };
     }
 }
 
 function writePlace(recipeId, place) {
     try {
-        if (place.ticked.length === 0 && place.step == null) {
+        if (place.ticked.length === 0 && place.step == null && place.servings == null) {
             sessionStorage.removeItem(storageKey(recipeId));
         } else {
-            sessionStorage.setItem(storageKey(recipeId), JSON.stringify(place));
+            const { servings, ...marks } = place;
+            sessionStorage.setItem(storageKey(recipeId), JSON.stringify(servings == null ? marks : place));
         }
     } catch {
         // Storage full or unavailable: the marks still show for this render
     }
+}
+
+/** The servings the cook set on `recipeId` this session (servings.js), or null. */
+export function readServings(recipeId) {
+    return readPlace(String(recipeId)).servings;
+}
+
+/** Stores the servings shown for `recipeId`, keeping its ticks and step mark. */
+export function writeServings(recipeId, servings) {
+    const place = readPlace(String(recipeId));
+    place.servings = servings;
+    writePlace(String(recipeId), place);
 }
 
 // --- Drawing ---

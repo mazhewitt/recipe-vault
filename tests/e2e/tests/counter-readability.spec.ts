@@ -122,8 +122,13 @@ test.describe('Readable and tappable from the counter', () => {
 
   test('recipe and note controls have a 44px hit area', async ({ page }) => {
     await openTwoRecipeBook(page);
+    await expectHitArea(page, '#page-right-content button.recipe-more');
+    // Share and add-photo, with the "⋯" popover open
+    await page.locator('#page-right-content button.recipe-more').click();
+    await expect(page.locator('#page-right-content .recipe-more-panel')).toBeVisible();
     await expectHitArea(page, '#page-right-content .share-btn');
     await expectHitArea(page, '#page-right-content .add-photo-btn');
+    await page.keyboard.press('Escape');
     await expectHitArea(page, '#send-button');
     await expectHitArea(page, '#clipboard-button');
     for (const sel of ['#send-button', '#clipboard-button']) {
@@ -142,30 +147,31 @@ test.describe('Readable and tappable from the counter', () => {
     await expectHitArea(page, '#page-right-content .footer-next');
   });
 
-  test('share and photo end the meta line, 44px each', async ({ page }) => {
+  test('share and photo end the "⋯" popover, 44px each', async ({ page }) => {
     await openTwoRecipeBook(page);
     await expect(page.locator('.recipe-title-row .share-btn')).toHaveCount(0);
     await expect(page.locator('.recipe-title-row .add-photo-btn')).toHaveCount(0);
-    const lastTwo = await page.locator('#page-right-content .recipe-meta-line').evaluate(el => {
-      const kids = Array.from(el.children);
-      return kids.slice(-2).map(k => k.className);
-    });
-    expect(lastTwo).toEqual(['share-btn', 'add-photo-btn']);
-    // The (prep · cook) breakdown comes before them
-    const breakdownBefore = await page.locator('#page-right-content .recipe-meta-line').evaluate(el => {
+    await expect(page.locator('.recipe-meta-line .share-btn, .recipe-meta-line .add-photo-btn')).toHaveCount(0);
+    await page.locator('#page-right-content button.recipe-more').click();
+    const panel = page.locator('#page-right-content .recipe-more-panel');
+    await expect(panel).toBeVisible();
+    // Last in the popover, after the (prep · cook) breakdown
+    const order = await panel.evaluate(el => {
       const b = el.querySelector('.meta-breakdown');
       const s = el.querySelector('.share-btn');
-      return !!b && !!s && (b.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      const p = el.querySelector('.add-photo-btn');
+      const follows = (x: Element | null, y: Element | null) => !!x && !!y && (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      return { shareAfterBreakdown: follows(b, s), photoAfterShare: follows(s, p) };
     });
-    expect(breakdownBefore).toBe(true);
+    expect(order).toEqual({ shareAfterBreakdown: true, photoAfterShare: true });
     for (const sel of ['.share-btn', '.add-photo-btn']) {
-      const box = (await page.locator(`#page-right-content .recipe-meta-line ${sel}`).boundingBox())!;
+      const box = (await panel.locator(sel).boundingBox())!;
       expect(box.width, `${sel} width`).toBeGreaterThanOrEqual(44);
       expect(box.height, `${sel} height`).toBeGreaterThanOrEqual(44);
     }
   });
 
-  test('a long title with a photo takes at most two lines', async ({ page }) => {
+  test('a long title with a photo takes at most two lines (one, ellipsised, on the phone)', async ({ page }) => {
     // Titles are unique: drop one left by another project's run
     const list = await page.request.get('/api/recipes', { headers: API_HEADERS });
     for (const r of (await list.json()) as Array<{ id: string; title: string }>) {
@@ -193,21 +199,33 @@ test.describe('Readable and tappable from the counter', () => {
       const cs = getComputedStyle(el);
       return Math.round(el.getBoundingClientRect().height / parseFloat(cs.lineHeight));
     });
-    expect(lines, 'title line count').toBeLessThanOrEqual(2);
+    if (isPhone(page)) {
+      expect(lines, 'title line count').toBe(1);
+      const style = await page.locator('#page-right-content .recipe-title').evaluate(el => {
+        const cs = getComputedStyle(el);
+        return { ws: cs.whiteSpace, to: cs.textOverflow };
+      });
+      expect(style).toEqual({ ws: 'nowrap', to: 'ellipsis' });
+    } else {
+      expect(lines, 'title line count').toBeLessThanOrEqual(2);
+    }
   });
 
-  test('the share toast appears next to the share button', async ({ page, context }) => {
+  test('the share toast appears next to the "⋯" button it was started from', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
     await openTwoRecipeBook(page);
     page.on('dialog', d => d.dismiss());
-    const btn = page.locator('#page-right-content .share-btn');
-    await btn.click();
+    const more = page.locator('#page-right-content button.recipe-more');
+    await more.click();
+    await page.locator('#page-right-content .recipe-more-panel .share-btn').click();
     const toast = page.locator('.share-toast');
     await expect(toast).toBeVisible();
+    // The popover closed once the share started
+    await expect(page.locator('#page-right-content .recipe-more-panel')).toBeHidden();
     const t = (await toast.boundingBox())!;
-    const b = (await btn.boundingBox())!;
+    const b = (await more.boundingBox())!;
     // Within a button's reach of the button, and on screen
-    expect(Math.abs((t.y + t.height) - b.y)).toBeLessThanOrEqual(40);
+    expect(Math.abs(t.y - (b.y + b.height))).toBeLessThanOrEqual(40);
     expect(t.x).toBeGreaterThanOrEqual(0);
     expect(t.x + t.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   });

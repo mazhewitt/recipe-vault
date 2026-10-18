@@ -131,6 +131,28 @@ pub struct TimerData {
     pub step_number: Option<u32>,
 }
 
+/// Servings extracted from a successful `set_servings` tool call, emitted to the
+/// frontend as a `servings_set` SSE event. No database write is involved.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ServingsData {
+    pub servings: u32,
+}
+
+/// What a chat turn asks the open page to do, without a re-render:
+/// timers to start and servings to show.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PageEvents {
+    pub timers: Vec<TimerData>,
+    pub servings: Vec<ServingsData>,
+}
+
+/// A page action extracted from one tool call.
+#[derive(Debug, Clone, PartialEq)]
+enum PageAction {
+    Timer(TimerData),
+    Servings(ServingsData),
+}
+
 impl AiAgent {
     pub fn new(llm: LlmProvider, config: AiAgentConfig) -> Self {
         Self {
@@ -493,11 +515,11 @@ impl AiAgent {
         Ok((result_msg, Some(data)))
     }
 
-    /// Execute a tool call. Returns (result_text, optional_recipe_id, optional_timer_data, optional_meal_artifact).
+    /// Execute a tool call. Returns (result_text, optional_recipe_id, optional_page_action, optional_meal_artifact).
     /// If the tool is display_recipe, returns the recipe_id for the chat handler to emit SSE.
-    /// If the tool is start_timer, returns TimerData for the chat handler to emit SSE.
+    /// If the tool is start_timer or set_servings, returns a PageAction for the chat handler to emit SSE.
     /// If the tool is display_meal_plan, returns MealArtifactData for the chat handler to emit SSE.
-    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>, Option<TimerData>, Option<MealArtifactData>), AiError> {
+    async fn execute_tool(&self, tool_call: &ToolCall) -> Result<(String, Option<String>, Option<PageAction>, Option<MealArtifactData>), AiError> {
         // Handle native tools (not MCP)
         if tool_call.name == "display_recipe" {
             tracing::info!("Tool call detected: display_recipe with args: {:?}", tool_call.arguments);
@@ -599,13 +621,22 @@ impl AiAgent {
                 match (duration, label) {
                     (Some(d), Some(l)) => {
                         tracing::info!("Timer data extracted: duration={}, label={}, step={:?}", d, l, step_number);
-                        Some(TimerData { duration_minutes: d, label: l, step_number })
+                        Some(PageAction::Timer(TimerData { duration_minutes: d, label: l, step_number }))
                     }
                     _ => None,
                 }
             } else {
                 None
             }
+        } else if tool_call.name == "set_servings" {
+            serde_json::from_str::<serde_json::Value>(content)
+                .ok()
+                .and_then(|parsed| parsed.get("servings").and_then(|v| v.as_u64()))
+                .and_then(|n| u32::try_from(n).ok())
+                .map(|servings| {
+                    tracing::info!("Servings data extracted: servings={}", servings);
+                    PageAction::Servings(ServingsData { servings })
+                })
         } else {
             None
         };
@@ -636,15 +667,15 @@ impl AiAgent {
     }
 
     /// Chat with the AI agent.
-    /// Returns (response_text, tools_used, recipe_ids_to_display, timer_data, meal_plans, full_messages).
-    /// Timer_data is Vec<TimerData> for start_timer tool calls.
+    /// Returns (response_text, tools_used, recipe_ids_to_display, page_events, meal_plans, full_messages).
+    /// page_events holds TimerData for start_timer and ServingsData for set_servings tool calls.
     /// meal_plans is Vec<MealArtifactData> for display_meal_plan tool calls.
     /// The full_messages vector contains all messages from the agent loop
     /// (including tool calls and results) for persisting in the session.
     pub async fn chat(
         &self,
         conversation: &[Message],
-    ) -> Result<(String, Vec<String>, Vec<String>, Vec<TimerData>, Vec<MealArtifactData>, Vec<Message>), AiError> {
+    ) -> Result<(String, Vec<String>, Vec<String>, PageEvents, Vec<MealArtifactData>, Vec<Message>), AiError> {
         // Ensure MCP is running
         {
             let processes_guard = self.mcp_processes.lock().await;
@@ -664,20 +695,13 @@ impl AiAgent {
             && let Some(Message::User { content }) = messages.last_mut() {
                 // Find the last Text block and append the reminder to it
                 if let Some(ContentBlock::Text { text }) = content.iter_mut().rev().find(|b| matches!(b, ContentBlock::Text { .. })) {
-                    text.push_str(
-                        "\n\n(Reminder: Use list_recipes when the user asks to see their recipes. \
-                         Use display_recipe to show recipe details in the side panel. \
-                         After creating a recipe, call display_recipe with the new recipe_id. \
-                         If current_recipe context is provided, treat it as the active recipe and call get_recipe when needed. \
-                         When guiding cooking, ask servings first, scale ingredients intelligently, break into phases, and call start_timer for waiting periods. \
-                         Do not output full ingredient lists or steps in chat.)"
-                    );
+                    text.push_str(LONG_CONVERSATION_REMINDER);
                 }
             }
 
         let mut tool_uses: Vec<String> = Vec::new();
         let mut recipe_ids: Vec<String> = Vec::new();
-        let mut timer_data: Vec<TimerData> = Vec::new();
+        let mut page_events = PageEvents::default();
         let mut meal_plan_data: Vec<MealArtifactData> = Vec::new();
         let mut final_text = String::new();
         let mut executed_tool_signatures: HashSet<String> = HashSet::new();
@@ -727,12 +751,14 @@ impl AiAgent {
                     tool_uses.push(call.name.clone());
                     let result = self.execute_tool(call).await;
                     match result {
-                        Ok((text, maybe_recipe_id, maybe_timer_data, maybe_meal_plan)) => {
+                        Ok((text, maybe_recipe_id, maybe_page_action, maybe_meal_plan)) => {
                             if let Some(rid) = maybe_recipe_id {
                                 recipe_ids.push(rid);
                             }
-                            if let Some(timer) = maybe_timer_data {
-                                timer_data.push(timer);
+                            match maybe_page_action {
+                                Some(PageAction::Timer(timer)) => page_events.timers.push(timer),
+                                Some(PageAction::Servings(servings)) => page_events.servings.push(servings),
+                                None => {}
                             }
                             if let Some(mp) = maybe_meal_plan {
                                 meal_plan_data.push(mp);
@@ -770,9 +796,19 @@ impl AiAgent {
 
         // Return messages starting after the original conversation
         let new_messages = messages[conversation.len()..].to_vec();
-        Ok((final_text, tool_uses, dedupe_recipe_ids(recipe_ids), timer_data, meal_plan_data, new_messages))
+        Ok((final_text, tool_uses, dedupe_recipe_ids(recipe_ids), page_events, meal_plan_data, new_messages))
     }
 }
+
+/// Appended to the last user message once a conversation reaches 5 messages, so the
+/// model keeps the critical tool-use rules in view.
+const LONG_CONVERSATION_REMINDER: &str = "\n\n(Reminder: Use list_recipes when the user asks to see their recipes. \
+     Use display_recipe to show recipe details in the side panel. \
+     After creating a recipe, call display_recipe with the new recipe_id. \
+     If current_recipe context is provided, treat it as the active recipe and call get_recipe when needed. \
+     Use set_servings to scale for tonight, and update_recipe only when the user asks to change or save the recipe. \
+     When guiding cooking, give the first step first, break into phases, and call start_timer for waiting periods. \
+     Do not output full ingredient lists or steps in chat.)";
 
 /// Appended to a successful `update_recipe` tool result so the model knows the page
 /// has already been refreshed and answers with a single margin note.
@@ -789,6 +825,21 @@ pub fn dedupe_recipe_ids(ids: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_long_conversation_reminder_covers_the_new_rules() {
+        // web-chat › Long-Conversation Reminder › Reminder covers all tool-use patterns
+        let r = LONG_CONVERSATION_REMINDER;
+        assert!(r.contains("list_recipes"));
+        assert!(r.contains("display_recipe"));
+        assert!(r.contains("call display_recipe with the new recipe_id"));
+        assert!(r.contains("Use set_servings to scale for tonight"));
+        assert!(r.contains("update_recipe only when the user asks to change or save the recipe"));
+        assert!(r.contains("give the first step first"));
+        assert!(r.contains("Do not output full ingredient lists or steps in chat"));
+        assert!(!r.to_lowercase().contains("servings first"), "must not ask for servings first: {r}");
+        assert!(!r.contains("scale ingredients intelligently"));
+    }
 
     fn make_recipe(id: &str, role: &str) -> serde_json::Value {
         serde_json::json!({ "recipe_id": id, "role": role })

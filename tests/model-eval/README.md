@@ -12,12 +12,12 @@ emits; it never judges prose. See
 | display-by-name | `recipe_artifact` for the lasagne |
 | display-german | German request opens the banana bread |
 | timer-for-step | `timer_start` 90 min for step 4 of the lasagne |
-| halve-current | curry updated to servings 2, coconut 200 ml, chicken 250 g, nothing dropped |
+| halve-current | `servings_set` 2 for the curry (the page is scaled), no `update_recipe`, the book unchanged |
 | image-to-recipe | handwritten card → one new recipe, 6-7 ingredients, 225 g flour, 220/200 °C, 12-15 min bake |
 | text-to-recipe | flapjacks saved with 4 ingredients, 20 min, 180 °C, makes 12 |
 | meal-plan | `meal_artifact` with valid ids, a main and a dessert, 6 guests |
 | grounded-search | vegetarian recipes named without inventing meat dishes |
-| guided-cooking-2-turns | first step mentions the oven, next mentions eggs, both concise |
+| guided-cooking-2-turns | first step mentions the oven, before any question; next mentions eggs; both concise; no writes |
 | troubleshoot-french | replies in French and writes nothing |
 
 Per model it also records latency per scenario and the summed token usage from the
@@ -31,7 +31,8 @@ server's `gemini usage` log lines (prompt, output, thoughts, cached).
 - `seed.cjs <base_url>` — the ten-recipe eval book (explicit difficulty and tags,
   so seeding makes no background LLM calls).
 - `run-eval.cjs <port> <label> [scenario_filter]` — drives `POST /api/chat` and
-  writes `runs/results/<label>.json`.
+  writes `runs/results/<label>.json`. The filter is a comma-separated list of
+  substrings of scenario ids (`halve-current,hard-guided-5`).
 - `run-all.sh <round>` — runs every candidate (list at the top of the file) in
   parallel, one port each.
 - `recipe-card.png` — the handwritten card for image-to-recipe; `card.cjs`

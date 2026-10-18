@@ -23,5 +23,13 @@
 
 - [x] 3.1 `design-system.md`: tokens, background, desk sizes, ingredient rows, pages that scroll like paper, tape, headers, meta line, duration clock, ribbons removed
 - [x] 3.2 `openspec validate lighter-book --strict`
-- [ ] 3.3 At the merge of `cook-from-the-page`: re-base the meta line and header requirements (design "Deferred")
+- [x] 3.3 At the merge of `cook-from-the-page`: re-base the meta line and header requirements, plus the hit-area ribbon scenario, times and tape (design "Done at the merge")
+
+## 4. Merge with `cook-from-the-page`
+
+- [x] 4.1 Conflicts: rows keep `--ingredient-row` (+ `min-height`); meta line serif 15px (14px at the desk) with the stepper; thumbnail `position: relative` + `flex: none`; "Ingredients" header + the servings note; `design-system.md` tap-target rows
+- [x] 4.2 Tests that met both: the time format in `contents-page`, `recipe-display` (popover breakdown, phone total) and `lighter-book` (breakdown in the popover); the desk title size in `recipe-display`
+- [x] 4.3 The tick in the margin: `lighter-book.spec` "margin rule" case. Red-check: tick back at −16px → its right edge at 57px, red; restored byte-identical
+- [x] 4.4 Popover times (`.meta-breakdown`, `.more-total`) in the serif
+- [x] 4.5 Full e2e green on the merge: 858 passed, 183 skipped, 0 failed; `cargo test` and `make lint` clean
 - [x] 3.4 `.scratch/ingredient-groups` filed for after the release

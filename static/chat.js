@@ -7,6 +7,7 @@
 
 import * as MealPlanDisplay from './meal-plan-display.js';
 import * as MarginNotes from './margin-notes.js';
+import * as Servings from './servings.js';
 import { clearPrefetchCache } from './page-transitions.js';
 
 // Recipe ids already fetched during the current chat turn (reset in sendMessage)
@@ -60,6 +61,7 @@ export function initializeState(appState) {
 // names never reach the page.
 const STATUS_LABELS = {
     start_timer: 'Setting a timer…',
+    set_servings: 'Adjusting the servings…',
     display_recipe: 'Opening the recipe…',
     update_recipe: 'Updating the recipe…',
     create_recipe: 'Writing it into the book…',
@@ -223,6 +225,11 @@ export async function sendMessage() {
             if (state.currentRecipeTitle) {
                 payload.current_recipe.title = state.currentRecipeTitle;
             }
+            // The servings the page shows (the stepper), so the model scales from them
+            const servings = Servings.displayedServings(state.currentRecipeId);
+            if (servings != null) {
+                payload.current_recipe.servings = servings;
+            }
         }
 
         // Include image if attached, then clear the indicator immediately
@@ -317,6 +324,15 @@ export async function sendMessage() {
                             // Timer start: the pill is the confirmation
                             if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
+                            }
+                            break;
+
+                        case 'servings_set':
+                            // The open recipe's stepper only (setServings ignores any
+                            // other id): the page is scaled, nothing is re-rendered
+                            // and nothing is saved
+                            if (state.viewMode === 'recipe') {
+                                Servings.setServings(parsed.recipe_id, parsed.servings);
                             }
                             break;
 

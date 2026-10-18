@@ -14,6 +14,7 @@ import * as MarginNotes from './margin-notes.js';
 import * as PageTabs from './page-tabs.js';
 import * as SpreadModes from './spread-modes.js';
 import * as PlaceKeeping from './place-keeping.js';
+import * as Servings from './servings.js';
 
 // Global state
 let conversationId = null;
@@ -375,6 +376,9 @@ function setupRecipePhotoUpload() {
         if (!btn) return;
         targetRecipeId = btn.dataset.recipeId;
         photoInput.value = '';
+        // The file picker opens: the "⋯" popover has done its job. Closed
+        // first, so its outside-tap guard never sees the input's own click.
+        RecipeDisplay.closeMorePanel();
         photoInput.click();
     });
 
@@ -420,6 +424,10 @@ function setupShareButton() {
         if (!recipeId) return;
 
         btn.disabled = true;
+        // The share has started: the "⋯" popover has done its job, and the
+        // toast shows by the "⋯" button it came from
+        const anchor = btn.closest('.recipe-header');
+        RecipeDisplay.closeMorePanel();
         try {
             const resp = await fetch(`/api/recipes/${recipeId}/share`, {
                 method: 'POST',
@@ -446,9 +454,11 @@ function setupShareButton() {
             const toast = document.createElement('div');
             toast.className = 'share-toast';
             toast.textContent = copied ? 'Link copied!' : 'Link created!';
-            // Just above the button, wherever the meta line has wrapped it to
-            toast.style.top = `${btn.offsetTop - 30}px`;
-            btn.parentElement.appendChild(toast);
+            // Just under the "⋯" button the share was started from
+            const more = anchor && anchor.querySelector('.recipe-more');
+            if (more) toast.style.top = `${more.offsetTop + more.offsetHeight + 4}px`;
+            else toast.style.top = `${btn.offsetTop - 30}px`;
+            (anchor || btn.parentElement).appendChild(toast);
             requestAnimationFrame(() => toast.classList.add('show'));
             setTimeout(() => {
                 toast.classList.remove('show');
@@ -545,6 +555,8 @@ function renderSpread(mode, options = {}) {
     // Whatever the mode, this call is now the one that decides what the pages
     // hold; anything still in flight from the last one is stale.
     spreadGeneration++;
+    // A mode change closes the header's "⋯" popover
+    RecipeDisplay.closeMorePanel();
 
     if (mode === 'cook') {
         const panel = RecipeDisplay.takeIngredientsPanel();
@@ -555,6 +567,8 @@ function renderSpread(mode, options = {}) {
         leftContent.appendChild(panel);
         // Ticks or a step mark set while the panel was parked off the page
         if (currentRecipeId != null) PlaceKeeping.applyPlace(currentRecipeId);
+        // ...and servings changed while it was parked
+        Servings.redrawServings();
         return;
     }
 
@@ -758,6 +772,10 @@ function setupOrientationChangeHandler() {
             renderSpread(effectiveSpreadMode());
         }
 
+        // The meta line moves with the band (recipe-display.js), before the
+        // scroll comes back, so the place restored is measured against it
+        RecipeDisplay.placeMetaLine();
+
         // Pages showing a recipe come back to where the reader left them in
         // this band. The contents are drawn afresh for the new layout, so they
         // start at the top.
@@ -785,6 +803,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     SpreadModes.initSpreadModes();
     Navigation.initFooterNav();
     PlaceKeeping.initPlaceKeeping();
+    Servings.initServings();
+    RecipeDisplay.initRecipeMore();
 
     // Initialize swipe gestures for mobile page-turn navigation
     const pagesContainer = document.querySelector('.pages-container');

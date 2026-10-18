@@ -71,6 +71,16 @@ async function toIngredients(page: Page) {
   await settled(page);
 }
 
+/** Taps the stepper's "+" `times` times. */
+async function moreServings(page: Page, times: number) {
+  const plus = page.locator('.servings-step[data-step="+1"]');
+  for (let i = 0; i < times; i++) {
+    const now = Number(await page.locator('.servings-count').textContent());
+    await plus.click();
+    await expect(page.locator('.servings-count')).toHaveText(String(now + 1));
+  }
+}
+
 async function stored(page: Page, id: string) {
   return page.evaluate((key) => sessionStorage.getItem(key), `rv-place:${id}`);
 }
@@ -112,15 +122,19 @@ test.describe('Keeping your place', () => {
     await tap(page, item);
     await expect(item).toHaveAttribute('data-ticked', 'true');
     expectSameBox(await boxOf(item), before, 'ticked ingredient');
-    // Struck through, faded, and a pencil tick drawn in the margin
+    // Struck through, faded but readable at arm's length (opacity ≥ 0.6), and
+    // a check mark drawn in the gutter, out of the row's box
     const look = await item.evaluate(el => ({
       deco: getComputedStyle(el).textDecorationLine,
       opacity: parseFloat(getComputedStyle(el).opacity),
       tick: getComputedStyle(el, '::before').content,
+      tickPosition: getComputedStyle(el, '::before').position,
     }));
     expect(look.deco).toContain('line-through');
     expect(look.opacity).toBeLessThan(1);
+    expect(look.opacity).toBeGreaterThanOrEqual(0.6);
     expect(look.tick).not.toBe('none');
+    expect(look.tickPosition).toBe('absolute');
 
     await tap(page, item);
     await expect(item).not.toHaveAttribute('data-ticked', 'true');
@@ -216,7 +230,7 @@ test.describe('Keeping your place', () => {
     });
   });
 
-  test('ticks and the mark are remembered per recipe, across paging and a reload', async ({ page }) => {
+  test('ticks, the mark and the servings are remembered per recipe, across paging and a reload', async ({ page }) => {
     const a = await createCookingRecipe(page);
     const b = await createCookingRecipe(page);
     await authenticate(page);
@@ -224,21 +238,33 @@ test.describe('Keeping your place', () => {
 
     await tap(page, ingredient(page, 1));
     await tap(page, ingredient(page, 3));
+    // The stepper is on the Ingredients tab on the phone
+    await moreServings(page, 2);
     await toMethod(page);
     await tap(page, step(page, 4));
-    expect(JSON.parse((await stored(page, a.id))!)).toEqual({ ticked: [1, 3], step: 4 });
+    expect(JSON.parse((await stored(page, a.id))!)).toEqual({ ticked: [1, 3], step: 4, servings: 6 });
 
-    // Next to B: B carries none of A's marks
+    // A spread mode switch keeps them
+    if (!isPhone(page)) {
+      await selectMode(page, 'notes');
+      await selectMode(page, 'cook');
+      await expect(page.locator('.servings-count')).toHaveText('6');
+      await expect(ingredient(page, 1)).toHaveAttribute('data-ticked', 'true');
+    }
+
+    // Next to B: B carries none of A's marks, and its own servings
     await turn(page, 'next', b.title);
     await toIngredients(page);
     await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(0);
     await expect(page.locator('.prep-step[aria-current="step"]')).toHaveCount(0);
+    await expect(page.locator('.servings-count')).toHaveText('4');
     await tap(page, ingredient(page, 0));
     expect(JSON.parse((await stored(page, b.id))!)).toEqual({ ticked: [0], step: null });
 
     // ...and back to A
     await turn(page, 'prev', a.title);
     await toIngredients(page);
+    await expect(page.locator('.servings-count')).toHaveText('6');
     await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(2);
     await expect(ingredient(page, 1)).toHaveAttribute('data-ticked', 'true');
     await expect(ingredient(page, 3)).toHaveAttribute('data-ticked', 'true');
@@ -252,9 +278,25 @@ test.describe('Keeping your place', () => {
     await expect(ingredient(page, 3)).toHaveAttribute('data-ticked', 'true');
     await expect(ingredient(page, 0)).not.toHaveAttribute('data-ticked', 'true');
     await expect(step(page, 4)).toHaveAttribute('aria-current', 'step');
+    await expect(page.locator('.servings-count')).toHaveText('6');
   });
 
-  test('clearing the ticks keeps the step mark, with a 44px hit area', async ({ page }) => {
+  test('ticks survive a change of servings', async ({ page }) => {
+    const r = await createCookingRecipe(page);
+    await openCooking(page, r.id);
+    await tap(page, ingredient(page, 1));
+    await tap(page, ingredient(page, 3));
+    await moreServings(page, 1);
+    await page.locator('.servings-step[data-step="-1"]').click();
+    await page.locator('.servings-step[data-step="-1"]').click();
+    await expect(page.locator('.servings-count')).toHaveText('3');
+    await expect(ingredient(page, 1)).toHaveAttribute('data-ticked', 'true');
+    await expect(ingredient(page, 3)).toHaveAttribute('data-ticked', 'true');
+    await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(2);
+    expect(JSON.parse((await stored(page, r.id))!)).toEqual({ ticked: [1, 3], step: null, servings: 3 });
+  });
+
+  test('clearing the ticks keeps the step mark and the servings, with a 44px hit area', async ({ page }) => {
     const r = await createCookingRecipe(page);
     // A recipe after it, so the phone's next-recipe strip is live (it takes no
     // taps on the last page)
@@ -271,6 +313,8 @@ test.describe('Keeping your place', () => {
     await expect(clear).toBeVisible();
     expect(Math.abs((await header.boundingBox())!.height - headerHeight)).toBeLessThanOrEqual(1);
 
+    // The stepper is on the Ingredients tab on the phone
+    await moreServings(page, 3);
     await toMethod(page);
     await tap(page, step(page, 2));
     await toIngredients(page);
@@ -281,7 +325,13 @@ test.describe('Keeping your place', () => {
     await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(0);
     await expect(page.locator('.prep-step[aria-current="step"]')).toHaveCount(1);
     await expect(step(page, 2)).toHaveAttribute('aria-current', 'step');
-    expect(JSON.parse((await stored(page, r.id))!)).toEqual({ ticked: [], step: 2 });
+    await expect(page.locator('.servings-count')).toHaveText('7');
+    expect(JSON.parse((await stored(page, r.id))!)).toEqual({ ticked: [], step: 2, servings: 7 });
+
+    // Undo restores the ticks and still keeps the servings
+    await clear.click();
+    await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(2);
+    expect(JSON.parse((await stored(page, r.id))!)).toEqual({ ticked: [0, 2], step: 2, servings: 7 });
   });
 
   test('clear ticks is hidden while nothing is ticked, even with a step marked', async ({ page }) => {

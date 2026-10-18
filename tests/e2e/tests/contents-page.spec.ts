@@ -197,17 +197,27 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     await expect(steps.nth(0).locator('.step-number')).toHaveText('1.');
     await expect(steps.nth(1).locator('.step-text')).toHaveText('Bake it');
 
-    // Meta line: total (prep + cook), serves, breakdown
+    // Meta line: serves, then the total (prep + cook) above 600px
     const meta = page.locator('.recipe-meta-line');
     await expect(meta).toHaveCount(1);
-    await expect(meta).toContainText('30m');
-    await expect(meta).toContainText('serves 4');
-    await expect(meta.locator('.meta-breakdown')).toHaveText('(10m prep · 20m cook)');
+    await expect(meta.locator('.meta-serves')).toContainText('serves');
+    await expect(meta.locator('.servings-count')).toHaveText('4');
+    await expect(meta.locator('.meta-breakdown, .share-btn, .add-photo-btn')).toHaveCount(0);
     await expect(page.locator('.recipe-meta')).toHaveCount(0);
 
-    // ...ending with share and add-photo, after the breakdown
-    const order = await meta.evaluate(el => Array.from(el.children).slice(-3).map(c => c.className));
-    expect(order).toEqual(['meta-breakdown', 'share-btn', 'add-photo-btn']);
+    // The breakdown, share and add-photo are in the "⋯" popover (with the
+    // total, on the phone)
+    const panel = page.locator('#page-right-content .recipe-more-panel');
+    await page.locator('#page-right-content button.recipe-more').click();
+    await expect(panel).toBeVisible();
+    await expect(isPhone(page) ? panel.locator('.meta-total') : meta.locator('.meta-total')).toHaveText('30m');
+    await expect(isPhone(page) ? panel.locator('.meta-total') : meta.locator('.meta-total')).toBeVisible();
+    await expect(panel.locator('.meta-breakdown')).toHaveText('(10m prep · 20m cook)');
+    const order = await panel.evaluate(el => [el.querySelector('.meta-breakdown'), el.querySelector('.share-btn'), el.querySelector('.add-photo-btn')]
+      .every((n, i, all) => i === 0 || (all[i - 1]!.compareDocumentPosition(n!) & 4) === 4));
+    expect(order).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
 
     // Read from the counter: 18px method text above 600px, 17px on the phone,
     // 16px at the desk; durations 15px (none here, so the step text is what is
@@ -239,11 +249,14 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     await expect(page.locator('.recipe-title')).toContainText('Slow Recipe');
 
     const meta = page.locator('.recipe-meta-line');
-    await expect(meta.locator('.meta-total')).toHaveText('1h 15m');
+    const panel = page.locator('#page-right-content .recipe-more-panel');
+    await expect((isPhone(page) ? panel : meta).locator('.meta-total')).toHaveText('1h 15m');
     await expect(meta.locator('.meta-serves')).toHaveCount(0);
-    await expect(meta.locator('.meta-breakdown')).toHaveText('(1h 15m cook)');
-    // The difficulty is not assessed yet, so its slot is there and empty
-    await expect(meta.locator('.meta-difficulty')).toHaveCount(1);
-    await expect(meta.locator('.meta-difficulty')).toBeEmpty();
+    await page.locator('#page-right-content button.recipe-more').click();
+    await expect(panel.locator('.meta-breakdown')).toHaveText('(1h 15m cook)');
+    // The difficulty is not assessed yet, so its slot in the popover is there and empty
+    await expect(meta.locator('.meta-difficulty')).toHaveCount(0);
+    await expect(panel.locator('.meta-difficulty')).toHaveCount(1);
+    await expect(panel.locator('.meta-difficulty')).toBeEmpty();
   });
 });

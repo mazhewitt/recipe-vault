@@ -193,7 +193,7 @@ fn test_sse_error_event_format() {
 
 // ==== Timer SSE event: step_number end to end ====
 
-use recipe_vault::ai::{AiAgent, AiAgentConfig, ContentBlock, LlmProvider, McpServerConfig, Message, TimerData};
+use recipe_vault::ai::{AiAgent, AiAgentConfig, ContentBlock, LlmProvider, McpServerConfig, Message, ServingsData, TimerData};
 use recipe_vault::handlers::chat::SseEvent;
 
 /// Build an AiAgent over the mock LLM and the real MCP binary (built by cargo for
@@ -239,12 +239,14 @@ async fn test_start_timer_over_mock_llm_yields_timer_start_with_step_number() {
     let agent = mock_agent();
     agent.start().await.expect("agent should start the MCP server");
 
-    let (text, tools_used, _recipe_ids, timer_data, _meal_plans, _messages) = agent
+    let (text, tools_used, _recipe_ids, page, _meal_plans, _messages) = agent
         .chat(&[user_message("Please start a timer")])
         .await
         .expect("chat over the mock provider should succeed");
     agent.stop().await.ok();
 
+    let timer_data = page.timers;
+    assert!(page.servings.is_empty());
     assert_eq!(tools_used, vec!["start_timer".to_string()]);
     assert_eq!(
         timer_data,
@@ -286,6 +288,79 @@ fn test_timer_start_event_includes_step_number_when_present() {
         step_number: Some(2),
     });
     assert_eq!(json, json!({"duration_minutes": 30.0, "label": "Marinate chicken", "step_number": 2}));
+}
+
+// ==== set_servings: servings_set end to end over the mock ====
+
+use recipe_vault::handlers::chat::{current_recipe_context_text, servings_set_events, CurrentRecipeContext};
+
+/// A user message as the chat handler builds it: the note, then the current-recipe block.
+fn note_with_recipe(note: &str, recipe_json: serde_json::Value) -> Message {
+    let ctx: CurrentRecipeContext = serde_json::from_value(recipe_json).unwrap();
+    Message::User {
+        content: vec![
+            ContentBlock::Text { text: note.to_string() },
+            ContentBlock::Text { text: current_recipe_context_text(&ctx) },
+        ],
+    }
+}
+
+#[tokio::test]
+async fn test_halve_over_mock_llm_yields_servings_data_and_no_recipe_ids() {
+    let agent = mock_agent();
+    agent.start().await.expect("agent should start the MCP server");
+
+    let (text, tools_used, recipe_ids, page, _meal_plans, _messages) = agent
+        .chat(&[note_with_recipe(
+            "halve this recipe",
+            json!({"recipe_id": "R", "title": "Lasagne", "servings": 8}),
+        )])
+        .await
+        .expect("chat over the mock provider should succeed");
+    agent.stop().await.ok();
+
+    assert_eq!(tools_used, vec!["set_servings".to_string()]);
+    assert_eq!(page.servings, vec![ServingsData { servings: 4 }]);
+    assert!(page.timers.is_empty());
+    assert!(recipe_ids.is_empty(), "set_servings must not emit recipe_artifact: {recipe_ids:?}");
+    assert!(text.contains("4 servings"), "reply should name the servings: {text}");
+}
+
+#[test]
+fn test_servings_set_event_serialises_servings_and_recipe_id() {
+    let event = SseEvent::ServingsSet { servings: 4, recipe_id: "R".to_string() };
+    let data: serde_json::Value = serde_json::from_str(&event.data_json()).unwrap();
+    assert_eq!(data, json!({"servings": 4, "recipe_id": "R"}));
+    let tagged = serde_json::to_value(&event).unwrap();
+    assert_eq!(tagged["event"], "servings_set");
+}
+
+#[test]
+fn test_servings_set_events_need_a_current_recipe() {
+    let servings = vec![ServingsData { servings: 4 }];
+    assert!(servings_set_events(None, &servings).is_empty(), "no recipe, no event");
+
+    let ctx: CurrentRecipeContext = serde_json::from_value(json!({"recipe_id": "R"})).unwrap();
+    let events = servings_set_events(Some(&ctx), &servings);
+    assert_eq!(events.len(), 1);
+    let data: serde_json::Value = serde_json::from_str(&events[0].data_json()).unwrap();
+    assert_eq!(data, json!({"servings": 4, "recipe_id": "R"}));
+}
+
+#[test]
+fn test_page_servings_reach_the_context_block() {
+    let ctx: CurrentRecipeContext =
+        serde_json::from_value(json!({"recipe_id": "R", "title": "Lasagne", "servings": 8})).unwrap();
+    let text = current_recipe_context_text(&ctx);
+    assert!(text.lines().any(|l| l == "page_servings: 8"), "missing page_servings line: {text}");
+    assert!(text.contains("may differ from the saved recipe"), "missing explanation: {text}");
+
+    // An old request body without the field still deserialises, and adds no line
+    let old: CurrentRecipeContext =
+        serde_json::from_value(json!({"recipe_id": "R", "title": "Lasagne"})).unwrap();
+    let text = current_recipe_context_text(&old);
+    assert!(!text.contains("page_servings"), "no servings, no line: {text}");
+    assert!(text.starts_with("[Current recipe context]\nrecipe_id: R"));
 }
 
 // ==== Integration Tests (require external dependencies) ====
@@ -403,7 +478,7 @@ async fn test_update_recipe_emits_recipe_artifact_and_ui_instruction() {
     agent.start().await.expect("agent should start the MCP server");
 
     let (text, tools_used, recipe_ids, _timers, _meal_plans, messages) = agent
-        .chat(&[user_message("Please halve this recipe")])
+        .chat(&[user_message("Please update this recipe")])
         .await
         .expect("chat over the mock provider should succeed");
     agent.stop().await.ok();
@@ -432,7 +507,7 @@ async fn test_failed_update_recipe_emits_no_artifact_and_leaves_text_unchanged()
     agent.start().await.expect("agent should start the MCP server");
 
     let (_text, _tools_used, recipe_ids, _timers, _meal_plans, messages) = agent
-        .chat(&[user_message("Please halve this recipe")])
+        .chat(&[user_message("Please update this recipe")])
         .await
         .expect("chat over the mock provider should succeed");
     agent.stop().await.ok();

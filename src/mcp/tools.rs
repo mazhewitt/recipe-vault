@@ -12,6 +12,7 @@ pub fn get_all_tools() -> Vec<ToolDefinition> {
         update_recipe_tool(),
         delete_recipe_tool(),
         start_timer_tool(),
+        set_servings_tool(),
     ]
 }
 
@@ -238,6 +239,26 @@ pub fn start_timer_tool() -> ToolDefinition {
     )
 }
 
+/// Tool definition for setting the servings the open recipe's page shows
+pub fn set_servings_tool() -> ToolDefinition {
+    ToolDefinition::new(
+        "set_servings",
+        "Set how many servings the open recipe's page shows, for cooking tonight. The page rescales its ingredient quantities; this never changes the saved recipe and makes no database write. Use this for \"make it for 6\", \"halve it\", \"just two of us\". Use update_recipe only to save a change to the recipe itself.",
+        json!({
+            "type": "object",
+            "properties": {
+                "servings": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24,
+                    "description": "The number of servings the page should show (1-24)"
+                }
+            },
+            "required": ["servings"]
+        })
+    )
+}
+
 /// Handle list_recipes tool call
 pub fn handle_list_recipes(client: &ApiClient, _params: JsonValue) -> Result<JsonValue, JsonRpcError> {
     let recipes = client.list_recipes()?;
@@ -329,6 +350,26 @@ pub fn handle_delete_recipe(client: &ApiClient, params: JsonValue) -> Result<Jso
 
     client.delete_recipe(recipe_id)?;
     Ok(json!({ "status": "success", "message": format!("Recipe {} deleted", recipe_id) }))
+}
+
+/// Handle set_servings tool call: validates only, the page does the scaling
+pub fn handle_set_servings(_client: &ApiClient, params: JsonValue) -> Result<JsonValue, JsonRpcError> {
+    let v = params
+        .get("servings")
+        .ok_or_else(|| JsonRpcError::invalid_params("Missing servings parameter"))?;
+    // Accept integer-valued floats (e.g. 6.0) since some models emit them
+    let servings = v
+        .as_u64()
+        .or_else(|| v.as_f64().filter(|f| f.fract() == 0.0 && *f >= 0.0).map(|f| f as u64))
+        .ok_or_else(|| JsonRpcError::invalid_params("servings must be a whole number"))?;
+    if !(1..=24).contains(&servings) {
+        return Err(JsonRpcError::invalid_params("servings must be between 1 and 24"));
+    }
+
+    Ok(json!({
+        "servings": servings,
+        "message": format!("The page now shows {} servings; the saved recipe is unchanged", servings)
+    }))
 }
 
 /// Handle start_timer tool call
@@ -591,13 +632,14 @@ mod tests {
     #[test]
     fn test_get_all_tools() {
         let tools = get_all_tools();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 7);
         assert_eq!(tools[0].name, "list_recipes");
         assert_eq!(tools[1].name, "get_recipe");
         assert_eq!(tools[2].name, "create_recipe");
         assert_eq!(tools[3].name, "update_recipe");
         assert_eq!(tools[4].name, "delete_recipe");
         assert_eq!(tools[5].name, "start_timer");
+        assert_eq!(tools[6].name, "set_servings");
     }
 
     #[test]
@@ -766,6 +808,48 @@ mod tests {
             )
             .unwrap_err();
             assert_eq!(err.code, -32602, "expected invalid params error");
+        }
+    }
+
+    #[test]
+    fn test_set_servings_tool_schema() {
+        let tool = set_servings_tool();
+        let props = tool.input_schema.get("properties").unwrap().as_object().unwrap();
+        assert_eq!(props.len(), 1, "servings is the only property");
+        let servings = props.get("servings").expect("servings property");
+        assert_eq!(servings.get("type").and_then(|v| v.as_str()), Some("integer"));
+        assert_eq!(servings.get("minimum").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(servings.get("maximum").and_then(|v| v.as_u64()), Some(24));
+        let required = tool.input_schema.get("required").and_then(|v| v.as_array()).unwrap();
+        assert!(required.iter().any(|v| v.as_str() == Some("servings")));
+        assert!(tool.description.contains("saved recipe"));
+        assert!(tool.description.contains("update_recipe"));
+    }
+
+    #[test]
+    fn test_set_servings_valid() {
+        // The client points nowhere: any API call would fail the handler
+        let client = timer_test_client();
+        let result = handle_set_servings(&client, json!({"servings": 6})).unwrap();
+        assert_eq!(result["servings"], json!(6));
+        assert!(result["message"].as_str().unwrap().contains('6'));
+    }
+
+    #[test]
+    fn test_set_servings_accepts_integer_valued_float() {
+        let client = timer_test_client();
+        let result = handle_set_servings(&client, json!({"servings": 6.0})).unwrap();
+        assert_eq!(result["servings"], json!(6));
+    }
+
+    #[test]
+    fn test_set_servings_rejects_invalid() {
+        let client = timer_test_client();
+        let err = handle_set_servings(&client, json!({})).unwrap_err();
+        assert_eq!(err.code, -32602, "missing servings");
+        for bad in [json!(0), json!(25), json!(-2), json!(2.5), json!("6")] {
+            let err = handle_set_servings(&client, json!({"servings": bad.clone()})).unwrap_err();
+            assert_eq!(err.code, -32602, "expected invalid params for {}", bad);
         }
     }
 

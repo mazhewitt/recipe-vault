@@ -1,6 +1,6 @@
 # Cook mode: the recipe header takes a third of the screen, and the ingredient rows are too tight to tick
 
-Status: ready-for-human
+Status: promoted 2026-10-18 to `openspec/changes/cook-from-the-page` (item 1: P3; item 2: P4). Archive this directory when that change is archived.
 Reported: 2026-10-18
 Reporter: Claude (fresh-eyes re-check of the post-steady build `e35a58c`, `tests/usability/runs/audit-post-steady/`)
 Severity: major for the header (it decides how much of the method fits on screen while cooking), minor for the rows.
@@ -56,5 +56,12 @@ Evidence:
 3. **Rows: padding where there is room.** Give `.ingredient-item` a `min-height: 44px` with vertical padding, not margin, only where the list fits (tablet portrait and desktop, or when the list has 12 items or fewer). Elsewhere keep the tight rows and add a 300ms "tap again to undo" on a fresh tick. Or accept the tight rows and make a wrong tick easier to spot: fade less, keep the strike-through.
 
 Either header option combines with either row option. Option 1 also frees the height that 44px rows would need.
+
+## Decision (owner, 2026-10-18)
+
+- **Header: option 1, the compact cook header** (design P3). Title, a ~44px tilted thumbnail and a "⋯" button on one line; "serves − N + · total time" on the next; difficulty, tags, the prep/cook split, share and add-photo in a "⋯" popover. The same in every spread mode. This replaces steady-cooking-spread D9's "Share and photo end the meta line". Targets: step 1 at most 180px below the right page's top at 810×1080, 1080×810 and 1280×800; on the phone the first ingredient at most 200px from the top.
+- **Rows: option 3, padding where it fits, readable ticks** (P4), settled as `.ingredient-item` `min-height: 38px` (36px on the phone) from padding, and a ticked row kept at opacity ≥ 0.6 with a strike-through and a gutter check mark. Target: a 44px sweep hits the neighbour at most 1 time in 5, and the lasagne's 19 ingredients still fit at 810×1080.
+
+Promoted to `openspec/changes/cook-from-the-page`.
 
 ## Comments

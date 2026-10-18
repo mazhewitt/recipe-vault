@@ -136,7 +136,7 @@ impl ChatState {
         Ok(())
     }
 
-    pub async fn chat(&self, conversation: &[crate::ai::Message]) -> Result<(String, Vec<String>, Vec<String>, Vec<crate::ai::TimerData>, Vec<crate::ai::MealArtifactData>, Vec<crate::ai::Message>), ChatError> {
+    pub async fn chat(&self, conversation: &[crate::ai::Message]) -> Result<(String, Vec<String>, Vec<String>, crate::ai::PageEvents, Vec<crate::ai::MealArtifactData>, Vec<crate::ai::Message>), ChatError> {
         let agent_guard = self.agent.read().await;
         let agent = agent_guard
             .as_ref()

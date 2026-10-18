@@ -93,11 +93,20 @@ OpenSpec keeps a MODIFIED requirement's scenario headings, so book-spread-modes'
 - **The meta line** is Libre Baskerville 13px (12px at the desk) with `tabular-nums`; the breakdown is 12px. Tags stay Kalam chips: they read as labels.
 - **Tape.** `.recipe-polaroid::before` is a translucent strip 46% of the photo's width, so it scales to `cook-from-the-page`'s ~44px thumbnail. The photo gets a 6px top margin, clear of the next arrow.
 
-### Deferred to the merge with cook-from-the-page
+### Done at the merge with cook-from-the-page (2026-10-18)
 
-That change rewrites the meta line and the header: share and photo go into a "⋯" popover, and the polaroid becomes a thumbnail. It also MODIFIES "Recipe metadata displays with icons" and "Recipe book displays as open two-page spread with leather cover". When it merges, re-base those two requirements on its text with this change's edits:
-- the serif meta line and the time format in the first;
-- the "Method" header in the second.
+That change rewrites the meta line and the header: share and photo go into a "⋯" popover, and the polaroid becomes a thumbnail. It archives first, so this change re-bases on its text:
+- "Recipe metadata displays with icons": the serif meta line ("serves − 8 + · 1h 5m") and the time format, the breakdown in the popover.
+- "Recipe book displays as open two-page spread with leather cover": the "Method" header.
+- "Every control the cook taps has a 44px hit area": its ribbon scenario now says the edge holds no strip.
+- "Times on the meta line read one way" and "The photo is taped to the page" follow the times into the popover and the photo onto the title line.
+
+The CSS keeps one rule for each overlap:
+- **Rows:** `--ingredient-row` padding, plus a `min-height` because the padding rounds to 37.97px.
+- **Meta line:** the serif, at 15px (14px at the desk). It now holds the stepper, a control read from the counter, not the old 13px line of data.
+- **Thumbnail:** `position: relative` for the tape, and `flex: none` in the title row.
+- **Popover times:** the times in the popover are serif too.
+- **Tick:** on the left page the pencil ✓ moves into the margin, left of the rule. At cook-from-the-page's −16px it sat on the rule.
 
 ## Risks
 

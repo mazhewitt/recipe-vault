@@ -212,8 +212,11 @@ test.describe('A lighter book', () => {
     const font = await meta.evaluate(el => ({ family: getComputedStyle(el).fontFamily, numeric: getComputedStyle(el).fontVariantNumeric }));
     expect(font.family).toContain('Libre Baskerville');
     expect(font.numeric).toContain('tabular-nums');
-    await expect(meta.locator('.meta-total')).toHaveText('3h 10m');
-    await expect(meta.locator('.meta-breakdown')).toHaveText('(40m prep · 2h 30m cook)');
+    // The total is on the meta line (in the "⋯" popover on the phone); the
+    // breakdown is in the popover
+    const panel = page.locator('#page-right-content .recipe-more-panel');
+    await expect((isPhone(page) ? panel : meta).locator('.meta-total')).toHaveText('3h 10m');
+    await expect(panel.locator('.meta-breakdown')).toHaveText('(40m prep · 2h 30m cook)');
   });
 
   test('a duration chip shows a clock', async ({ page }) => {
@@ -286,5 +289,18 @@ test.describe('A lighter book', () => {
     expect(m.text).toBe(62);
     expect(m.tabs.length).toBeGreaterThan(0);
     for (const tab of m.tabs) expect(tab).toEqual([10, 36]);
+
+    // A tick is written in the margin, clear of the rule
+    const item = page.locator('#page-left-content .ingredient-item').first();
+    await item.click();
+    await expect(item).toHaveAttribute('data-ticked', 'true');
+    const tick = await item.evaluate(el => {
+      const x = document.getElementById('page-left')!.getBoundingClientRect().x;
+      const cs = getComputedStyle(el, '::before');
+      const left = el.getBoundingClientRect().x - x + parseFloat(cs.left);
+      return { left, right: left + parseFloat(cs.width) };
+    });
+    expect(tick.left).toBeGreaterThanOrEqual(10);
+    expect(tick.right).toBeLessThanOrEqual(49);
   });
 });

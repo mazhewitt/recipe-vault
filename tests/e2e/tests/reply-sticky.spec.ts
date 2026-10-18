@@ -299,7 +299,7 @@ test.describe('A turn in progress', () => {
     await page.evaluate(() => {
       const w = window as unknown as { __plumbing: string[] };
       w.__plumbing = [];
-      const bad = /Using tool|Timer set|start_timer|update_recipe|list_recipes/;
+      const bad = /Using tool|Timer set|start_timer|set_servings|update_recipe|list_recipes/;
       const check = () => {
         const regions = [
           document.getElementById('page-margin'),
@@ -314,13 +314,15 @@ test.describe('A turn in progress', () => {
       new MutationObserver(check).observe(document.body, { subtree: true, childList: true, characterData: true });
     });
 
-    for (const [note, reply] of [['list all recipes', 'Here are'], ['start a timer', 'Timer started'], ['halve this recipe', 'serves 2']]) {
+    // "halve" scales the page (set_servings), and the reply says so
+    for (const [note, reply] of [['list all recipes', 'Here are'], ['start a timer', 'Timer started'], ['halve this recipe', 'Showing 2 servings']]) {
       await sendNote(page, note);
       await expect(page.locator('#page-margin .margin-note[data-kind="reply"]')).toContainText(reply, { timeout: 10000 });
       await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true');
     }
     await openNotesView(page);
-    await expect(notesThread(page)).toContainText('serves 2');
+    await expect(notesThread(page)).toContainText('Showing 2 servings');
+    await expect(page.locator('.servings-count')).toHaveText('2');
 
     const seen = await page.evaluate(() => (window as unknown as { __plumbing: string[] }).__plumbing);
     expect(seen).toEqual([]);
@@ -394,13 +396,14 @@ test.describe('A turn in progress', () => {
   test('statusLabelFor speaks the cook\'s language', async ({ page }) => {
     const labels = await page.evaluate(async () => {
       const chat = await import('/static/chat.js');
-      const tools = ['start_timer', 'display_recipe', 'update_recipe', 'create_recipe', 'list_recipes', 'get_recipe',
+      const tools = ['start_timer', 'set_servings', 'display_recipe', 'update_recipe', 'create_recipe', 'list_recipes', 'get_recipe',
         'display_meal_plan', 'fetch', 'jina_fetch', 'duckduckgo_search', 'duckduckgo_news_search', 'search',
         'delete_recipe', 'something_new'];
       return Object.fromEntries(tools.map(t => [t, chat.statusLabelFor(t)]));
     });
     expect(labels).toEqual({
       start_timer: 'Setting a timer…',
+      set_servings: 'Adjusting the servings…',
       display_recipe: 'Opening the recipe…',
       update_recipe: 'Updating the recipe…',
       create_recipe: 'Writing it into the book…',

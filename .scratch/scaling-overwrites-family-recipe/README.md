@@ -1,6 +1,6 @@
 # One-off scaling or substitution silently overwrites the family's master recipe
 
-Status: ready-for-human
+Status: promoted 2026-10-18 to `openspec/changes/cook-from-the-page` (P1, P2; the first-step item is P5). Archive this directory when that change is archived.
 Reported: 2026-10-17
 Reporter: Claude (live model eval for `openspec/changes/upgrade-gemini-models`, see its `eval-judgement.md`, scenarios `halve-current` and `hard-substitute-and-scale`)
 Severity: medium. It loses family data the user didn't ask to change, and it happens with every model tested
@@ -47,5 +47,14 @@ At "Let's cook this together. I'm at the stove, what first?" no model gave the
 first instruction. Each one asked about servings first, because the
 cooking-guidance spec's session-start rule asks for servings. For a cook with
 busy hands, the first step should come first and the servings question second.
+
+## Decision (owner, 2026-10-18)
+
+**C for scaling, plus A for substitutions** (the recommendation above):
+- A servings stepper on the page scales the displayed quantities for the session; the saved recipe is untouched (design P1).
+- The assistant scales through a new page tool, `set_servings`, plumbed like `start_timer` with no database write. Substitutions and other one-off changes are presented in the reply with "Want me to save this as a change to the recipe?", and `update_recipe` is called only on a yes or an explicit request (P2). The mock's "halve" path moves to `set_servings`; "update"/"save" keeps saving.
+- "Also seen": the cooking session opens with the first step and names the page's servings in one line, instead of asking for servings first (P5).
+
+Promoted to `openspec/changes/cook-from-the-page`.
 
 ## Comments

@@ -72,19 +72,29 @@ file-backed database too (`SQLITE_BUSY`, 4 of 4 creates).
   `openspec/changes/glanceable-cooking` (G6, G7); archive with that change.
 - `note-input-rough-edges/` — the image chip grows the slip and cannot
   re-attach the same file, an empty send is silent, and send keeps its hover
-  colour on touch.
+  colour on touch. (The 40-character tablet wrap: owner accepted it,
+  2026-10-18.)
 - `phone-paging-rough-edges/` — "next recipe ›" moves between taps, paging
   resets the tab, and a header tap during a view transition is lost.
 - `cook-page-polish/` — uneven cook-mode ingredient spacing, and 14px replies
   beside an 18px method.
 
-## Waiting on a human decision (`ready-for-human` / `needs-info`)
+### Promoted 2026-10-18 to `openspec/changes/cook-from-the-page`
 
-- `cook-header-takes-a-third-of-the-screen/` — 27-42% of the screen sits
-  above step 1 (title, polaroid, a 3-4 row meta line, share and add-photo),
-  and ingredient rows are 29-31px, so ticks land on the neighbour. Both trade
-  space against D9 and list length; three options for the owner. Left out of
-  `glanceable-cooking` on purpose.
+Archive these with that change.
+
+- `scaling-overwrites-family-recipe/` — a one-off scale or swap rewrote the
+  family recipe. Owner chose a page servings stepper plus a `set_servings`
+  tool, saving only on request, and the first step first.
+- `cook-header-takes-a-third-of-the-screen/` — owner chose the compact header
+  with a "⋯" popover, and ~38px ingredient rows with readable ticks.
+
+### Other
+
+- `anthropic-claude-5-thinking-blocks/` — Claude 5.5 is not a drop-in
+  `AI_MODEL` for chat: its thinking blocks are discarded.
+
+## Waiting on a human decision (`ready-for-human` / `needs-info`)
 
 - `book-spread-modes-follow-ups/01-deploy-and-purge-cache.md` — the spread-modes
   work is implemented, tested and archived but unshipped: merge, tag a release,
