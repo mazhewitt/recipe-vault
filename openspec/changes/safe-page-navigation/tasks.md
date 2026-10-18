@@ -120,15 +120,15 @@ Satisfies:
 - `recipe-prefetch`: "Prefetch cache serves navigation requests" (all scenarios) and "Prefetch cache is invalidated on recipe list changes" (all scenarios).
 - `recipe-book-index` "Index displays on page load" → "Index fetches fresh data", for page load and the Contents spread tab. The return to the contents lands in group 7.
 
-- [ ] 6.1 `fetchRecipeList(forceRefresh)` stops calling `clearPrefetchCache()`. After a successful response it calls `PageTransitions.prunePrefetchCache(list.map(r => r.id))`, which deletes only entries whose id is no longer listed.
-- [ ] 6.2 `loadNextRecipe`/`loadPrevRecipe`: use `await state.fetchRecipeList()`, the held list, which goes to the network only when nothing is held yet. Nothing awaited before `animatePageTurn` may make a request.
-- [ ] 6.3 `fetchAndDisplayRecipe`:
+- [x] 6.1 `fetchRecipeList(forceRefresh)` stops calling `clearPrefetchCache()`. After a successful response it calls `PageTransitions.prunePrefetchCache(list.map(r => r.id))`, which deletes only entries whose id is no longer listed.
+- [x] 6.2 `loadNextRecipe`/`loadPrevRecipe`: use `await state.fetchRecipeList()`, the held list, which goes to the network only when nothing is held yet. Nothing awaited before `animatePageTurn` may make a request.
+- [x] 6.3 `fetchAndDisplayRecipe`:
   - Check the cache before `showRecipeLoading()`, and show the skeleton only on a miss.
   - Replace the unconditional `fetchRecipeList(true)` after every render (`// Refresh recipe list to include newly created recipes`) with a refresh only when the displayed id is not in the held list. When it does refresh, recompute the page number and the navigation state from the new list.
   - Keep the contents-mode column re-render, drawn from the held list, so the `current` highlight still follows the page (`navigation.spec.ts` "next arrow navigates to next recipe").
-- [ ] 6.4 `chat.js`: note `tool_use` events whose tool is `create_recipe` or `delete_recipe` during a turn. On that turn's `done`, refresh the list once and call `state.updateNavigationState()`. If the contents are on screen, re-render them (`state.renderContents()`). `handleRecipeArtifact` keeps its `clearPrefetchCache()`, as the `web-chat` spec requires.
-- [ ] 6.5 `renderContents` still refreshes the list each time the contents are shown (the Contents spread tab, filter taps). Because of 6.1 that no longer empties the cache. `refreshDifficultyIfPending`'s refresh likewise stops emptying it.
-- [ ] 6.6 Tests in a new `tests/e2e/tests/page-turn-cache.spec.ts`, run on all projects with the next control per viewport (`#page-next`, `.footer-next` or `#gutter-next`). Add a `helpers.ts` `recordRequests(page)` that classifies `/api/recipes` as list and `/api/recipes/:id` as recipe. Before each turn, wait for the prefetch: poll `(await import('/static/page-transitions.js')).getCachedRecipe(nextId)`.
+- [x] 6.4 `chat.js`: note `tool_use` events whose tool is `create_recipe` or `delete_recipe` during a turn. On that turn's `done`, refresh the list once and call `state.updateNavigationState()`. If the contents are on screen, re-render them (`state.renderContents()`). `handleRecipeArtifact` keeps its `clearPrefetchCache()`, as the `web-chat` spec requires.
+- [x] 6.5 `renderContents` still refreshes the list each time the contents are shown (the Contents spread tab, filter taps). Because of 6.1 that no longer empties the cache. `refreshDifficultyIfPending`'s refresh likewise stops emptying it.
+- [x] 6.6 Tests in a new `tests/e2e/tests/page-turn-cache.spec.ts`, run on all projects with the next control per viewport (`#page-next`, `.footer-next` or `#gutter-next`). Add a `helpers.ts` `recordRequests(page)` that classifies `/api/recipes` as list and `/api/recipes/:id` as recipe. Before each turn, wait for the prefetch: poll `(await import('/static/page-transitions.js')).getCachedRecipe(nextId)`.
   - A turn makes no list request between the tap and 500ms after `isAnimating()` is false.
   - A cached turn makes no request for the next recipe, and no `.skeleton` is inserted (MutationObserver on `#page-right-content`).
   - With `/api/recipes*` responses delayed 300ms (`page.route`), the next title appears in under 300ms.
@@ -137,9 +137,9 @@ Satisfies:
   - The Contents spread tab (above 600px) and a page load each make exactly one list request.
   - A recipe created through the API after load and then opened refreshes the list once, and `#note-page-number` is correct.
   - A chat turn whose stream contains `tool_use` `delete_recipe` refreshes the list once at `done`. The mock LLM never calls `delete_recipe`, so route `**/api/chat` to a canned SSE body, as `margin-notes.spec.ts:147` does.
-- [ ] 6.7 Re-run the specs that hold `/api/recipes` open or count its requests: `spread-modes.spec.ts` "a contents render still in flight…", which must still see a list request from the Contents tab, and anything that seeds recipes after load and then pages to them.
-- [ ] 6.8 Red-check: restore the forced refetch in `loadNextRecipe`, and separately the `clearPrefetchCache()` in `fetchRecipeList`. Confirm the no-list-request and keeps-neighbours tests go red.
-- [ ] 6.9 Gate: `make lint`, `npx playwright test tests/page-turn-cache.spec.ts tests/navigation.spec.ts tests/spread-modes.spec.ts`, `make test-e2e`.
+- [x] 6.7 Re-run the specs that hold `/api/recipes` open or count its requests: `spread-modes.spec.ts` "a contents render still in flight…", which must still see a list request from the Contents tab, and anything that seeds recipes after load and then pages to them.
+- [x] 6.8 Red-check: restore the forced refetch in `loadNextRecipe`, and separately the `clearPrefetchCache()` in `fetchRecipeList`. Confirm the no-list-request and keeps-neighbours tests go red.
+- [x] 6.9 Gate: `make lint`, `npx playwright test tests/page-turn-cache.spec.ts tests/navigation.spec.ts tests/spread-modes.spec.ts`, `make test-e2e`.
 
 ## 7. Back to the contents is one clean page turn; the header hit area (design N8)
 

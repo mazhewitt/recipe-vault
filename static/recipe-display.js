@@ -805,8 +805,6 @@ export async function fetchAndDisplayRecipe(recipeId) {
     // Record the id before any await so a timer_start arriving in the same
     // SSE turn as the recipe_artifact binds to this recipe, not the last one.
     state.currentRecipeId = recipeId;
-    // A refresh keeps the recipe on the page until the new one replaces it
-    if (!isRefresh) showRecipeLoading();
     try {
         // Check prefetch cache first
         const cached = getCachedRecipe(recipeId);
@@ -814,6 +812,10 @@ export async function fetchAndDisplayRecipe(recipeId) {
         if (cached && cached.difficulty != null) {
             recipe = cached;
         } else {
+            // Only a miss waits on the network, so only a miss shows the
+            // skeleton. A refresh keeps the recipe on the page until the new
+            // one replaces it.
+            if (!isRefresh) showRecipeLoading();
             try {
                 recipe = await fetchRecipeFromApi(recipeId);
             } catch (error) {
@@ -844,7 +846,13 @@ export async function fetchAndDisplayRecipe(recipeId) {
         }
 
         // Cosmetic page number: the recipe's position in the alphabetical list.
-        const list = await state.fetchRecipeList();
+        // A recipe the held list does not know yet (created since it was
+        // fetched) refreshes it once; otherwise the held list is the truth.
+        let list = await state.fetchRecipeList();
+        const displayedId = recipe.id ?? recipeId;
+        if (!list.some(r => String(r.id) === String(displayedId))) {
+            list = await state.fetchRecipeList(true);
+        }
         const idx = list.findIndex(r => String(r.id) === String(recipe.id ?? recipeId));
         const pageNumber = idx >= 0 ? pageNumberFor(idx) : null;
 
@@ -872,15 +880,12 @@ export async function fetchAndDisplayRecipe(recipeId) {
         state.currentRecipeId = recipe.id || recipe.recipe?.id || state.currentRecipeId;
         state.lastRecipeId = state.currentRecipeId;
         state.currentRecipeTitle = recipe.title || recipe.recipe?.title || state.currentRecipeTitle;
-        // Refresh recipe list to include newly created recipes, and keep the
-        // contents column on the left page in step with it.
-        const fresh = await state.fetchRecipeList(true);
-        // Only while the left page is actually holding the contents: in cook
-        // and notes modes it holds the ingredients or the conversation, and
-        // renderIndex would overwrite them. The list is still refreshed, since
-        // navigation and the prefetch walk it either way.
+        // Keep the contents column on the left page in step with the page, so
+        // its current highlight follows it. Only while the left page is
+        // actually holding the contents: in cook and notes modes it holds the
+        // ingredients or the conversation, and renderIndex would overwrite them.
         if (getSpreadMode() === 'contents') {
-            renderIndex(fresh, { currentRecipeId: state.currentRecipeId, singleColumn: true, filter: state.contentsFilter });
+            renderIndex(list, { currentRecipeId: state.currentRecipeId, singleColumn: true, filter: state.contentsFilter });
             // renderIndex scrolls the contents to the current entry; a refresh
             // hands the reader back the place they had
             if (restoredScroll) restorePageScroll(restoredScroll);

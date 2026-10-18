@@ -47,12 +47,14 @@ let contentsFilter = readStoredContentsFilter();
 // Shared utility: fetchRecipeList
 async function fetchRecipeList(forceRefresh = false) {
     if (recipeListCache && !forceRefresh) return recipeListCache;
-    if (forceRefresh) PageTransitions.clearPrefetchCache();
     try {
         const resp = await fetch('/api/recipes', { credentials: 'same-origin' });
         if (!resp.ok) return [];
         const list = await resp.json();
         recipeListCache = list;
+        // A refresh keeps the prefetched neighbours, so the next page turn
+        // still renders from memory; only recipes gone from the book leave.
+        PageTransitions.prunePrefetchCache(list.map(r => r.id));
         return list;
     } catch (e) {
         console.error('Failed to fetch recipe list:', e);

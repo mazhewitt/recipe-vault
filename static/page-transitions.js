@@ -42,6 +42,18 @@ export function clearPrefetchCache() {
     prefetchCache.clear();
 }
 
+/**
+ * Drops the cached recipes whose ids are not in `ids` (the list just fetched)
+ * and keeps the rest.
+ * @param {Array<string|number>} ids
+ */
+export function prunePrefetchCache(ids) {
+    const listed = new Set(ids.map(String));
+    for (const key of [...prefetchCache.keys()]) {
+        if (!listed.has(key)) prefetchCache.delete(key);
+    }
+}
+
 function cacheRecipe(recipeId, data) {
     const key = String(recipeId);
     prefetchCache.set(key, { data, timestamp: Date.now() });

@@ -67,8 +67,9 @@ export async function updateNavigationState() {
 export async function loadNextRecipe() {
     if (isAnimating()) return;
 
-    // Fetch fresh list to ensure we're using up-to-date data after chat operations
-    const list = await state.fetchRecipeList(true);
+    // The list already held: a turn must not wait on the network. Chat turns
+    // that create, rename or delete a recipe refresh it (chat.js).
+    const list = await state.fetchRecipeList();
     if (list.length === 0) return;
 
     // If in index view, load first recipe
@@ -94,8 +95,9 @@ export async function loadNextRecipe() {
 export async function loadPrevRecipe() {
     if (isAnimating()) return;
 
-    // Fetch fresh list to ensure we're using up-to-date data after chat operations
-    const list = await state.fetchRecipeList(true);
+    // The list already held: a turn must not wait on the network. Chat turns
+    // that create, rename or delete a recipe refresh it (chat.js).
+    const list = await state.fetchRecipeList();
     if (list.length === 0) return;
 
     // If in index view, do nothing (back arrow should be disabled)

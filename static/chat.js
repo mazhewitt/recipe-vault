@@ -12,6 +12,28 @@ import { clearPrefetchCache } from './page-transitions.js';
 // Recipe ids already fetched during the current chat turn (reset in sendMessage)
 let fetchedRecipeIds = new Set();
 
+// Tools that add, rename (and so re-order) or remove a recipe. A turn that ran
+// one refreshes the held recipe list once, at its done event; page turns use
+// that list and never fetch it themselves.
+const LIST_CHANGING_TOOLS = new Set(['create_recipe', 'update_recipe', 'delete_recipe']);
+
+// Whether the current turn ran one of them (reset in sendMessage)
+let listChanged = false;
+
+/**
+ * Refreshes the held recipe list after a turn that changed the book, and the
+ * navigation state from it. With the contents on screen the contents redraw,
+ * which makes the refresh itself (one list request either way).
+ */
+async function refreshListAfterTurn() {
+    if (state.viewMode === 'index') {
+        await state.renderContents();
+    } else {
+        await state.fetchRecipeList(true);
+    }
+    state.updateNavigationState();
+}
+
 /**
  * Handles a recipe_artifact id: clears the prefetch cache so the freshly
  * edited recipe is re-fetched rather than served stale, and fetches each id
@@ -178,6 +200,7 @@ export async function sendMessage() {
 
     // Each turn fetches a given recipe id at most once
     fetchedRecipeIds = new Set();
+    listChanged = false;
 
     // A previous turn that ended without a done event (dropped connection) would
     // otherwise leave its streaming note open and have this turn overwrite it
@@ -272,6 +295,7 @@ export async function sendMessage() {
                             // Tool call notification: a label on the in-flight line, nothing stored
                             if (parsed.tool) {
                                 MarginNotes.setInFlight(statusLabelFor(parsed.tool));
+                                if (LIST_CHANGING_TOOLS.has(parsed.tool)) listChanged = true;
                             }
                             break;
 
@@ -301,6 +325,10 @@ export async function sendMessage() {
                             }
                             MarginNotes.finalizeStreamingNote();
                             MarginNotes.setInFlight(null);
+                            if (listChanged) {
+                                listChanged = false;
+                                refreshListAfterTurn();
+                            }
                             break;
 
                         case 'error':

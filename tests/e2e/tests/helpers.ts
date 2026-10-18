@@ -603,3 +603,34 @@ export async function touchGesture(page: Page, x0: number, y0: number, path: Arr
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
 }
+
+export interface RecordedRequests {
+  /** `GET /api/recipes`, the list, in the order made (ms since recording began). */
+  list: number[];
+  /** `GET /api/recipes/:id`, by id. */
+  recipe: string[];
+  /** Forget everything recorded so far. */
+  reset(): void;
+}
+
+/**
+ * Records the page's recipe requests from now on: `/api/recipes` as a list
+ * request and `/api/recipes/:id` as a request for that recipe. Sub-resources
+ * (`/api/recipes/:id/photo`, `/share`) are ignored. Only GETs count.
+ */
+export function recordRequests(page: Page): RecordedRequests {
+  const start = Date.now();
+  const rec: RecordedRequests = {
+    list: [],
+    recipe: [],
+    reset() { rec.list.length = 0; rec.recipe.length = 0; },
+  };
+  page.on('request', (req) => {
+    if (req.method() !== 'GET') return;
+    const path = new URL(req.url()).pathname;
+    if (path === '/api/recipes') rec.list.push(Date.now() - start);
+    const m = path.match(/^\/api\/recipes\/([^/]+)$/);
+    if (m) rec.recipe.push(decodeURIComponent(m[1]));
+  });
+  return rec;
+}
