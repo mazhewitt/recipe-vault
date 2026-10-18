@@ -608,8 +608,10 @@ export function renderRecipe(recipe, options = {}) {
 
     // Build preparation steps
     const stepsList = (recipe.steps || []).map((step, i) => {
-        const duration = step.duration_minutes
-            ? `<span class="step-duration">${step.duration_minutes} min</span>`
+        // A button: tapping it starts this step's timer (timer.js)
+        const minutes = Number.parseInt(step.duration_minutes, 10);
+        const duration = minutes > 0
+            ? `<button type="button" class="step-duration" data-minutes="${minutes}" aria-label="Start a ${minutes} minute timer for step ${i + 1}">${minutes} min</button>`
             : '';
         // SANITIZED: step.instruction is user input
         return `<div class="prep-step" data-step="${i + 1}"><span class="step-number">${i + 1}.</span> <span class="step-text">${escapeHtml(step.instruction)}</span>${duration}</div>`;

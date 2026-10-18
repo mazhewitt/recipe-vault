@@ -286,6 +286,38 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     expect(dTop, `#timer-widget top moved ${dTop.toFixed(1)}px at zero`).toBeLessThanOrEqual(1);
   });
 
+  test("starting a timer from a step's duration", async ({ page }) => {
+    const recipe = await createCookingRecipe(page, { durations: { 3: 8, 4: 2 } });
+    await openRecipe(page, recipe.id);
+    if (!isPhone(page)) await selectMode(page, 'cook');
+    if (isPhone(page)) {
+      await openTab(page, 'method');
+      await page.waitForTimeout(400); // the tab crossfade holds the animation lock
+    }
+    const chip = (n: number) => page.locator(`#page-right-content .prep-step[data-step="${n}"] .step-duration`);
+    await chip(3).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const anchors = await ANCHORS(page);
+
+    const result = await trackAnchors(page, anchors, async () => {
+      await chip(3).click();
+      await expect(page.locator('#timer-widget .timer-label')).toHaveText('Step 3');
+      await chip(4).click();
+      await expect(page.locator('#timer-widget .timer-label')).toHaveText('Tap again to replace');
+      await chip(4).click();
+      await expect(page.locator('#timer-widget .timer-label')).toHaveText('Step 4');
+    });
+
+    expectAnchorsStill(withoutAnchor(result, 'timer-widget'));
+    const frames = result['timer-widget'].frames.filter(f => f.shown);
+    expect(frames.length, 'timer pill never shown').toBeGreaterThan(0);
+    const base = frames[0];
+    const drift = Math.max(...frames.map(f => Math.max(
+      Math.abs(f.x - base.x), Math.abs(f.y - base.y),
+      Math.abs(f.width - base.width), Math.abs(f.height - base.height))));
+    expect(drift, `#timer-widget moved ${drift.toFixed(1)}px`).toBeLessThanOrEqual(1);
+    await page.locator('.timer-cancel').click();
+  });
+
   test('ticking an ingredient and marking a step', async ({ page }) => {
     // Red on 9f28329 (no anchor moved, but data-ticked was never set); fixed in group 8 (D10).
     const recipe = await openCookingRecipe(page);

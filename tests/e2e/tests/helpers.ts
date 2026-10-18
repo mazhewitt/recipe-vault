@@ -10,6 +10,7 @@ export interface Ingredient {
 export interface Step {
   step_number: number;
   instruction: string;
+  duration_minutes?: number;
 }
 
 export interface Recipe {
@@ -502,7 +503,10 @@ export async function expectHitArea(page: Page, selector: string): Promise<void>
  * enough that any padding on `.timer-active` re-wraps it at every width.
  * `difficulty` is set, so no backfill refresh lands mid-test.
  */
-export async function createCookingRecipe(page: Page): Promise<{ id: string; title: string; steps: number }> {
+export async function createCookingRecipe(
+  page: Page,
+  opts: { durations?: Record<number, number> } = {},
+): Promise<{ id: string; title: string; steps: number }> {
   const title = `Steady Stew ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const instructions = [
     'Pat the beef dry with kitchen paper, season it well with salt and pepper, and leave it on the board for ten minutes while you prepare the vegetables.',
@@ -536,7 +540,11 @@ export async function createCookingRecipe(page: Page): Promise<{ id: string; tit
     title,
     description: 'A slow beef stew to cook from at the counter',
     ingredients,
-    steps: instructions.map((instruction, i) => ({ step_number: i + 1, instruction })),
+    steps: instructions.map((instruction, i) => ({
+      step_number: i + 1,
+      instruction,
+      ...(opts.durations?.[i + 1] ? { duration_minutes: opts.durations[i + 1] } : {}),
+    })),
     prep_time_minutes: 30,
     cook_time_minutes: 180,
     servings: 4,

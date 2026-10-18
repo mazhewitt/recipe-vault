@@ -151,15 +151,18 @@ body::before {
    spine. Positioned relative to .recipe-book (position: relative) so it
    scrolls and resizes with the book. Centred, it can never meet a page arrow
    (top corners) or the user pill. top: -10px overhangs the cover's 8px rim by
-   2px. Its width is fixed per state - a ch-based minimum on the time and
-   tabular numerals - so it does not wobble on every tick. */
+   2px. One fixed width in every state (running, Done, "Tap again to
+   replace"), so its centre and edges never move; a long label ellipsizes.
+   The time is the largest text in it, readable across the kitchen. */
 .timer-widget {
     position: absolute;
     top: -10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 11; /* above .page-nav and .mobile-edge-nav (10) so the close target is tappable */
-    height: 36px;
+    width: 280px;
+    height: 48px;
+    box-sizing: border-box;
     background: var(--color-paper-cream);
     border: 2px solid var(--color-ink-dark);
     border-radius: var(--radius-pill);
@@ -184,8 +187,9 @@ body::before {
 }
 
 .timer-text {
+    flex: 1;
     font-family: var(--font-handwritten);
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
     color: var(--color-ink-dark);
     font-weight: 400;
@@ -196,31 +200,64 @@ body::before {
 }
 
 .timer-label {
+    flex: 1 1 auto;
     min-width: 0;
     line-height: 1.3; /* overflow clips at the line box; keep Kalam's descenders */
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+/* The separator is drawn in the time's left margin, not written as text,
+   so the pill reads "Step 2 · 7:42" and never "Step 2:7:42" */
 .timer-time {
-    display: inline-block;
-    min-width: 5ch; /* "88:88" in tabular numerals, so no tick changes the width */
+    position: relative;
+    flex: none;
+    margin-left: 18px;
+    font-size: 26px;
     font-variant-numeric: tabular-nums;
-    text-align: left;
+    text-align: right;
 }
 
-/* Finished: "Done - <label>" in the leather red, until tapped */
-.timer-widget[data-state="done"] {
-    border-color: var(--color-leather);
+.timer-time::before {
+    content: "·";
+    position: absolute;
+    left: -13px;
+    font-size: 16px;
+    bottom: 0.3em;
+}
+
+/* A running pill with a step leads to it (timer.js) */
+.timer-widget[data-state="running"] {
     cursor: pointer;
 }
 
-.timer-widget[data-state="done"] .timer-text {
-    color: var(--color-leather);
+/* Finished: "Done · <label>", cream on the leather red, pulsing until tapped */
+.timer-widget[data-state="done"] {
+    background: var(--color-leather);
+    border-color: var(--color-leather);
+    cursor: pointer;
+    animation: timer-done-pulse 1.6s ease-in-out infinite;
+}
+
+.timer-widget[data-state="done"] .timer-text,
+.timer-widget[data-state="done"] .timer-cancel {
+    color: var(--color-paper-cream);
 }
 
 .timer-widget[data-state="done"] .timer-icon svg {
-    stroke: var(--color-leather);
+    stroke: var(--color-paper-cream);
+}
+
+/* Opacity and box-shadow only: the pill never changes size or position */
+@keyframes timer-done-pulse {
+    0%, 100% { box-shadow: var(--shadow-soft), 0 0 0 0 rgba(139, 45, 26, 0.55); }
+    50% { box-shadow: var(--shadow-soft), 0 0 0 8px rgba(139, 45, 26, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timer-widget[data-state="done"] {
+        animation: none;
+    }
 }
 
 .timer-cancel {
@@ -899,14 +936,20 @@ body::before {
     font-style: italic;
 }
 
+/* A button (it starts the step's timer) that keeps the chip look the span
+   had: the reset leaves the step's box unchanged. */
 .step-duration {
+    position: relative;
     display: inline-block;
     background: var(--color-paper-aged);
     color: var(--color-ink-medium);
     padding: 2px 6px;
+    border: none;
     border-radius: 3px;
+    font: inherit;
     font-size: 15px;
-    margin-left: 4px;
+    margin: 0 0 0 4px;
+    cursor: pointer;
 }
 
 .recipe-note {
@@ -1398,6 +1441,7 @@ body[data-feature-meals] .contents-tab-meals {
 .contents-tab::before,
 .page-nav::before,
 .share-btn::before,
+.step-duration::before,
 .add-photo-btn::before,
 .note-send::before,
 .clipboard-button::before,
@@ -2281,14 +2325,23 @@ body[data-feature-meals] .contents-tab-meals {
         width: min(200px, calc(100% - 130px));
         box-sizing: border-box;
         z-index: 11; /* above .mobile-edge-nav */
-        height: 30px;
+        height: 44px;
         padding: 2px 6px 2px 10px;
         gap: 6px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
 
     .timer-text {
-        flex: 1;
+        font-size: 14px;
+    }
+
+    .timer-time {
+        font-size: 22px;
+        margin-left: 14px;
+    }
+
+    .timer-time::before {
+        left: -10px;
         font-size: 14px;
     }
 

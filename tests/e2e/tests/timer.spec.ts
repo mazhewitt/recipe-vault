@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { authenticate, createRecipe, expectHitArea, openTab, paceChat, sendNote, spineX } from './helpers';
+import {
+  authenticate, createCookingRecipe, createRecipe, expectAnchorsStill, expectHitArea, openTab, paceChat,
+  sendNote, spineX, trackAnchors,
+} from './helpers';
 
 function isPhone(page: any): boolean {
   return page.viewportSize()!.width <= 600;
@@ -60,7 +63,7 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
 
     await expect(widget).toBeVisible();
     await expect(page.locator('.recipe-book #timer-widget')).toHaveCount(1);
-    await expect(page.locator('#timer-text')).toContainText('Test: ');
+    await expect(page.locator('#timer-widget .timer-label')).toHaveText('Step 2 · Test');
 
     // Fully within the viewport
     const box = (await widget.boundingBox())!;
@@ -82,7 +85,7 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
 
     if (isPhone(page)) {
       // Compact pill at the top right of the book frame's header bar
-      expect(box.height).toBeLessThanOrEqual(30);
+      expect(box.height).toBeGreaterThanOrEqual(44);
       const book = (await page.locator('.recipe-book').boundingBox())!;
       expect(box.x + box.width / 2).toBeGreaterThan(book.x + book.width / 2);
       expect(book.x + book.width - (box.x + box.width)).toBeLessThanOrEqual(16);
@@ -207,14 +210,14 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
       startTimer(0.02, 'Done', 2);
     });
     await expect(page.locator('.prep-step[data-step="2"]')).toHaveClass(/timer-active/);
-    await expect(page.locator('#timer-text')).toHaveText('Done — Done', { timeout: 10000 });
+    await expect(page.locator('#timer-text')).toHaveText('Done · Step 2 · Done', { timeout: 10000 });
     await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'done');
     await expect(page.locator('.prep-step.timer-active')).toHaveCount(0);
 
     // The finished state stays past the old 3s auto-hide, until tapped
     await page.waitForTimeout(4000);
     await expect(page.locator('#timer-widget')).toBeVisible();
-    await expect(page.locator('#timer-text')).toHaveText('Done — Done');
+    await expect(page.locator('#timer-text')).toHaveText('Done · Step 2 · Done');
     await page.locator('#timer-text').click();
     await expect(page.locator('#timer-widget')).toBeHidden();
   });
@@ -370,7 +373,7 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
       // @ts-ignore
       startTimer(0.02, 'Chime', 2);
     });
-    await expect(page.locator('#timer-text')).toHaveText('Done — Chime', { timeout: 10000 });
+    await expect(page.locator('#timer-text')).toHaveText('Done · Step 2 · Chime', { timeout: 10000 });
     const log = await page.evaluate(() => (window as any).__audioLog);
     expect(log.starts).toBe(3);
     expect(log.created).toBe(1);
@@ -406,12 +409,383 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
       // @ts-ignore
       startTimer(0.02, 'Silent', 2);
     });
-    await expect(page.locator('#timer-text')).toHaveText('Done — Silent', { timeout: 10000 });
+    await expect(page.locator('#timer-text')).toHaveText('Done · Step 2 · Silent', { timeout: 10000 });
     await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'done');
-    const red = await page.locator('#timer-text').evaluate((el) => getComputedStyle(el).color);
+    const red = await page.locator('#timer-widget').evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(red).toBe('rgb(139, 45, 26)');
     expect(errors).toEqual([]);
     await page.locator('#timer-widget').click();
     await expect(page.locator('#timer-widget')).toBeHidden();
+  });
+});
+
+/** Counts OscillatorNode.start() calls and vibrations (window.__audioLog). */
+async function installAudioStub(page: any) {
+  await page.addInitScript(() => {
+    const log: any = { starts: 0, vibrations: 0 };
+    // @ts-ignore
+    window.__audioLog = log;
+    class FakeParam { setValueAtTime() {} linearRampToValueAtTime() {} exponentialRampToValueAtTime() {} }
+    class FakeNode { connect() { return this; } disconnect() {} }
+    class FakeOsc extends FakeNode {
+      type = 'sine'; frequency = new FakeParam();
+      start() { log.starts++; } stop() {}
+    }
+    class FakeGain extends FakeNode { gain = new FakeParam(); }
+    class FakeCtx {
+      state = 'running'; currentTime = 0; destination = new FakeNode();
+      resume() { return Promise.resolve(); }
+      createOscillator() { return new FakeOsc(); }
+      createGain() { return new FakeGain(); }
+    }
+    // @ts-ignore
+    window.AudioContext = FakeCtx;
+    // @ts-ignore
+    window.webkitAudioContext = FakeCtx;
+    Object.defineProperty(navigator, 'vibrate', {
+      configurable: true,
+      value: () => { log.vibrations++; return true; },
+    });
+  });
+}
+
+async function chimes(page: any): Promise<number> {
+  return page.evaluate(() => (window as any).__audioLog.starts);
+}
+
+async function boxOf(page: any, selector: string) {
+  return (await page.locator(selector).boundingBox())!;
+}
+
+function expectSameBox(a: any, b: any, what: string) {
+  for (const k of ['x', 'y', 'width', 'height'] as const) {
+    expect(Math.abs(a[k] - b[k]), `${what}: ${k} ${a[k]} -> ${b[k]}`).toBeLessThanOrEqual(1);
+  }
+}
+
+/** The cooking fixture with durations on steps 3 and 4, on the cook spread (wide) or the Method tab. */
+async function openDurationRecipe(page: any) {
+  const recipe = await createCookingRecipe(page, { durations: { 3: 8, 4: 2 } });
+  await openRecipe(page, recipe.id, 'Steady Stew');
+  if (isPhone(page)) {
+    await openTab(page, 'method');
+    await page.waitForTimeout(400); // the tab crossfade holds the animation lock
+  }
+  return recipe;
+}
+
+test.describe('A timer for across the kitchen (glanceable-cooking G5)', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  // family-recipe-ui › Timer widget displays as fixed speech bubble › The time is readable across the kitchen
+  test('the time is readable across the kitchen', async ({ page }) => {
+    const { first } = await seedTwoRecipes(page);
+    await openRecipe(page, first, 'Timer Recipe');
+    if (isPhone(page)) await openTab(page, 'method');
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(0.05, 'Simmer', 2);
+    });
+    const phone = isPhone(page);
+    const check = async () => {
+      const m = await page.evaluate(() => {
+        const w = document.getElementById('timer-widget')!.getBoundingClientRect();
+        const label = document.querySelector('#timer-widget .timer-label') as HTMLElement;
+        const time = document.querySelector('#timer-widget .timer-time') as HTMLElement | null;
+        const step = document.querySelector('.prep-step .step-text') as HTMLElement;
+        const lr = label.getBoundingClientRect();
+        const tr = time && time.offsetParent ? time.getBoundingClientRect() : null;
+        return {
+          height: w.height,
+          labelSize: parseFloat(getComputedStyle(label).fontSize),
+          timeSize: time ? parseFloat(getComputedStyle(time).fontSize) : 0,
+          numeric: time ? getComputedStyle(time).fontVariantNumeric : '',
+          stepSize: parseFloat(getComputedStyle(step).fontSize),
+          gap: tr ? tr.left - lr.right : null,
+        };
+      });
+      expect(m.height, '#timer-widget height').toBeGreaterThanOrEqual(44);
+      expect(m.labelSize).toBe(phone ? 14 : 16);
+      return m;
+    };
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'running');
+    const running = await check();
+    expect(running.timeSize).toBe(phone ? 22 : 26);
+    expect(running.timeSize).toBeGreaterThanOrEqual(running.stepSize);
+    expect(running.numeric).toContain('tabular-nums');
+    expect(running.gap!, 'space between label and time').toBeGreaterThanOrEqual(6);
+
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+    await check();
+    await page.locator('#timer-widget').click();
+  });
+
+  // cooking-guidance › Frontend timer execution › The pill names its step
+  test('the pill names its step', async ({ page }) => {
+    await openDurationRecipe(page);
+    const label = page.locator('#timer-widget .timer-label');
+    const time = page.locator('#timer-widget .timer-time');
+
+    await page.locator('.prep-step[data-step="3"] .step-duration').click();
+    await expect(label).toHaveText('Step 3');
+    await expect(time).toHaveText('8:00');
+
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(5, 'Simmer', 2);
+    });
+    await expect(label).toHaveText('Step 2 · Simmer');
+    await expect(time).toHaveText(/^\d+:\d\d$/);
+    // No text node between the two: the pill never reads "Label:7:42"
+    const between = await page.locator('#timer-text').evaluate((el) =>
+      Array.from(el.childNodes).filter(n => n.nodeType === Node.TEXT_NODE && n.textContent!.trim()).length);
+    expect(between).toBe(0);
+
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(5, 'Simmer');
+    });
+    await expect(label).toHaveText('Simmer');
+    await page.locator('.timer-cancel').click();
+  });
+
+  // family-recipe-ui › Timer widget displays as fixed speech bubble › One width in every state
+  test('one width in every state', async ({ page }) => {
+    await page.clock.install();
+    await page.reload();
+    await openDurationRecipe(page);
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(10, 'Step 2 · a label far too long for the pill to hold', 2);
+    });
+    const widget = '#timer-widget';
+    await expect(page.locator('#timer-widget .timer-time')).toHaveText('10:00');
+    const start = await boxOf(page, widget);
+    expect(await page.locator('#timer-widget .timer-label').evaluate(
+      (el) => getComputedStyle(el).textOverflow)).toBe('ellipsis');
+
+    await page.locator('.prep-step[data-step="3"] .step-duration').click();
+    await expect(page.locator('#timer-widget .timer-label')).toHaveText('Tap again to replace');
+    expectSameBox(await boxOf(page, widget), start, 'Tap again to replace');
+
+    await page.clock.runFor(9 * 60 * 1000 + 10 * 1000);
+    await expect(page.locator('#timer-widget .timer-time')).toHaveText('0:50');
+    expectSameBox(await boxOf(page, widget), start, 'the last minute');
+
+    await page.clock.runFor(60 * 1000);
+    await expect(page.locator(widget)).toHaveAttribute('data-state', 'done');
+    expectSameBox(await boxOf(page, widget), start, 'Done');
+    await page.locator(widget).click();
+  });
+
+  // cooking-guidance › Frontend timer execution › The chime repeats until acknowledged
+  test('the chime repeats every 15s and stops by itself 5 minutes after zero', async ({ page }) => {
+    await installAudioStub(page);
+    await page.clock.install();
+    await page.reload();
+    const { first } = await seedTwoRecipes(page);
+    await openRecipe(page, first, 'Timer Recipe');
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(0.5, 'Chime', 2);
+    });
+    await page.clock.runFor(30 * 1000);
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'done');
+    await expect(page.locator('#timer-text')).toHaveText(/^Done · Step 2 · Chime/);
+    expect(await chimes(page)).toBe(3);
+    await page.clock.runFor(15 * 1000);
+    expect(await chimes(page)).toBe(6);
+    await page.clock.runFor(15 * 1000);
+    expect(await chimes(page)).toBe(9);
+    expect(await page.evaluate(() => (window as any).__audioLog.vibrations)).toBe(3);
+
+    await page.clock.runFor(271 * 1000); // 301s after zero
+    const atStop = await chimes(page);
+    expect(atStop).toBeGreaterThanOrEqual(60);
+    await page.clock.runFor(299 * 1000); // 600s after zero
+    expect(await chimes(page), 'a chime started after the 300-second mark').toBe(atStop);
+    await expect(page.locator('#timer-widget')).toBeVisible();
+    await page.locator('#timer-widget').click();
+  });
+
+  test('a tap on the finished pill or its ✕ stops the repeats at once', async ({ page }) => {
+    await installAudioStub(page);
+    await page.clock.install();
+    await page.reload();
+    const { first } = await seedTwoRecipes(page);
+    await openRecipe(page, first, 'Timer Recipe');
+    for (const target of ['#timer-text', '.timer-cancel']) {
+      await page.evaluate(() => {
+        // @ts-ignore
+        startTimer(0.5, 'Chime', 2);
+      });
+      await page.clock.runFor(30 * 1000);
+      await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'done');
+      await page.locator(target).click();
+      await expect(page.locator('#timer-widget')).toBeHidden();
+      const after = await chimes(page);
+      await page.clock.runFor(60 * 1000);
+      expect(await chimes(page), `a chime started after a tap on ${target}`).toBe(after);
+    }
+  });
+
+  // cooking-guidance › Frontend timer execution › The finished pill pulses without moving
+  test('the finished pill pulses without moving', async ({ page }) => {
+    const { first } = await seedTwoRecipes(page);
+    await openRecipe(page, first, 'Timer Recipe');
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(0.5, 'Pulse', 2);
+    });
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'running');
+    const runningBg = await page.locator('#timer-widget').evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(0.02, 'Pulse', 2);
+    });
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+    const look = await page.locator('#timer-widget').evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const props = new Set<string>();
+      for (const sheet of Array.from(document.styleSheets)) {
+        let rules: CSSRuleList;
+        try { rules = sheet.cssRules; } catch { continue; }
+        for (const rule of Array.from(rules)) {
+          if (rule instanceof CSSKeyframesRule && rule.name === cs.animationName) {
+            for (const kf of Array.from(rule.cssRules) as CSSKeyframeRule[]) {
+              for (let i = 0; i < kf.style.length; i++) props.add(kf.style[i]);
+            }
+          }
+        }
+      }
+      return { name: cs.animationName, bg: cs.backgroundColor, props: Array.from(props) };
+    });
+    expect(look.name).not.toBe('none');
+    expect(look.bg).not.toBe(runningBg);
+    expect(look.props.length).toBeGreaterThan(0);
+    for (const p of look.props) expect(['opacity', 'box-shadow']).toContain(p);
+
+    const boxes: any[] = await page.evaluate(() => new Promise((resolve) => {
+      const out: any[] = [];
+      const t0 = performance.now();
+      const sample = () => {
+        const r = document.getElementById('timer-widget')!.getBoundingClientRect();
+        out.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+        if (performance.now() - t0 < 1500) requestAnimationFrame(sample); else resolve(out);
+      };
+      sample();
+    }));
+    for (const b of boxes) expectSameBox(b, boxes[0], 'finished pill frame');
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    expect(await page.locator('#timer-widget').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+    await page.locator('#timer-widget').click();
+  });
+});
+
+test.describe('The running pill leads to its step (glanceable-cooking G7)', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  async function stepWhollyVisible(page: any, n: number): Promise<boolean> {
+    return page.evaluate((step: number) => {
+      const el = document.querySelector(`#page-right-content .prep-step[data-step="${step}"]`);
+      const pr = document.getElementById('page-right')!.getBoundingClientRect();
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.height > 0 && r.top >= pr.top - 1 && r.bottom <= pr.bottom + 1;
+    }, n);
+  }
+
+  // cooking-guidance › The running pill leads to its step › Timer's recipe is open
+  test("tapping the running pill scrolls the timer's step into view", async ({ page }) => {
+    const recipe = await createCookingRecipe(page);
+    await openRecipe(page, recipe.id, 'Steady Stew');
+    if (isPhone(page)) await openTab(page, 'method');
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(10, 'Oven', 9);
+    });
+    await page.locator('#page-right').evaluate((el) => { el.scrollTop = 0; });
+    if (isPhone(page)) {
+      await page.waitForTimeout(400); // the Method tab's crossfade holds the lock
+      await openTab(page, 'ingredients');
+    }
+    expect(await stepWhollyVisible(page, 9)).toBe(false);
+
+    const anchors = [
+      { name: 'note-input', selector: '#note-input' },
+      { name: 'message-input', selector: '#message-input' },
+      { name: 'timer-widget', selector: '#timer-widget' },
+    ];
+    const present = [];
+    for (const a of anchors) if (await page.locator(a.selector).isVisible()) present.push(a);
+    const result = await trackAnchors(page, present, async () => {
+      await page.locator('#timer-widget .timer-label').click();
+      await expect.poll(() => stepWhollyVisible(page, 9)).toBe(true);
+    });
+    expectAnchorsStill(result);
+    if (isPhone(page)) await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'method');
+    await page.locator('.timer-cancel').click();
+  });
+
+  // cooking-guidance › The running pill leads to its step › Another recipe is open
+  test("tapping the running pill from another recipe opens the timer's recipe at its step", async ({ page }) => {
+    const recipe = await createCookingRecipe(page);
+    const { second } = await seedTwoRecipes(page);
+    await openRecipe(page, recipe.id, 'Steady Stew');
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(10, 'Oven', 9);
+    });
+    await openRecipe(page, second, 'Other Recipe');
+    const before = await page.locator('#timer-widget .timer-time').textContent();
+    await page.locator('#timer-widget .timer-label').click();
+    await expect(page.locator('#page-right-content .recipe-title')).toContainText('Steady Stew', { timeout: 10000 });
+    await expect.poll(() => stepWhollyVisible(page, 9), { timeout: 10000 }).toBe(true);
+    if (isPhone(page)) await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'method');
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'running');
+    await expect(page.locator('#timer-widget .timer-time')).not.toHaveText(before!);
+    await expect(page.locator('.prep-step[data-step="9"]')).toHaveClass(/timer-active/);
+    await page.locator('.timer-cancel').click();
+  });
+
+  // cooking-guidance › The running pill leads to its step › A timer with no step
+  test('tapping a pill with no step changes nothing', async ({ page }) => {
+    const recipe = await createCookingRecipe(page);
+    await openRecipe(page, recipe.id, 'Steady Stew');
+    if (isPhone(page)) await openTab(page, 'ingredients');
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(10, 'Plain');
+    });
+    const scroll = await page.locator('#page-right').evaluate((el) => el.scrollTop);
+    const tab = await page.locator('#page-right').getAttribute('data-tab');
+    await page.locator('#timer-widget .timer-label').click();
+    await page.waitForTimeout(500);
+    expect(await page.locator('#page-right').evaluate((el) => el.scrollTop)).toBe(scroll);
+    expect(await page.locator('#page-right').getAttribute('data-tab')).toBe(tab);
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'running');
+    await page.locator('.timer-cancel').click();
+  });
+
+  // cooking-guidance › The running pill leads to its step › Finished pill still dismisses
+  test('tapping the finished pill dismisses it without scrolling', async ({ page }) => {
+    const recipe = await createCookingRecipe(page);
+    await openRecipe(page, recipe.id, 'Steady Stew');
+    if (isPhone(page)) await openTab(page, 'method');
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(0.02, 'Oven', 9);
+    });
+    await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'done', { timeout: 10000 });
+    await page.locator('#page-right').evaluate((el) => { el.scrollTop = 0; });
+    await page.locator('#timer-widget').click();
+    await expect(page.locator('#timer-widget')).toBeHidden();
+    await page.waitForTimeout(500);
+    expect(await page.locator('#page-right').evaluate((el) => el.scrollTop)).toBe(0);
   });
 });

@@ -54,29 +54,29 @@ Stop the server you started (`kill $(cat tests/usability/runs/3036/server.pid)`)
 
 ## 2. A timer for across the kitchen (G5, G6, G7)
 
-- [ ] 2.1 The pill's markup and size (G5).
+- [x] 2.1 The pill's markup and size (G5).
   - Files: `static/chat.html` (≈28-39): split `#timer-text` into `.timer-label` and `.timer-time`, and keep `#timer-text` as their container for existing selectors.
   - `static/timer.js` `setTimerText` and `updateDisplay` (≈151-170): fill the two spans; there is no ":" text node between them. Build the label as cooking-guidance › Frontend timer execution › The pill names its step specifies.
   - `static/styles.css` `.timer-widget` (≈156-225) and the phone block (≈2278): ≥44px tall; time 26px (22px on the phone) with `tabular-nums`; label 16px (14px), ellipsised; one fixed `width` per breakpoint for every state. Keep centre-over-spine and clear of `#page-next`. If 26px reaches `#page-next` at 1080×810, use 24px there and record it.
   - Test first, in `timer.spec.ts`: family-recipe-ui › Timer widget displays as fixed speech bubble › The time is readable across the kitchen, and One width in every state (10:00, the last minute, Done, "Tap again to replace"). Keep every existing pill test green.
   - Red-check: on `e35a58c` the digits are 18px (14px on the phone) and "Simmer:5:00" has a 4px gap. The pill also widens 147 → 166px at Done (cook `timer-done-easy-to-miss`, counter `timer-small-at-distance`). Removing the fixed width turns "One width" red.
-- [ ] 2.2 An insistent Done (G5).
+- [x] 2.2 An insistent Done (G5).
   - Files: `static/timer.js` `onTimerComplete` (≈115-130) and `playChime` (≈74). Show "Done · <label>". Repeat `playChime` and the vibration every 15s with a `setInterval`, and clear it on a tap on the pill or ✕ (`hideWidget`, `cancelTimer` ≈191), on a new timer and 300s after zero.
   - `static/styles.css`: the done state gets a `--leather` fill, cream text and a `@keyframes` pulse on `opacity`/`box-shadow` only, with `@media (prefers-reduced-motion: reduce) { animation: none }`.
   - Test first, in `timer.spec.ts`, with `page.clock`: cooking-guidance › Frontend timer execution › The chime repeats until acknowledged (oscillator starts at 0, 15, 30s; none after 300s at 600s; none after a tap), and The finished pill pulses without moving (rAF bounding box, plus `page.emulateMedia({ reducedMotion: 'reduce' })` → `animation-name: none`).
   - Red-check: on `e35a58c` 3 notes in 20s after expiry, one chime. Deleting the repeat interval turns the repeat case red. Deleting the 300s stop turns the stop case red.
-- [ ] 2.3 A step's duration starts its timer (G6).
+- [x] 2.3 A step's duration starts its timer (G6).
   - Files: `static/recipe-display.js` (≈603): `<button type="button" class="step-duration" aria-label="Start a N minute timer for step n">N min</button>`. `step.duration_minutes` is an integer in the schema (`src/mcp/tools.rs`), so there is no range to parse.
   - `static/styles.css` `.step-duration` (≈890): reset button styles so the chip and the step's box are unchanged, and add a `::before` 44px hit area as for `.share-btn`.
   - `static/place-keeping.js` click handler (≈106): ignore clicks inside `.step-duration`, so the step mark never toggles.
   - `static/timer.js`: export `startStepTimer(stepNumber, minutes, button)`. It calls `startTimer(minutes, 'Step n', n)` when no timer runs or one is finished. While one runs, it sets `data-confirm` and shows "Tap again to replace" in `.timer-label` for 4s, and a second tap on the same button inside the window replaces the timer. Honour the animation lock.
   - Test first: a new `tests/e2e/tests/duration-timer.spec.ts`, one case per scenario of cooking-guidance › A step's duration starts its timer. Use `page.route('**/api/chat')` to assert no request, `page.clock` for the 4s window, and `expectHitArea(page, '.step-duration')`. In `layout-stability.spec.ts`, add "Starting a timer from a step's duration".
   - Red-check: on `e35a58c` tapping "4 min" sets `aria-current` and starts no timer (cook `duration-chip-no-timer`, counter `duration-chip-toggles-mark`). Removing the `data-confirm` check turns "A running timer is not replaced by one tap" red.
-- [ ] 2.4 The running pill leads to its step (G7).
+- [x] 2.4 The running pill leads to its step (G7).
   - Files: `static/timer.js`, a click handler on `#timer-widget` that ignores `.timer-cancel` and the done state (D7 dismiss stays). If `activeTimer.recipeId` is displayed, scroll `.prep-step[data-step=n]` into view in `#page-right`, and on the phone switch to the Method tab first through `page-tabs.js`. Otherwise open the recipe the way a contents row does (the `app.js` / `navigation.js` open path), then scroll.
   - Test first, in `timer.spec.ts`: cooking-guidance › The running pill leads to its step, all four scenarios, with `trackAnchors` on `#note-input`, `#message-input` and `#timer-widget` for the same-recipe case.
   - Red-check: on `e35a58c` tapping the pill leaves `scrollTop` 575 → 575 (cook `timer-pill-not-linked`). Removing the handler turns the cases red.
-- [ ] 2.5 `make lint`, then the full suite on port 3002, green.
+- [x] 2.5 `make lint`, then the full suite on port 3002, green.
 
 ## 3. Notes and place marks (G8, G9, G10, G11)
 
