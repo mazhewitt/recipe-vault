@@ -7,6 +7,7 @@ import { escapeHtml } from './utils.js';
 import { getCachedRecipe, prefetchAdjacent, animatePageTurn } from './page-transitions.js';
 import { applyStepHighlight } from './timer.js';
 import { applyPlace, holdWakeLock } from './place-keeping.js';
+import { applyServings } from './servings.js';
 import { setActiveTab, resetTabScroll } from './page-tabs.js';
 import { getSpreadMode, setSpreadMode } from './spread-modes.js';
 
@@ -649,8 +650,10 @@ export function renderRecipe(recipe, options = {}) {
         metaParts.push(`<span class="meta-total">${formatDuration(totalTimeMinutes)}</span>`);
     }
     if (servings) {
+        // The stepper (servings.js): the count is set to the session's value
+        // once the markup is on the page, and the buttons' disabled state with it
         // SANITIZED: servings coerced to a number above
-        metaParts.push(`<span class="meta-serves">serves ${servings}</span>`);
+        metaParts.push(`<span class="meta-serves">serves <button type="button" class="servings-step" data-step="-1" aria-label="Fewer servings">−</button><output class="servings-count" aria-live="polite">${servings}</output><button type="button" class="servings-step" data-step="+1" aria-label="More servings">+</button></span>`);
     }
     // The slot is always there, empty until the difficulty is known, and as
     // wide either way (styles.css), so a late difficulty reflows nothing
@@ -720,6 +723,7 @@ export function renderRecipe(recipe, options = {}) {
 
         <section class="tab-panel" data-tab="ingredients">
             <div class="section-header">ingredients: <button type="button" class="clear-ticks" hidden>clear ticks</button></div>
+            ${servings ? '<div class="servings-note"></div>' : ''}
             <div class="ingredients-list">
                 ${ingredientsList}
             </div>
@@ -753,6 +757,8 @@ export function renderRecipe(recipe, options = {}) {
     // ...and the cook's ticks and step mark, to the markup just written (the
     // ingredients panel may be parked off the page below)
     applyPlace(recipe.id, rightContent);
+    // ...and the servings shown this session, scaling the quantities
+    applyServings(recipe, rightContent);
 
     // Re-assert the active tab so a re-render (difficulty refresh, photo
     // upload, update_recipe) keeps the user's tab and re-fills .notes-thread.

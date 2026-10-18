@@ -107,13 +107,15 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
   test('an update_recipe refreshes in place', async ({ page }) => {
     const recipe = await createCookingRecipe(page);
     await openRecipe(page, recipe.id);
-    await expect(page.locator('.meta-serves')).toHaveText('serves 4');
+    await expect(page.locator('.servings-count')).toHaveText('4');
     const scroll = await scrollToMidMethod(page);
 
     await startWatch(page);
-    // The mock LLM answers "halve" with update_recipe (servings: 2)
-    await sendNote(page, 'halve it');
-    await expect(page.locator('#page-right-content .meta-serves')).toHaveText('serves 2', { timeout: 10000 });
+    // The mock LLM answers "update" with update_recipe (servings: 2); "halve"
+    // only scales the page (set_servings)
+    await sendNote(page, 'update it');
+    await expect(page.locator('#page-right-content .servings-count')).toHaveText('2', { timeout: 10000 });
+    await expect(page.locator('.servings-note')).toHaveText('');
     await page.waitForTimeout(300);
     await expectInPlace(page, await stopWatch(page), scroll);
   });
@@ -139,8 +141,8 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
     expect(scroll.left, 'the contents have to scroll for the check to mean anything').toBeGreaterThan(0);
 
     await startWatch(page);
-    await sendNote(page, 'halve it');
-    await expect(page.locator('#page-right-content .meta-serves')).toHaveText('serves 2', { timeout: 10000 });
+    await sendNote(page, 'update it');
+    await expect(page.locator('#page-right-content .servings-count')).toHaveText('2', { timeout: 10000 });
     // The contents are re-drawn after the recipe, once the list has been re-read
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(300);

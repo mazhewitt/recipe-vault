@@ -1134,6 +1134,62 @@ body::before {
     margin-left: 4px;
 }
 
+/* The servings stepper, "serves − N +". The count is a fixed width, so a
+   change of N moves nothing on the line, and it keeps the two buttons' 44px
+   hit areas (::before, below) from overlapping. */
+.meta-serves {
+    display: inline-flex;
+    align-items: center;
+}
+
+.meta-serves .servings-step {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: var(--font-handwritten);
+    font-size: 18px;
+    line-height: 1;
+    color: var(--color-ink-medium);
+    cursor: pointer;
+}
+
+.meta-serves .servings-step:first-child {
+    margin-left: 4px;
+}
+
+.meta-serves .servings-step:disabled {
+    color: var(--color-ink-muted);
+    cursor: default;
+}
+
+.servings-count {
+    display: inline-block;
+    width: 30px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Scaled quantities are written in the blue of a handwritten note */
+.ingredient-qty[data-scaled] {
+    color: var(--color-biro);
+}
+
+/* "Scaled for N · amounts in the method are for S": one line, reserved
+   whether or not it shows, so showing it moves nothing */
+.servings-note {
+    height: 1.4em;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-handwritten);
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--color-biro);
+}
+
 /* Display-only tag chips at the end of the meta line (at most three) */
 .recipe-tags {
     display: inline-flex;
@@ -1529,7 +1585,8 @@ body[data-feature-meals] .contents-tab-meals {
 .clipboard-button::before,
 .footer-prev::before,
 .footer-next::before,
-.clear-ticks::before {
+.clear-ticks::before,
+.servings-step::before {
     content: "";
     position: absolute;
     top: 50%;

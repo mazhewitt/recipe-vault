@@ -245,10 +245,75 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     const anchors = await ANCHORS(page);
 
     const result = await trackAnchors(page, anchors, async () => {
-      await sendNote(page, 'halve it');
-      await expect(page.locator('#page-right-content .meta-serves')).toHaveText('serves 2', { timeout: 10000 });
+      // The mock LLM answers "update" with update_recipe (servings: 2); a
+      // stepper at 2 with no "Scaled for" note is the re-rendered recipe
+      await sendNote(page, 'update it');
+      await expect(page.locator('#page-right-content .servings-count')).toHaveText('2', { timeout: 10000 });
+      await expect(page.locator('.servings-note')).toHaveText('');
     });
     expectAnchorsStill(result);
+  });
+
+  test('changing the servings', async ({ page }) => {
+    const recipe = await openCookingRecipe(page);
+    await expect(page.locator('.servings-count')).toHaveText('4');
+    const anchors = await ANCHORS(page);
+
+    // Each item's line and height, the meta line and the note slot, as boxes
+    const boxes = () => page.evaluate(() => {
+      const box = (el: Element | null) => {
+        const r = el!.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      };
+      return {
+        items: [...document.querySelectorAll('.ingredient-item[data-index]')].map(el => {
+          const r = el.getBoundingClientRect();
+          return { y: r.y, height: r.height };
+        }),
+        meta: box(document.querySelector('.recipe-meta-line')),
+        note: box(document.querySelector('.servings-note')),
+      };
+    });
+    const expectSameBoxes = (now: Awaited<ReturnType<typeof boxes>>, before: typeof now, what: string) => {
+      for (const k of ['x', 'y', 'width', 'height'] as const) {
+        expect(Math.abs(now.meta[k] - before.meta[k]), `${what}: meta line ${k}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(now.note[k] - before.note[k]), `${what}: servings note ${k}`).toBeLessThanOrEqual(1);
+      }
+      now.items.forEach((item, i) => {
+        expect(Math.abs(item.y - before.items[i].y), `${what}: ingredient ${i} y`).toBeLessThanOrEqual(1);
+        expect(Math.abs(item.height - before.items[i].height), `${what}: ingredient ${i} height`).toBeLessThanOrEqual(1);
+      });
+    };
+    const before = await boxes();
+
+    let result = await trackAnchors(page, anchors, async () => {
+      await page.locator('.servings-step[data-step="-1"]').click();
+      await expect(page.locator('.servings-count')).toHaveText('3');
+    });
+    expectAnchorsStill(result);
+    expectSameBoxes(await boxes(), before, '−');
+
+    result = await trackAnchors(page, anchors, async () => {
+      await page.locator('.servings-step[data-step="+1"]').click();
+      await expect(page.locator('.servings-count')).toHaveText('4');
+    });
+    expectAnchorsStill(result);
+    expectSameBoxes(await boxes(), before, '+');
+
+    // ...and a servings_set event from the chat
+    await page.route('**/api/chat', route => route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+      body: `event: servings_set\ndata: {"servings":5,"recipe_id":"${recipe.id}"}\n\n`
+        + 'event: done\ndata: {"conversation_id":"layout-servings"}\n\n',
+    }));
+    const afterTaps = await boxes();
+    result = await trackAnchors(page, anchors, async () => {
+      await sendNote(page, 'for five');
+      await expect(page.locator('.servings-count')).toHaveText('5', { timeout: 10000 });
+    });
+    expectAnchorsStill(result);
+    expectSameBoxes(await boxes(), afterTaps, 'servings_set');
   });
 
   test('a timer starting, ticking and finishing', async ({ page }) => {

@@ -45,7 +45,8 @@ The mock LLM reacts to keywords in a note:
 - "show" or "display" opens the lasagne.
 - "list" replies with the recipe list.
 - "timer" starts a 6-second timer on step 2.
-- "halve" or "update" sets servings to 2 on the open recipe and refreshes it.
+- "halve" calls `set_servings` with half the page's servings (rounded up): the page's stepper changes, nothing is saved.
+- "update" or "save" sets servings to 2 on the open recipe and refreshes it.
 - "meal plan" shows a two-recipe plan.
 - Anything else gets a canned reply.
 
@@ -70,7 +71,7 @@ lsof -tiTCP:3012 -sTCP:LISTEN | xargs kill
 
 Selecting checks works differently per script. `cook` takes ids as separate arguments. `find` and `manage` take a comma-separated list. `ask` and `counter` always run every check.
 
-Run `fresh.sh` again before each run. The ask, manage and counter scripts change the book: they halve the lasagne, replace its photo and create throwaway recipes.
+Run `fresh.sh` again before each run. The ask, manage and counter scripts change the book: they replace the lasagne's photo and create throwaway recipes. Their "halve" now scales the page's stepper only, so it no longer changes the lasagne's saved servings.
 
 ### Reading a line
 

@@ -36,6 +36,9 @@ async function createLongRecipe(page: Page, name: string): Promise<string> {
     servings: 4,
     // Already assessed, so the pending-difficulty refresh cannot re-render mid-test
     difficulty: 3,
+    // Already tagged, so the background tagger cannot add chips that re-wrap the
+    // meta line (and change the page's height) between a render and a refresh
+    tags: ['main'],
   });
 }
 

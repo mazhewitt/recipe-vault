@@ -201,7 +201,8 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     const meta = page.locator('.recipe-meta-line');
     await expect(meta).toHaveCount(1);
     await expect(meta).toContainText('30 min');
-    await expect(meta).toContainText('serves 4');
+    await expect(meta.locator('.meta-serves')).toContainText('serves');
+    await expect(meta.locator('.servings-count')).toHaveText('4');
     await expect(meta.locator('.meta-breakdown')).toHaveText('(prep 10 · cook 20)');
     await expect(page.locator('.recipe-meta')).toHaveCount(0);
 

@@ -7,6 +7,7 @@
 
 import * as MealPlanDisplay from './meal-plan-display.js';
 import * as MarginNotes from './margin-notes.js';
+import * as Servings from './servings.js';
 import { clearPrefetchCache } from './page-transitions.js';
 
 // Recipe ids already fetched during the current chat turn (reset in sendMessage)
@@ -224,6 +225,11 @@ export async function sendMessage() {
             if (state.currentRecipeTitle) {
                 payload.current_recipe.title = state.currentRecipeTitle;
             }
+            // The servings the page shows (the stepper), so the model scales from them
+            const servings = Servings.displayedServings(state.currentRecipeId);
+            if (servings != null) {
+                payload.current_recipe.servings = servings;
+            }
         }
 
         // Include image if attached, then clear the indicator immediately
@@ -322,8 +328,12 @@ export async function sendMessage() {
                             break;
 
                         case 'servings_set':
-                            // The page's stepper takes this once it exists (group 2)
-                            console.debug('servings_set', parsed);
+                            // The open recipe's stepper only (setServings ignores any
+                            // other id): the page is scaled, nothing is re-rendered
+                            // and nothing is saved
+                            if (state.viewMode === 'recipe') {
+                                Servings.setServings(parsed.recipe_id, parsed.servings);
+                            }
                             break;
 
                         case 'done':
