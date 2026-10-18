@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone, openTab, waitForTurn } from './helpers';
+import { authenticate, createRecipe, isDesk, isPhone, openTab, waitForTurn } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -200,20 +200,21 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     // Meta line: total (prep + cook), serves, breakdown
     const meta = page.locator('.recipe-meta-line');
     await expect(meta).toHaveCount(1);
-    await expect(meta).toContainText('30 min');
+    await expect(meta).toContainText('30m');
     await expect(meta).toContainText('serves 4');
-    await expect(meta.locator('.meta-breakdown')).toHaveText('(prep 10 · cook 20)');
+    await expect(meta.locator('.meta-breakdown')).toHaveText('(10m prep · 20m cook)');
     await expect(page.locator('.recipe-meta')).toHaveCount(0);
 
     // ...ending with share and add-photo, after the breakdown
     const order = await meta.evaluate(el => Array.from(el.children).slice(-3).map(c => c.className));
     expect(order).toEqual(['meta-breakdown', 'share-btn', 'add-photo-btn']);
 
-    // Read from the counter: 18px method text above 600px, 17px on the phone;
-    // durations 15px (none here, so the step text is what is measured)
+    // Read from the counter: 18px method text above 600px, 17px on the phone,
+    // 16px at the desk; durations 15px (none here, so the step text is what is
+    // measured)
     const stepSize = await steps.nth(1).locator('.step-text')
       .evaluate(el => parseFloat(getComputedStyle(el).fontSize));
-    expect(stepSize).toBe(isPhone(page) ? 17 : 18);
+    expect(stepSize).toBe(isPhone(page) ? 17 : (await isDesk(page)) ? 16 : 18);
   });
 
   test('meta line formats hours and omits missing values', async ({ page }) => {
@@ -238,9 +239,9 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     await expect(page.locator('.recipe-title')).toContainText('Slow Recipe');
 
     const meta = page.locator('.recipe-meta-line');
-    await expect(meta.locator('.meta-total')).toHaveText('1h 15');
+    await expect(meta.locator('.meta-total')).toHaveText('1h 15m');
     await expect(meta.locator('.meta-serves')).toHaveCount(0);
-    await expect(meta.locator('.meta-breakdown')).toHaveText('(cook 75)');
+    await expect(meta.locator('.meta-breakdown')).toHaveText('(1h 15m cook)');
     // The difficulty is not assessed yet, so its slot is there and empty
     await expect(meta.locator('.meta-difficulty')).toHaveCount(1);
     await expect(meta.locator('.meta-difficulty')).toBeEmpty();

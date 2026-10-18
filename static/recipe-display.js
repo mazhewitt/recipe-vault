@@ -138,13 +138,16 @@ export function getMinutesField(recipe, name) {
     return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-/** Format minutes as "45 min" or "1h 15" for the meta line. */
+/**
+ * Format minutes as "45m", "2h" or "2h 30m" for the meta line: one format for
+ * the total and the breakdown, so nothing reads as raw minutes ("cook 150").
+ */
 export function formatDuration(minutes) {
     if (!Number.isFinite(minutes) || minutes <= 0) return '';
-    if (minutes < 60) return `${minutes} min`;
+    if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
     const rest = minutes % 60;
-    return rest ? `${hours}h ${String(rest).padStart(2, '0')}` : `${hours}h`;
+    return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
 /**
@@ -643,7 +646,7 @@ export function renderRecipe(recipe, options = {}) {
     const cookMinutes = getMinutesField(recipe, 'cook_time');
     const servings = recipe.servings ? Number(recipe.servings) : null;
 
-    // Single handwritten meta line: total · serves · difficulty (prep · cook)
+    // Single meta line: total · serves · difficulty (prep · cook)
     const metaParts = [];
     if (totalTimeMinutes) {
         metaParts.push(`<span class="meta-total">${formatDuration(totalTimeMinutes)}</span>`);
@@ -667,8 +670,8 @@ export function renderRecipe(recipe, options = {}) {
         metaParts.push(`<span class="recipe-tags">${chips}</span>`);
     }
     const breakdown = [];
-    if (prepMinutes) breakdown.push(`prep ${prepMinutes}`);
-    if (cookMinutes) breakdown.push(`cook ${cookMinutes}`);
+    if (prepMinutes) breakdown.push(`${formatDuration(prepMinutes)} prep`);
+    if (cookMinutes) breakdown.push(`${formatDuration(cookMinutes)} cook`);
 
     // Photo display
     const hasPhoto = recipe.photo_filename && recipe.photo_filename !== '';
@@ -719,14 +722,14 @@ export function renderRecipe(recipe, options = {}) {
         ${metaLine}
 
         <section class="tab-panel" data-tab="ingredients">
-            <div class="section-header">ingredients: <button type="button" class="clear-ticks" hidden>clear ticks</button></div>
+            <div class="section-header">Ingredients <button type="button" class="clear-ticks" hidden>clear ticks</button></div>
             <div class="ingredients-list">
                 ${ingredientsList}
             </div>
         </section>
 
         <section class="tab-panel" data-tab="method">
-            <div class="section-header">method:</div>
+            <div class="section-header">Method</div>
 
             <div class="prep-list">
                 ${stepsList || '<div class="prep-step">No preparation steps listed</div>'}

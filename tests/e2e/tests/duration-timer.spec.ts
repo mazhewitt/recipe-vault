@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import {
-  authenticate, chimes, createCookingRecipe, expectHitArea, installAudioStub, isPhone, openRecipe, openTab,
+  authenticate, chimes, createCookingRecipe, expectHitArea, installAudioStub, isDesk, isPhone, openRecipe, openTab,
 } from './helpers';
 
 /**
@@ -38,7 +38,8 @@ test.describe("A step's duration starts its timer", () => {
     expect(await button.evaluate((el) => el.tagName)).toBe('BUTTON');
     await expect(button).toHaveAttribute('type', 'button');
     await expect(button).toHaveAttribute('aria-label', 'Start a 8 minute timer for step 3');
-    expect(await button.evaluate((el) => getComputedStyle(el).fontSize)).toBe('15px');
+    // 14px at the desk, where the book's type is about 90% (lighter-book)
+    expect(await button.evaluate((el) => getComputedStyle(el).fontSize)).toBe((await isDesk(page)) ? '14px' : '15px');
     await button.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await expectHitArea(page, '#page-right-content .prep-step[data-step="3"] .step-duration');
 

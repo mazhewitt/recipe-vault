@@ -1,9 +1,9 @@
 /* ==================== DESIGN TOKENS ==================== */
 :root {
-    /* Colors - Wood */
-    --color-wood-dark: #2a1f17;
-    --color-wood-medium: #3d2c20;
-    --color-wood-light: #4a3628;
+    /* Colors - Desk: the light linen cloth the book lies on */
+    --color-desk: #ece4d4;
+    --color-desk-light: #f5f0e6;
+    --color-desk-shade: #ddd2bd;
 
     /* Colors - Leather */
     --color-leather: #8B2D1A;
@@ -27,7 +27,7 @@
     /* Colors - UI */
     --color-border: #c9a86c;
     --color-border-light: #d4c4a8;
-    --color-label-cream: #d4c4a8;
+    --color-label-cream: #d4c4a8; /* labels on the leather */
     --color-accent-brown: #6b4423;
     --color-timer-band: #fff4c2;
     --color-biro: #1f3d8a;
@@ -46,7 +46,7 @@
     --space-xl: 40px;
 
     /* Shadows */
-    --shadow-deep: 6px 6px 20px rgba(0,0,0,0.5);
+    --shadow-deep: 0 14px 32px rgba(74, 54, 40, 0.28), 0 3px 8px rgba(74, 54, 40, 0.2);
     --shadow-medium: 4px 4px 15px rgba(0,0,0,0.4);
     --shadow-soft: 3px 3px 10px rgba(0,0,0,0.3);
     --shadow-inset-left: inset -4px 0 12px rgba(0,0,0,0.08);
@@ -57,6 +57,9 @@
     --radius-md: 6px;
     --radius-lg: 8px;
     --radius-pill: 20px;
+
+    /* A one-line ingredient row: a fingertip lands on the row it aims at */
+    --ingredient-row: 38px;
 }
 
 /* ==================== GLOBAL RESET ==================== */
@@ -67,29 +70,21 @@
 }
 
 /* ==================== BODY & BACKGROUND ==================== */
+/* A light linen cloth, a little lighter where the book lies */
 body {
     min-height: 100vh;
-    background:
-        url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"),
-        linear-gradient(90deg,
-            var(--color-wood-dark) 0%,
-            var(--color-wood-medium) 15%,
-            var(--color-wood-light) 30%,
-            var(--color-wood-medium) 45%,
-            var(--color-wood-dark) 50%,
-            var(--color-wood-medium) 55%,
-            var(--color-wood-light) 70%,
-            var(--color-wood-medium) 85%,
-            var(--color-wood-dark) 100%
-        );
-    background-blend-mode: overlay, normal;
-    background-color: var(--color-wood-dark);
+    background: radial-gradient(ellipse at 50% 40%,
+        var(--color-desk-light) 0%,
+        var(--color-desk) 55%,
+        var(--color-desk-shade) 100%
+    );
+    background-color: var(--color-desk);
     font-family: var(--font-handwritten);
     padding: 30px 50px;
     overflow-x: hidden;
 }
 
-/* Wood grain lines */
+/* The linen's weave, too fine to read as a pattern */
 body::before {
     content: '';
     position: fixed;
@@ -97,17 +92,9 @@ body::before {
     left: 0;
     right: 0;
     bottom: 0;
-    background: repeating-linear-gradient(
-        90deg,
-        transparent 0px,
-        transparent 80px,
-        rgba(0,0,0,0.15) 80px,
-        rgba(0,0,0,0.15) 82px,
-        transparent 82px,
-        transparent 160px,
-        rgba(0,0,0,0.1) 160px,
-        rgba(0,0,0,0.1) 161px
-    );
+    background:
+        repeating-linear-gradient(0deg, rgba(120, 95, 60, 0.035) 0 1px, transparent 1px 3px),
+        repeating-linear-gradient(90deg, rgba(120, 95, 60, 0.03) 0 1px, transparent 1px 3px);
     pointer-events: none;
     z-index: 0;
 }
@@ -128,10 +115,10 @@ body::before {
 .section-label {
     font-family: var(--font-handwritten);
     font-size: 22px;
-    color: var(--color-label-cream);
+    color: var(--color-accent-brown);
     text-align: center;
     margin-bottom: 12px;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
     letter-spacing: 1px;
 }
 
@@ -141,12 +128,11 @@ body::before {
 }
 
 .section-label.clickable:hover {
-    color: var(--color-paper-cream);
+    color: var(--color-leather);
     transform: scale(1.05);
-    text-shadow: 0 0 10px rgba(255,255,255,0.3);
 }
 
-/* The way back to the contents. Its hit area is the label, not the wood beside
+/* The way back to the contents. Its hit area is the label, not the desk beside
    it: as wide as the text plus 22px a side, and 44px tall with the text centred
    on that line. The extra 9px of height goes upward, into the space above the
    book, so the book stays where it was and the gap the timer pill overhangs
@@ -660,13 +646,14 @@ body::before {
 
 /* Page styles */
 .page {
-    flex: 1;
-    min-height: 0;
-    background: linear-gradient(180deg,
+    --page-paper: linear-gradient(180deg,
         var(--color-paper-cream) 0%,
         #f5f0e0 50%,
         #f0ebd8 100%
     );
+    flex: 1;
+    min-height: 0;
+    background: var(--page-paper);
     padding: 20px 28px;
     position: relative;
     display: flex;
@@ -674,25 +661,23 @@ body::before {
     overflow-y: auto;
 }
 
-/* Page scrollbar */
+/* A page scrolls like paper under the hand, with no scrollbar: a bar by the
+   spine or under the page's edge reads as a web view inside a book frame.
+   Where the text runs on, it fades out (.page-content::after below). */
+.page {
+    scrollbar-width: none;
+}
+
 .page::-webkit-scrollbar {
-    width: 6px;
-}
-
-.page::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.page::-webkit-scrollbar-thumb {
-    background: var(--color-border-light);
-    border-radius: 3px;
+    display: none;
 }
 
 .page-left {
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);
     box-shadow: var(--shadow-inset-left);
     /* clear the .note-input slip pinned to the foot, and the reply sticky above it */
-    padding-bottom: calc(var(--slip-clearance) + var(--sticky-clearance));
+    --page-foot: calc(var(--slip-clearance) + var(--sticky-clearance));
+    padding-bottom: var(--page-foot);
     /* Room for the leather tabs' 44px hit area: the page clips at its edge (it
        scrolls), so the 26px tab sits 10px in and its hit area reaches 9px
        either side without touching the text. */
@@ -712,28 +697,14 @@ body::before {
     box-shadow: var(--shadow-inset-right);
 }
 
-/* Center binding shadows */
-.page-left::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 15px;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08));
-    pointer-events: none;
+/* Center binding shadows: a background layer stays on the page's edge while
+   its content scrolls, where a 100%-tall pseudo-element scrolled away with it */
+.page-left {
+    background: linear-gradient(90deg, transparent calc(100% - 15px), rgba(0,0,0,0.08)), var(--page-paper);
 }
 
-.page-right::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 15px;
-    height: 100%;
-    background: linear-gradient(90deg, rgba(0,0,0,0.08), transparent);
-    z-index: 1;
-    pointer-events: none;
+.page-right {
+    background: linear-gradient(90deg, rgba(0,0,0,0.08), transparent 15px), var(--page-paper);
 }
 
 /* Page navigation arrows */
@@ -913,8 +884,6 @@ body::before {
     margin-bottom: 12px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--color-border);
-    text-decoration: underline;
-    text-underline-offset: 4px;
 }
 
 /* Ingredients list (serif body text) */
@@ -924,10 +893,6 @@ body::before {
     line-height: 1.7;
     color: var(--color-ink-dark);
     margin-bottom: 20px;
-}
-
-.ingredient-line {
-    margin-bottom: 3px;
 }
 
 .ingredient-qty {
@@ -980,6 +945,12 @@ body::before {
     font-size: 15px;
     margin: 0 0 0 4px;
     cursor: pointer;
+    /* A small clock before the time says the chip starts a timer */
+    padding-left: calc(6px + 0.8em + 4px);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235a4a3a' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='13' r='8.5'/%3E%3Cpolyline points='12 8.5 12 13 15 15'/%3E%3Cpath d='M9.5 2.5h5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 6px 50%;
+    background-size: 0.8em 0.8em;
 }
 
 .recipe-note {
@@ -1094,15 +1065,18 @@ body::before {
 }
 
 /* ==================== RECIPE METADATA ==================== */
-/* Single handwritten line under the title: total · serves · difficulty (prep · cook) */
+/* Single line under the title: total · serves · difficulty (prep · cook). It is
+   data, so it is set in the serif with tabular figures; the handwriting is
+   kept for titles, headings, step numbers, tabs and notes. */
 .recipe-meta-line {
     position: relative; /* the share toast is placed against its button */
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    font-family: var(--font-handwritten);
-    font-size: 15px;
+    font-family: var(--font-serif);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
     color: var(--color-ink-medium);
     margin: -6px 0 var(--space-md);
 }
@@ -1112,7 +1086,6 @@ body::before {
 }
 
 .meta-label {
-    font-family: var(--font-handwritten);
     color: var(--color-ink-medium);
 }
 
@@ -1129,7 +1102,7 @@ body::before {
 }
 
 .meta-breakdown {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--color-ink-light);
     margin-left: 4px;
 }
@@ -1174,8 +1147,9 @@ body::before {
 /* A small polaroid floated at the right of the title row. 96x76 including the
    white border, so it never competes with the handwritten title. */
 .recipe-polaroid {
+    position: relative;
     float: right;
-    margin: 0 0 6px 10px;
+    margin: 6px 0 6px 10px;
     display: block;
     width: 96px;
     height: 76px;
@@ -1183,6 +1157,22 @@ body::before {
     background: #fff;
     box-shadow: var(--shadow-soft);
     transform: rotate(-1.5deg);
+}
+
+/* A strip of tape holding the photo to the page, across its top edge */
+.recipe-polaroid::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    width: 46%;
+    height: 13px;
+    transform: translateX(-50%) rotate(3deg);
+    background: rgba(236, 222, 180, 0.8);
+    border-left: 1px dashed rgba(160, 147, 122, 0.45);
+    border-right: 1px dashed rgba(160, 147, 122, 0.45);
+    box-shadow: 0 1px 2px rgba(74, 54, 40, 0.18);
+    pointer-events: none;
 }
 
 /* Beats the generic .recipe-photo sizing (and its phone override) on specificity */
@@ -1276,64 +1266,9 @@ body::before {
     font-style: italic;
 }
 
-/* ==================== EDGE TABS (desktop / tablet) ==================== */
-/* Bookmark ribbons poking out of the book's right outer edge. A child of
-   .recipe-book, so they neither scroll with the page nor join the
-   #page-right grid. Shown on the recipe page only.
-
-   They are the book's furniture, not controls: above 600px a spread mode
-   always applies and the right page is fixed, so there is nothing for them to
-   switch. chat.html marks them aria-hidden and out of the tab order; here they
-   take no pointer input and are all drawn alike - no hover, nothing pulled out
-   as active. */
-.edge-tabs {
-    display: none;
-    position: absolute;
-    top: 76px;
-    right: -8px;
-    z-index: 9; /* below .page-nav (10) and the timer pill (11) */
-    flex-direction: column;
-    gap: 6px;
-}
-
-@media (min-width: 601px) {
-    body[data-view-mode="recipe"] .edge-tabs {
-        display: flex;
-    }
-
-    /* Notes is a left-page spread mode now, not a section of the right page, so
-       the strip that controls the right page drops it. The phone keeps all
-       three on .page-tabs - it has no left page to promote anything to. */
-    .edge-tab[data-tab="notes"] {
-        display: none;
-    }
-}
-
-.edge-tab {
-    writing-mode: vertical-rl;
-    width: 26px;
-    min-height: 92px;
-    padding: 10px 4px;
-    border: none;
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    background: var(--color-border);
-    color: var(--color-ink-dark);
-    font-family: var(--font-handwritten);
-    font-size: 14px;
-    line-height: 1;
-    letter-spacing: 0.5px;
-    pointer-events: none;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.25);
-}
-
-.edge-tab[data-tab="notes"] {
-    background: var(--color-leather);
-    color: var(--color-paper-cream);
-}
-
 /* ==================== PAGE TABS (phone) ==================== */
-/* Paper tabs on the page's top edge. Hidden above 600px, where .edge-tabs
-   does the same job on the book's outer edge. */
+/* Paper tabs on the page's top edge. Hidden above 600px, where both sections
+   are on the spread at once. */
 .page-tabs {
     display: none;
     position: sticky;
@@ -2048,21 +1983,21 @@ body[data-feature-meals] .contents-tab-meals {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: rgba(0,0,0,0.3);
+    background: rgba(255, 252, 245, 0.6);
     padding: 6px 14px;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-border-light);
     z-index: 100;
 }
 
 .user-email {
-    color: var(--color-paper-cream);
+    color: var(--color-ink-dark);
     font-size: 14px;
     font-weight: 700;
 }
 
 .logout-link {
-    color: var(--color-label-cream);
+    color: var(--color-ink-light);
     text-decoration: none;
     font-size: 13px;
     opacity: 0.8;
@@ -2268,9 +2203,14 @@ body[data-feature-meals] .contents-tab-meals {
 
     /* A whole page for the ingredients buys the phone's one-per-line list: a
        column half a spread wide wraps the packed run badly, and a cook reading
-       with their hands busy scans a list, not a paragraph. */
+       with their hands busy scans a list, not a paragraph. Every row is the
+       same height at any type size: a wrapped line stays close (1.45) and
+       rows are set apart by padding, not margin, so the whole row is the tap
+       target. */
     body[data-spread-mode="cook"] #page-left-content .ingredient-item {
         display: block;
+        line-height: 1.45;
+        padding: calc((var(--ingredient-row) - 1.45em) / 2) 0;
     }
 
     /* ...at the size the method is read at, from the counter */
@@ -2353,17 +2293,7 @@ body[data-feature-meals] .contents-tab-meals {
 @media (max-width: 600px) {
     body {
         padding: 0;
-        background-image: linear-gradient(90deg,
-            var(--color-wood-dark) 0%,
-            var(--color-wood-medium) 15%,
-            var(--color-wood-light) 30%,
-            var(--color-wood-medium) 45%,
-            var(--color-wood-dark) 50%,
-            var(--color-wood-medium) 55%,
-            var(--color-wood-light) 70%,
-            var(--color-wood-medium) 85%,
-            var(--color-wood-dark) 100%
-        ); /* Remove noise texture */
+        background: var(--color-desk);
         display: flex;
         flex-direction: column;
         height: 100vh;
@@ -2372,7 +2302,7 @@ body[data-feature-meals] .contents-tab-meals {
     }
 
     body::before {
-        display: none; /* Hide wood grain lines */
+        display: none; /* No weave */
     }
 
     .app-container {
@@ -2410,6 +2340,8 @@ body[data-feature-meals] .contents-tab-meals {
         min-height: 44px;
         z-index: 11; /* level with the timer pill */
         margin: 0;
+        color: var(--color-label-cream);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
         font-size: 16px;
         line-height: 44px;
         letter-spacing: 0;
@@ -2465,8 +2397,8 @@ body[data-feature-meals] .contents-tab-meals {
         width: 100%;
         border-radius: 0;
         border: none;
-        border-bottom: 1px solid var(--color-border);
-        background: rgba(0,0,0,0.5);
+        border-bottom: 1px solid var(--color-border-light);
+        background: var(--color-desk-shade);
         padding: 8px 16px;
         justify-content: space-between;
     }
@@ -2499,8 +2431,9 @@ body[data-feature-meals] .contents-tab-meals {
         padding-bottom: calc(16px + var(--sticky-clearance));
     }
 
-    .page-right::before {
-        display: none;
+    .page-left,
+    .page-right {
+        background: var(--page-paper); /* no binding shadow */
     }
 
     body[data-view-mode="recipe"] .page-left,
@@ -2559,9 +2492,13 @@ body[data-feature-meals] .contents-tab-meals {
         display: none;
     }
 
-    /* One ingredient per line, at reading size */
+    /* One ingredient per row, at reading size, rows as on the page, a
+       little shorter */
     .ingredient-item {
+        --ingredient-row: 36px;
         display: block;
+        line-height: 1.45;
+        padding: calc((var(--ingredient-row) - 1.45em) / 2) 0;
     }
 
     .ingredient-sep {
@@ -2638,10 +2575,6 @@ body[data-feature-meals] .contents-tab-meals {
         font-size: 12px;
     }
 
-    .page-left::after {
-        display: none;
-    }
-
     .book-cover {
         top: 0;
         left: 0;
@@ -2687,10 +2620,6 @@ body[data-feature-meals] .contents-tab-meals {
         width: 48px;
         height: 40px;
         padding: 2px 2px 6px;
-    }
-
-    .recipe-meta-line {
-        font-size: 14px;
     }
 
     .index-alphabet-nav {
@@ -2873,3 +2802,95 @@ html[data-nav-direction="backward"]::view-transition-new(page-content) {
     text-transform: capitalize;
 }
 
+
+/* ==================== AT THE DESK ====================
+   A mouse means a desk: the book is read from a chair, not across a counter,
+   so the type is about 90% of the counter sizes (the owner's "one zoom level
+   smaller" on the Mac). Boxes keep their sizes, so every hit area stays 44px
+   and the timer pill, read across the kitchen, keeps its type. */
+@media (min-width: 601px) and (hover: hover) and (pointer: fine) {
+    .section-label {
+        font-size: 20px;
+    }
+
+    .recipe-title {
+        font-size: 24px;
+    }
+
+    .recipe-meta-line {
+        font-size: 12px;
+    }
+
+    .section-header {
+        font-size: 17px;
+    }
+
+    .prep-list,
+    .step-number,
+    body[data-spread-mode="cook"] #page-left-content .ingredients-list {
+        font-size: 16px;
+    }
+
+    .step-duration {
+        font-size: 14px;
+    }
+
+    .recipe-note {
+        font-size: 12px;
+    }
+
+    .margin-note,
+    .notes-thread,
+    .note-textarea {
+        font-size: 14px;
+    }
+
+    body[data-spread-mode="notes"] #page-left-content .notes-thread {
+        font-size: 15px;
+    }
+
+    .index-title {
+        font-size: 27px;
+    }
+
+    .index-letter-header {
+        font-size: 20px;
+    }
+
+    .index-recipe-item {
+        font-size: 14px;
+    }
+
+    .index-page-number,
+    .index-alpha-letter,
+    .contents-tab,
+    .user-email {
+        font-size: 13px;
+    }
+
+    .logout-link {
+        font-size: 12px;
+    }
+}
+
+/* ==================== TEXT THAT RUNS ON ====================
+   Where a page's text runs on below what is shown, it fades out above the
+   page's foot (the slip and the sticky on the left page, a 20px margin on the
+   right) and nothing shows through the foot, so no line is cut in half. A
+   strip at the end of the content, sticky to the bottom of the page and out
+   of the flow's height (its negative margin), so nothing moves: while there is
+   more below it rides at the foot, and at the end of the page it lies under
+   the last line, over empty paper. --page-foot is the page's bottom padding. */
+@media (min-width: 601px) {
+    .page-content::after {
+        --page-fade: 28px;
+        content: '';
+        display: block;
+        position: sticky;
+        bottom: calc(-1 * var(--page-foot, 20px));
+        height: calc(var(--page-fade) + var(--page-foot, 20px));
+        margin-bottom: calc(-1 * (var(--page-fade) + var(--page-foot, 20px)));
+        background: linear-gradient(to bottom, rgba(240, 235, 216, 0), #f0ebd8 var(--page-fade));
+        pointer-events: none;
+    }
+}

@@ -49,7 +49,7 @@ export function resetTabScroll() {
 
 /**
  * Binds ONE delegated click listener on `document` that routes clicks on
- * `[role="tab"][data-tab]` (both `.page-tabs` and `.edge-tabs`) to setActiveTab.
+ * `[role="tab"][data-tab]` (the phone's `.page-tabs`) to setActiveTab.
  * Call once from app.js DOMContentLoaded. Idempotent.
  */
 export function initPageTabs() {
@@ -96,8 +96,7 @@ export function setActiveTab(tab, options = {}) {
         // height is there to scroll; the browser clamps a stale position.
         if (switching) pageRight.scrollTop = tabScroll.get(tab) ?? 0;
 
-        // The edge ribbons are plain page edges: nothing is drawn as selected
-        document.querySelectorAll('[role="tab"][data-tab]:not(.edge-tab)').forEach(el => {
+        document.querySelectorAll('[role="tab"][data-tab]').forEach(el => {
             const selected = el.dataset.tab === tab;
             el.classList.toggle('active', selected);
             el.setAttribute('aria-selected', String(selected));

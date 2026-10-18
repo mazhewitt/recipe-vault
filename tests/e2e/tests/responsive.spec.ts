@@ -35,12 +35,11 @@ test.describe('Responsive Layout (book only)', () => {
     test.skip(!isPhone(page), 'phone layout only');
     await seedAndOpen(page);
 
-    // Paper tabs on the page's top edge; the desktop edge tabs stay hidden
+    // Paper tabs on the page's top edge
     const paperTabs = page.locator('.page-tabs');
     await expect(paperTabs).toBeVisible();
     await expect(page.locator('.page-tab')).toHaveCount(3);
     await expect(page.locator('.page-tab[data-tab="ingredients"]')).toHaveClass(/active/);
-    await expect(page.locator('.edge-tabs')).toBeHidden();
 
     // The note input is a static bar beneath the book, not a slip on the page
     const position = await page.locator('.note-input').evaluate(el => getComputedStyle(el).position);
@@ -191,7 +190,6 @@ test.describe('Responsive Layout (book only)', () => {
     await expect(page.locator('.index-title')).toBeVisible();
 
     await expect(page.locator('.page-tabs')).toBeHidden();
-    await expect(page.locator('.edge-tabs')).toBeHidden();
     // The contents page is the visible page now
     await expect(page.locator('#page-left')).toBeVisible();
     await expect(page.locator('#note-page-number')).toHaveText('p. 1');
@@ -204,10 +202,9 @@ test.describe('Responsive Layout (book only)', () => {
     // on the right as in every mode, the ribbon strip on the outer edge.
     await useContentsMode(page);
 
-    // Edge ribbons on the book's outer edge; the phone paper tabs stay hidden.
-    // Two of them: Notes is a left-page spread mode now, not a section.
-    await expect(page.locator('.edge-tabs')).toBeVisible();
-    await expect(page.locator('.edge-tab')).toHaveCount(2);
+    // No section tabs above 600px (lighter-book removed the inert ribbons) and
+    // the phone paper tabs stay hidden
+    await expect(page.locator('.edge-tabs, .edge-tab')).toHaveCount(0);
     await expect(page.locator('.page-tabs')).toBeHidden();
 
     // Contents mode keeps the slip: it has one home in every mode
@@ -236,17 +233,16 @@ test.describe('Responsive Layout (book only)', () => {
     expect(input.y).toBeLessThan(leftPage.y + leftPage.height);
   });
 
-  test('desktop hides the edge tabs on the contents page', async ({ page }) => {
+  test('desktop shows no section tabs on the contents page', async ({ page }) => {
     test.skip(isPhone(page), 'wide layout only');
     await seedAndOpen(page);
     await useContentsMode(page);
-    await expect(page.locator('.edge-tabs')).toBeVisible();
+    await expect(page.locator('.page-tabs')).toBeHidden();
 
     await page.locator('#recipe-book-header').click();
     await waitForTurn(page);
     await expect(page.locator('.index-title')).toBeVisible();
 
-    await expect(page.locator('.edge-tabs')).toBeHidden();
     await expect(page.locator('.page-tabs')).toBeHidden();
   });
 
@@ -268,7 +264,6 @@ test.describe('Responsive Layout (book only)', () => {
     });
     await openRecipe(page, recipeId);
 
-    await expect(page.locator('.edge-tabs')).toBeVisible();
     await expect(page.locator('.page-tabs')).toBeHidden();
 
     await page.locator('#message-input').fill('hello tablet');

@@ -1,8 +1,9 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, expectHitArea, isPhone, openRecipe, openTab } from './helpers';
+import { authenticate, createRecipe, expectHitArea, isDesk, isPhone, openRecipe, openTab } from './helpers';
 
 /**
- * family-recipe-ui › Recipe text is sized for reading from the counter,
+ * family-recipe-ui › Recipe text is sized for reading from the counter (the
+ * desk sizes and the ingredient row pitch: lighter-book.spec.ts),
  * › Every control the cook taps has a 44px hit area, › The title takes the
  * width of the page, › Share and photo end the meta line (D9).
  */
@@ -66,25 +67,25 @@ test.describe('Readable and tappable from the counter', () => {
 
   test('recipe text is sized for reading from the counter', async ({ page }) => {
     await openTwoRecipeBook(page);
-    const big = isPhone(page) ? 17 : 18;
+    // At the desk (a mouse) the type is about 90% of the counter size
+    const desk = await isDesk(page);
+    const big = isPhone(page) ? 17 : desk ? 16 : 18;
 
     if (isPhone(page)) {
       await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
       expect(await fontSize(page, '#page-right-content .ingredient-item')).toBe(17);
-      expect(await lineHeightRatio(page, '#page-right-content .ingredients-list')).toBeGreaterThanOrEqual(1.6);
       await openTab(page, 'method');
     }
 
     // The method is the same size in every mode (lead answer Q2)
     expect(await fontSize(page, '#page-right-content .prep-step .step-text')).toBe(big);
-    expect(await fontSize(page, '#page-right-content .step-duration')).toBe(15);
+    expect(await fontSize(page, '#page-right-content .step-duration')).toBe(desk ? 14 : 15);
     expect(await lineHeightRatio(page, '#page-right-content .prep-list')).toBeGreaterThanOrEqual(1.6);
 
     if (!isPhone(page)) {
       await selectCook(page);
-      expect(await fontSize(page, '#page-left-content .ingredient-item')).toBe(18);
-      expect(await lineHeightRatio(page, '#page-left-content .ingredients-list')).toBeGreaterThanOrEqual(1.6);
-      expect(await fontSize(page, '#page-right-content .prep-step .step-text')).toBe(18);
+      expect(await fontSize(page, '#page-left-content .ingredient-item')).toBe(big);
+      expect(await fontSize(page, '#page-right-content .prep-step .step-text')).toBe(big);
     }
   });
 
@@ -92,7 +93,7 @@ test.describe('Readable and tappable from the counter', () => {
     await createRecipe(page, { title: `Contents Size ${Date.now()}`, ingredients: [], steps: [], tags: ['main'] });
     await authenticate(page);
     await expect(page.locator('.index-recipe-item').first()).toBeVisible();
-    expect(await fontSize(page, '.index-recipe-item')).toBe(isPhone(page) ? 16 : 15);
+    expect(await fontSize(page, '.index-recipe-item')).toBe(isPhone(page) ? 16 : (await isDesk(page)) ? 14 : 15);
   });
 
   test('book controls have a 44px hit area', async ({ page }) => {

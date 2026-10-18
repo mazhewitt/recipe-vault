@@ -123,10 +123,7 @@ test.describe('Contents filter tabs', () => {
     expect(await face('.contents-tab-mains')).toEqual({ background: 'rgb(201, 168, 108)', color: 'rgb(45, 36, 24)' });
     expect((await face('.contents-tab-sweets')).background).toBe('rgb(107, 68, 35)');
 
-    // The section tabs on the right page are a different strip and untouched:
-    // its role="tab" buttons are there, none of them here. Two of them now —
-    // Notes left that strip when it became a spread mode.
-    await expect(page.locator('.edge-tabs[role="tablist"] .edge-tab[role="tab"]')).toHaveCount(2);
+    // The filters are not section tabs: none of them has role="tab"
     await expect(page.locator('.contents-tab[role="tab"]')).toHaveCount(0);
   });
 

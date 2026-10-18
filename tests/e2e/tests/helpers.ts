@@ -184,13 +184,20 @@ export function isTablet(page: Page): boolean {
 }
 
 /**
- * The visible tab strip for this viewport: paper tabs on the page's top edge on
- * a phone, edge tabs on the book's outer edge everywhere else.
+ * A desk: above the phone breakpoint with a mouse or trackpad (the `chromium`
+ * project), where the book's type is about 90% of its counter size
+ * (lighter-book L1). The `ipad` project is a touch screen at counter size.
  */
-export function tabSelector(page: Page, tab: TabName): string {
-  return isPhone(page)
-    ? `.page-tab[data-tab="${tab}"]`
-    : `.edge-tab[data-tab="${tab}"]`;
+export async function isDesk(page: Page): Promise<boolean> {
+  return page.evaluate(() => window.matchMedia('(min-width: 601px) and (hover: hover) and (pointer: fine)').matches);
+}
+
+/**
+ * The section tab strip: the paper tabs on the page's top edge. Only the phone
+ * has one; above 600px both sections are on the spread at once.
+ */
+export function tabSelector(_page: Page, tab: TabName): string {
+  return `.page-tab[data-tab="${tab}"]`;
 }
 
 /** Taps a section tab and waits for the right page to actually adopt it. */

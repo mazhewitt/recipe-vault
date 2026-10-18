@@ -167,50 +167,24 @@ test.describe('Spread modes', () => {
     expect(await scrollTop('page-left')).toBeGreaterThan(100);
   });
 
-  test('the right-edge strip stays on the edge in cook mode as inert ribbons', async ({ page }) => {
+  test('the right page has no edge ribbons in any mode', async ({ page }) => {
     skipOnPhone(page);
     const recipeId = await createLongRecipe(page, 'Edge Strip');
     await openRecipe(page, recipeId);
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
 
-    // The strip is the book's furniture and stays put in every mode
-    await expect(page.locator('.edge-tabs')).toBeVisible();
-    await expect(page.locator('.edge-tab')).toHaveCount(2);
-    // Notes is a left-page mode now, so it has left the right-edge strip entirely
-    await expect(page.locator('.edge-tab[data-tab="notes"]')).toHaveCount(0);
-
+    // lighter-book: the inert ribbons read as broken tabs, so the right edge
+    // is the page's plain edge in every mode
     for (const mode of ['cook', 'notes', 'contents'] as const) {
       if (mode !== 'cook') await selectMode(page, mode);
-      await expect(page.locator('.edge-tabs')).toBeVisible();
-
-      for (const tab of ['ingredients', 'method']) {
-        const ribbon = page.locator(`.edge-tab[data-tab="${tab}"]`);
-        await expect(ribbon).toBeVisible();
-        // Ribbons, not controls: not announced, not focusable, no pointer input
-        await expect(ribbon).toHaveAttribute('aria-hidden', 'true');
-        await expect(ribbon).toHaveAttribute('tabindex', '-1');
-        expect(await ribbon.evaluate(el => getComputedStyle(el).pointerEvents)).toBe('none');
-
-        const box = (await ribbon.boundingBox())!;
-        const cx = box.x + box.width / 2;
-        const cy = box.y + box.height / 2;
+      await expect(page.locator('.edge-tabs, .edge-tab')).toHaveCount(0);
+      const right = (await page.locator('#page-right').boundingBox())!;
+      // Where the ribbons hung (12px in from the outer edge, 70px and 168px down)
+      for (const y of [70 + 46, 168 + 46]) {
         expect(await page.evaluate(({ x, y }) => {
           const hit = document.elementFromPoint(x, y);
-          return !!hit && !!hit.closest('.edge-tab');
-        }, { x: cx, y: cy }), `elementFromPoint at the ${tab} ribbon`).toBe(false);
-
-        // A click where the ribbon is drawn changes neither page
-        const snapshot = () => page.evaluate(() => ({
-          left: document.getElementById('page-left-content')!.innerHTML,
-          right: document.getElementById('page-right-content')!.innerHTML,
-          leftTop: document.getElementById('page-left')!.scrollTop,
-          rightTop: document.getElementById('page-right')!.scrollTop,
-          mode: document.body.dataset.spreadMode,
-        }));
-        const before = await snapshot();
-        await page.mouse.click(cx, cy);
-        await page.waitForTimeout(400);
-        expect(await snapshot()).toEqual(before);
+          return !!hit && !!hit.closest('#page-right');
+        }, { x: right.x + right.width - 6, y: right.y + y }), `the right edge at ${y}px in ${mode} mode`).toBe(true);
       }
     }
   });
