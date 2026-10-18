@@ -25,13 +25,13 @@ Each group ends with a gate. A group is done when its gate is green.
 Files: `static/page-transitions.js` (`initSwipeGestures`), `tests/e2e/tests/helpers.ts`, new `tests/e2e/tests/swipe-navigation.spec.ts`.
 Satisfies: `swipe-navigation` "Swipe gesture triggers recipe navigation on mobile" (all scenarios) and "Swipe does not conflict with vertical scrolling" (all scenarios).
 
-- [ ] 2.1 Lock rule: the direction stays undecided until `max(|dx|, |dy|) ≥ 30`. At that moment the gesture is horizontal only if `|dx| > 2·|dy|`; otherwise set `tracking = false` for the rest of the gesture. This replaces the 10px lock and `absDy < absDx * 2`.
-- [ ] 2.2 Call `preventDefault()` only after a horizontal lock, and only when `e.cancelable`. Before the lock, never call it.
-- [ ] 2.3 Release rule: navigate only if, measured from `touchstart`, `|dx| ≥ 0.3 × .pages-container width` **and** `|dy| < |dx| / 2`.
-- [ ] 2.4 Momentum: record `performance.now()` on every `scroll` of `#page-left` and `#page-right`. `scroll` does not bubble, so use one capture-phase passive listener on `.pages-container`. A `touchstart` less than 300ms after the last one is ignored for the whole gesture.
-- [ ] 2.5 Keep what exists: touches that start on `.recipe-photo` are ignored, the `isMobile()` gate stays, and so does the `animating` check.
-- [ ] 2.6 `helpers.ts`: add `touchGesture(page, x0, y0, path)` and `line(n, dx, dy)`. They drive real touches through CDP `Input.dispatchTouchEvent`, as `tests/usability/remeasure/find.cjs` `gesture()` does. Every project runs Chromium, so CDP is available everywhere.
-- [ ] 2.7 Tests in `swipe-navigation.spec.ts`. The phone cases are guarded `test.skip(!isPhone(page))`. Seed at least three recipes and open the middle one.
+- [x] 2.1 Lock rule: the direction stays undecided until `max(|dx|, |dy|) ≥ 30`. At that moment the gesture is horizontal only if `|dx| > 2·|dy|`; otherwise set `tracking = false` for the rest of the gesture. This replaces the 10px lock and `absDy < absDx * 2`.
+- [x] 2.2 Call `preventDefault()` only after a horizontal lock, and only when `e.cancelable`. Before the lock, never call it.
+- [x] 2.3 Release rule: navigate only if, measured from `touchstart`, `|dx| ≥ 0.3 × .pages-container width` **and** `|dy| < |dx| / 2`.
+- [x] 2.4 Momentum: record `performance.now()` on every `scroll` of `#page-left` and `#page-right`. `scroll` does not bubble, so use one capture-phase passive listener on `.pages-container`. A `touchstart` less than 300ms after the last one is ignored for the whole gesture.
+- [x] 2.5 Keep what exists: touches that start on `.recipe-photo` are ignored, the `isMobile()` gate stays, and so does the `animating` check.
+- [x] 2.6 `helpers.ts`: add `touchGesture(page, x0, y0, path)` and `line(n, dx, dy)`. They drive real touches through CDP `Input.dispatchTouchEvent`, as `tests/usability/remeasure/find.cjs` `gesture()` does. Every project runs Chromium, so CDP is available everywhere.
+- [x] 2.7 Tests in `swipe-navigation.spec.ts`. The phone cases are guarded `test.skip(!isPhone(page))`. Seed at least three recipes and open the middle one.
   - Swipe left and swipe right navigate. Assert the new title, and that `html[data-nav-direction]` was observed with the right value (MutationObserver installed before the swipe).
   - A 25% swipe does nothing.
   - The 31° drift does nothing: start at (255, 600), `line(12, -130, -220)`, on the Method tab.
@@ -43,8 +43,9 @@ Satisfies: `swipe-navigation` "Swipe gesture triggers recipe navigation on mobil
   - Swipe right on the first recipe returns to the contents.
   - Swipe left on the last recipe does nothing.
   - On `ipad` (`test.skip(!isTablet(page))`), a 300px swipe does nothing.
-- [ ] 2.8 Red-check: revert 2.1, 2.3 and 2.4 one at a time and confirm the diagonal, drift and momentum tests go red. Restore each revert.
-- [ ] 2.9 Gate: `make lint`, `npx playwright test tests/swipe-navigation.spec.ts` (all projects), `make test-e2e`.
+- [x] 2.8 Red-check: revert 2.1, 2.3 and 2.4 one at a time and confirm the diagonal, drift and momentum tests go red. Restore each revert.
+  - Done. Reverting 2.1 alone left the diagonal test green, because the 2.3 release rule also rejects it (|dy| 220 >= |dx| 130 / 2). An extra test ("a gesture that locked as a scroll never turns the page, even if it then goes far sideways") isolates the lock and went red; with 2.1 and 2.3 both reverted the diagonal, the extra test and the drift test all went red. Reverting 2.3 turned the drift test red, and reverting 2.4 turned the momentum test red. Each restore was checked byte-identical with `cmp`.
+- [x] 2.9 Gate: `make lint`, `npx playwright test tests/swipe-navigation.spec.ts` (all projects), `make test-e2e`.
 
 ## 3. Gutter chevrons replace the invisible edge zones (design N1)
 

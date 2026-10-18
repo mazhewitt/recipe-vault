@@ -579,3 +579,27 @@ export async function paceChat(page: Page, gapMs = 600): Promise<void> {
     };
   }, gapMs);
 }
+
+/** One touch-move path: n even steps from the start point to (dx, dy). */
+export function line(n: number, dx: number, dy: number): Array<[number, number]> {
+  return Array.from({ length: n }, (_, i) => [(dx * (i + 1)) / n, (dy * (i + 1)) / n] as [number, number]);
+}
+
+/**
+ * Drives a real one-finger touch through CDP `Input.dispatchTouchEvent`: down
+ * at (x0, y0), then each [dx, dy] of `path` (offsets from the start) one frame
+ * apart, then up. Real touches scroll and fire touch events the way a thumb
+ * does, which synthetic dispatchEvent calls do not (as in
+ * tests/usability/remeasure/find.cjs gesture()). Every project runs Chromium.
+ */
+export async function touchGesture(page: Page, x0: number, y0: number, path: Array<[number, number]>): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  const pt = (x: number, y: number) => [{ x: Math.round(x), y: Math.round(y), id: 1, radiusX: 8, radiusY: 8, force: 1 }];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(x0, y0) });
+  for (const [dx, dy] of path) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(x0 + dx, y0 + dy) });
+    await page.waitForTimeout(16);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}

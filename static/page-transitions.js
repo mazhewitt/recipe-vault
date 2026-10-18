@@ -358,6 +358,14 @@ export async function crossfadeElement(el, applyFn, ms = 200) {
 export function initSwipeGestures(container) {
     if (!container) return;
 
+    // The direction stays undecided until the touch has moved LOCK_PX; it is
+    // horizontal only if |dx| > 2·|dy| at that moment, otherwise a scroll
+    // for the rest of the gesture.
+    const LOCK_PX = 30;
+    // A touch this soon after the page last scrolled lands on a page that is
+    // still coasting: never a swipe.
+    const MOMENTUM_MS = 300;
+
     let touchStartX = 0;
     let touchStartY = 0;
     let tracking = false;
@@ -365,13 +373,23 @@ export function initSwipeGestures(container) {
     let isHorizontalSwipe = false;
     let shouldIgnoreSwipe = false;
     let pageWidth = 0;
+    let lastScrollAt = -Infinity;
+
+    // `scroll` does not bubble, so one capture-phase listener sees both pages
+    container.addEventListener('scroll', (e) => {
+        if (e.target.id === 'page-left' || e.target.id === 'page-right') {
+            lastScrollAt = window.performance.now();
+        }
+    }, { capture: true, passive: true });
 
     container.addEventListener('touchstart', (e) => {
         if (!isMobile()) return;
         if (animating) return;
 
-        if (e.target.classList.contains('recipe-photo')) {
+        if (e.target.classList.contains('recipe-photo')
+            || window.performance.now() - lastScrollAt < MOMENTUM_MS) {
             shouldIgnoreSwipe = true;
+            tracking = false;
             return;
         }
         shouldIgnoreSwipe = false;
@@ -389,24 +407,20 @@ export function initSwipeGestures(container) {
         if (!tracking || !isMobile() || shouldIgnoreSwipe) return;
 
         const touch = e.touches[0];
-        const dx = touch.clientX - touchStartX;
-        const dy = touch.clientY - touchStartY;
-        const absDx = Math.abs(dx);
-        const absDy = Math.abs(dy);
+        const absDx = Math.abs(touch.clientX - touchStartX);
+        const absDy = Math.abs(touch.clientY - touchStartY);
 
-        // Decide direction within first movement
-        if (!directionLocked && (absDx > 10 || absDy > 10)) {
+        if (!directionLocked) {
+            if (Math.max(absDx, absDy) < LOCK_PX) return; // undecided
             directionLocked = true;
-            isHorizontalSwipe = absDy < absDx * 2;
+            isHorizontalSwipe = absDx > 2 * absDy;
             if (!isHorizontalSwipe) {
                 tracking = false;
                 return;
             }
         }
 
-        if (!directionLocked || !isHorizontalSwipe) return;
-
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
     }, { passive: false });
 
     container.addEventListener('touchend', (e) => {
@@ -418,9 +432,11 @@ export function initSwipeGestures(container) {
         tracking = false;
 
         const dx = e.changedTouches[0].clientX - touchStartX;
-        const progress = Math.abs(dx) / pageWidth;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        const absDx = Math.abs(dx);
 
-        if (progress < 0.3) return; // Below threshold — no navigation
+        // Below threshold, or drifted vertical by the end: no navigation
+        if (absDx < 0.3 * pageWidth || Math.abs(dy) >= absDx / 2) return;
 
         if (dx < 0) {
             // Swipe left → forward
