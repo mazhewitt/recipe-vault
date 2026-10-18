@@ -338,8 +338,8 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
 
 ## 9. Verification and documentation
 
-- [ ] 9.1 `grep -n "test.fail\|test.fixme" tests/e2e/tests/layout-stability.spec.ts` returns nothing. Every case runs on every project, except "Switching spread mode" on the phone, which is skipped with a reason.
-- [ ] 9.2 Revert-and-fail, as in book-spread-modes task 9.5. Revert each line below, name the test that goes red, then restore it and confirm the tree is byte-identical:
+- [x] 9.1 `grep -n "test.fail\|test.fixme" tests/e2e/tests/layout-stability.spec.ts` returns nothing. Every case runs on every project, except "Switching spread mode" on the phone, which is skipped with a reason.
+- [x] 9.2 Revert-and-fail, as in book-spread-modes task 9.5. Revert each line below, name the test that goes red, then restore it and confirm the tree is byte-identical:
   - the contents-mode slip hide
   - ribbon `pointer-events`
   - the sticky's position
@@ -352,13 +352,13 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - one `::before` hit area
   - the place-keeping click handler
   - the wake-lock request
-- [ ] 9.3 `make lint`, then `lsof -ti:3001 | xargs kill`, then `make test-e2e` green on chromium, mobile-chrome and ipad. One agent owns the suite.
-- [ ] 9.4 Run `tests/usability/run-all.sh after-steady-spread`. It diffs against `baseline-2026-10-17/`, and its output goes to the gitignored `tests/usability/runs/after-steady-spread/`. Fill the "after" column of `audit-summary.md` "Before / after":
+- [x] 9.3 `make lint`, then `lsof -ti:3001 | xargs kill`, then `make test-e2e` green on chromium, mobile-chrome and ipad. One agent owns the suite.
+- [x] 9.4 Run `tests/usability/run-all.sh after-steady-spread`. It diffs against `baseline-2026-10-17/`, and its output goes to the gitignored `tests/usability/runs/after-steady-spread/`. Fill the "after" column of `audit-summary.md` "Before / after":
   - Rows covered by D1-D11 get the new number.
   - Rows covered by N1-N8 get `n/a (safe-page-navigation N…)`.
   - Rows covered by `scratch:` get `n/a (scratch:<slug>)`.
   - A check that prints `ERROR` usually relies on a selector this change renamed or removed (`#loading`, `.sticky-note`, the right-page margin column, the 28px `.timer-cancel`). Fix the check in `tests/usability/remeasure/`, record that in the table, and do not read the old number as a pass.
-- [ ] 9.5 `design-system.md`: update every place that describes the old layout:
+- [x] 9.5 `design-system.md`: update every place that describes the old layout:
   - the Spread Modes table (≈181-185)
   - the breakpoint table (≈158-159)
   - the right-page grid paragraph (≈241)
@@ -367,7 +367,7 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - the type tables (≈95-118)
   - the timer pill position
   - Also add a section on the reply sticky, the in-flight line, ribbons, hit areas and place keeping.
-- [ ] 9.6 `planned-ideas/ui-v2-journal/README.md`: note that the interaction model's "keep the last two or three notes visible" (≈120) became one sticky above the input, and that timers now chime and persist.
+- [x] 9.6 `planned-ideas/ui-v2-journal/README.md`: note that the interaction model's "keep the last two or three notes visible" (≈120) became one sticky above the input, and that timers now chime and persist.
 - [ ] 9.7 Hand-off to `safe-page-navigation`:
   - Its spec deltas must be written against this change's versions of family-recipe-ui "Phone page tabs" and "Recipe book displays as open two-page spread with leather cover", and web-chat "Recipe Artifact Event Handling".
   - Archive this change first.

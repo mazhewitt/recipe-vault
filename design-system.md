@@ -59,8 +59,8 @@ Recipe Vault embraces a **handwritten journal aesthetic** that evokes the warmth
 | `--color-border-light` | `#d4c4a8` | Subtle dividers |
 | `--color-label-cream` | `#d4c4a8` | Section labels on dark bg |
 | `--color-accent-brown` | `#6b4423` | Section headers |
-| `--color-biro` | `#1f3d8a` | Margin note handwriting (AI replies) |
-| `--color-sticky` | `#fbe9a0` | Sticky note background on the contents page |
+| `--color-biro` | `#1f3d8a` | Reply handwriting on the sticky (AI replies) |
+| `--color-sticky` | `#fbe9a0` | The reply sticky, above the note input in every view |
 
 ---
 
@@ -89,27 +89,32 @@ Load via Google Fonts: `Kalam:wght@300;400;700` and `Libre+Baskerville:ital,wght
 | Meal Plan Title | Kalam | 28px | 400 | 1.4 | ink-dark |
 | Step Number | Kalam | 18px | 700 | 1.4 | leather |
 | Contents Entry | Libre Baskerville | 15px | 400 | 1.35 | ink-dark |
-| Notes Thread | Kalam | 15px | 400 | 1.5 | ink-dark |
+| Notes Thread | Kalam | 15px (16px on the notes spread) | 400 | 1.5 | ink-dark |
 | Note Input | Kalam | 16px | 400 | 1.4 | ink-dark |
 | Meta Line | Kalam | 15px | 400 | 1.4 | ink-medium |
-| Ingredients | Libre Baskerville | 14px | 400 | 1.7 | ink-dark |
-| Method Steps | Libre Baskerville | 14px | 400 | 1.65 | ink-dark |
+| Ingredients | Libre Baskerville | 18px in cook mode (the left page); 14px in the packed list nowhere else on screen | 400 | 1.7 | ink-dark |
+| Method Steps | Libre Baskerville | 18px, in every spread mode | 400 | 1.65 | ink-dark |
+| Step Duration | Libre Baskerville | 15px | 400 | inherit | ink-medium |
+| Reply Sticky | Kalam | 15px | 400 | 1.45 | biro |
 | Contents Page Number / Footer | Kalam | 13–14px | 400 | 1.4 | ink-light |
 | Section Tab | Kalam | 14px (edge) / 16px (paper) | 400 | 1 | ink-dark |
 | Contents Filter Tab | Kalam | 14px (edge) / 15px (chip) | 400 | 1 | per tab (see Index View) |
 | Recipe Tag Chip | Kalam | 12px | 400 | 1 | ink-light |
-| Timer Display | Kalam | 18px | 400 | 1 | ink-dark |
+| Timer Display | Kalam | 18px, tabular numerals | 400 | 1 | ink-dark (leather when done) |
 
 **Contrast rule:** on paper, nothing under 16px may be lighter than `--color-ink-light` (`#6b5a4a`). `--color-ink-muted` (`#8a7a60`) is decorative only (separators, disabled letters).
 
 ### Mobile Type Adjustments
 
-On mobile (≤ 600px) the reading text goes up and the chrome comes down:
+The recipe is read from the counter, at arm's length, so the ingredients and the method are 18px above 600px (17px on the phone) and the durations 15px. The method is 18px in **every** spread mode, not just cook: a mode switch must not reflow the step being read. The contents page and the Notes thread keep their sizes.
+
+On mobile (≤ 600px) the reading text stays large and the chrome comes down:
 
 | Element | Desktop | Mobile |
 |---------|---------|--------|
-| Ingredients | 14px | 16px |
-| Method Steps | 14px | 16px |
+| Ingredients | 18px (cook mode) | 17px |
+| Method Steps | 18px | 17px |
+| Step Duration | 15px | 15px |
 | Contents Entry | 15px | 16px |
 | Note Input | 16px | 16px (16px keeps iOS from zooming on focus) |
 | Notes Thread | 15px | 15px |
@@ -149,14 +154,14 @@ Recipe Title (27px), Contents Title (30px) and Contents Letter Header (22px) kee
 
 ## Responsive Layout Strategy
 
-There is one column: the recipe book. Chat is not a second panel — it is a single note input that belongs to the book, pinned to the foot of the right page on desktop and tablet and dropped to a bar beneath the book on the phone. Nothing switches between a "book view" and a "chat view" at any width.
+There is one column: the recipe book. Chat is not a second panel — it is a single note input that belongs to the book, pinned to the foot of the left page on desktop and tablet in every view, and dropped to a bar beneath the book on the phone. Nothing switches between a "book view" and a "chat view" at any width.
 
 ### Breakpoints
 
 | Name | Range | Layout Mode |
 |------|-------|-------------|
-| **Desktop** | > 1024px | Two-page spread; margin notes in a 150px column beside the recipe; section tabs on the book's outer edge |
-| **Tablet Portrait** | 601px – 1024px | Same spread, full width; margin notes collapse beneath the recipe body |
+| **Desktop** | > 1024px | Two-page spread; the note slip and its reply sticky at the foot of the left page; bookmark ribbons on the book's outer edge |
+| **Tablet Portrait** | 601px – 1024px | Same spread, full width; nothing collapses — the right page has no margin column to collapse |
 | **Mobile** | ≤ 600px | One page at a time; paper tabs on the page's top edge; note input becomes a bar |
 
 CSS follows the same three bands: `@media (max-width: 1024px)` is tablet-and-below, `@media (max-width: 600px)` is the phone (it comes later in `styles.css` and therefore wins), and everything outside a media query is the desktop base. JS uses one predicate everywhere — `window.matchMedia('(max-width: 600px)').matches`. No module reads `window.innerWidth` or invents a second breakpoint.
@@ -177,17 +182,19 @@ Above 600px the book is a spread, and `body[data-spread-mode]` says what the **l
 
 | Value | Left page | Right page | Left-edge strip |
 |-------|-----------|------------|-----------------|
-| `contents` | The contents — split across both pages in `index` view, one column while a recipe is open | The recipe or meal plan, or the second half of the contents | The filters plus Notes in `index` view, the spread tabs otherwise |
-| `cook` | The open recipe's `ingredients:` panel, **moved** off the right page, with the note slip at its foot | The `method:` panel alone — no margin column, but the reply pinned to its top corner as a slip | Spread tabs, Cook pressed |
-| `notes` | The thread for the open recipe (`.notes-page > .notes-thread`), with the note slip at its foot | The whole recipe and its margin column, exactly as in contents mode; in `index` view the contents move here as one column | Spread tabs, Notes pressed |
+| `contents` | The contents — split across both pages in `index` view, one column while a recipe is open — with the note slip and the reply sticky at its foot | With a recipe open: title, meta and method. Otherwise the meal plan, or the second half of the contents | The filters plus Notes in `index` view, the spread tabs otherwise |
+| `cook` | The open recipe's `ingredients:` panel, **moved** off the right page, with the slip and the sticky at its foot | Title, meta and method | Spread tabs, Cook pressed |
+| `notes` | The thread for the open recipe (`.notes-page > .notes-thread`), with the slip at its foot; the in-flight line is the thread's last, unstored entry and the sticky stands down | Title, meta and method, exactly as in cook mode; in `index` view the contents move here as one column | Spread tabs, Notes pressed |
+
+**With a recipe open, the right page is the same in every mode** — title, meta, method — so a mode switch changes the left page only and the step being read never moves. In `contents` and `notes` the ingredients are not on screen; the Cook tab is one tap away. The slip has one home, the foot of the left page, in every state above 600px (the contents page, all three modes, a meal plan, the fallback after a failed load) and is never hidden.
 
 - **Cook mode is the default every time a recipe opens** — from the contents, from `display_recipe`, from the nav arrows or a swipe. It is not sticky and not remembered; the tab back to Contents is one click.
-- **Focusing the note input selects nothing.** The slip holds one position — the foot of the left page — in both modes that show it, and `contents` mode hides it rather than moving it, so a click can never shift it out from under the cursor. The Notes tab is the only way into `notes` mode. (It used to switch on focus, which is exactly the jump that removed it.)
+- **Focusing the note input selects nothing.** The slip holds one position — the foot of the left page — in every mode and view, so a click can never shift it out from under the cursor. The Notes tab is the only way into `notes` mode. (It used to switch on focus, which is exactly the jump that removed it.)
 - **Notes is on the strip in every view**, beside the filters while browsing and beside Contents and Cook while a recipe is open — otherwise the book-level thread would have no entry point at all.
 - **Returning to the contents selects `contents`** and the strip reverts to the filters, restoring the one remembered in `sessionStorage['rv-contents-filter']`.
 - **A meal plan never cooks.** `setSpreadMode('cook')` is refused in `meal` view, not merely left off the strip.
 - **A mode change is refused while the animation lock is held**, exactly as a tab change is. The programmatic transitions that happen *inside* a page turn (opening a recipe, going back to the contents) pass `{ force: true }`; a reader's tab click never does.
-- **The ingredients are moved, not re-rendered.** Cook mode relocates the one `.tab-panel[data-tab="ingredients"]` node into `#page-left-content` and puts it back on leaving, so there is only ever one copy and `applyStepHighlight`, the section headers and every refresh path keep their single `querySelector` target. A recipe refresh (photo upload, `update_recipe`, difficulty backfill) re-asserts the mode.
+- **The ingredients are moved, not re-rendered.** Cook mode relocates the one `.tab-panel[data-tab="ingredients"]` node into `#page-left-content`; on leaving it is held off the page (not put back on the right page, which stays title, meta and method), so there is only ever one copy and `applyStepHighlight`, the section headers and every refresh path keep their single `querySelector` target. A recipe refresh (photo upload, `update_recipe`, difficulty backfill) re-asserts the mode.
 - **A whole page buys the phone's ingredient list.** In cook mode `#page-left-content .ingredient-item` goes back to `display: block` with `.ingredient-sep` hidden — one ingredient per line, as on the phone. A column half a spread wide wraps the packed `·`-separated run badly, and a cook with their hands busy scans a list, not a paragraph.
 - **Below 600px there is no spread, so there is no mode.** Every rule keyed off the attribute lives inside `@media (min-width: 601px)`, and `setSpreadMode` refuses to write at all on the phone — the attribute keeps its last desktop value, so the reader's mode comes back when the viewport grows again. Render decisions therefore ask for the *effective* mode (`contents` on a phone, whatever the body says above it).
 
@@ -208,19 +215,20 @@ The book is the only child of `.app-container`, centred up to 1400px.
 │                                        [user@email  Logout]  │
 │                       "Recipe Book"                          │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │ < ┌─────────────────┬──────────────────────────────┐ > │  │
-│  │   │                 │                    │         │▐I▌│  │
-│  │   │   Contents      │   Recipe           │ margin  │▐M▌│  │
-│  │   │   (left page)   │   (right page)     │ notes   │▐N▌│  │
-│  │   │                 │                    │  150px  │   │  │
-│  │   │                 │ ┌────────────────────────┐   │   │  │
-│  │   │                 │ │ ✎ Write a note…  ➤ p. 7│   │   │  │
-│  │   └─────────────────┴─┴────────────────────────┴───┘   │  │
+│  │ < ┌──────────────────────[⏱ 12:00]─────────────┐ > │  │
+│  │   │ C  Ingredients        │  Recipe title          │▐I▌│  │
+│  │   │ C  (cook) / thread    │  meta line   ⇪ 📷      │▐M▌│  │
+│  │   │ N  (notes) / contents │  method                │   │  │
+│  │   │ ┌───────────────────┐ │   1. …                 │   │  │
+│  │   │ │ reply sticky   ✕  │ │   2. …                 │   │  │
+│  │   │ ├───────────────────┤ │                        │   │  │
+│  │   │ │ ✎ Write a note… ➤ │ │                        │   │  │
+│  │   └─┴───────────────────┴─┴────────────────────────┘   │  │
 │  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-That is `contents` mode, the arrangement the book opens in. In `cook` mode the ingredients replace the contents on the left and the method takes the whole right page; in `notes` mode the conversation and the note slip take the left page. See **Spread Modes** above.
+A recipe open in `cook` mode, the arrangement every recipe opens in. The left page holds the ingredients (`cook`), the conversation (`notes`) or the contents (`contents`), with the slip and the reply sticky at its foot; the right page holds title, meta and method in every mode. The timer pill sits over the spine, the ribbons (I, M) on the right edge are furniture, and the spread tabs (C, C, N) are on the left edge. See **Spread Modes** above.
 
 ### Dimensions
 
@@ -231,14 +239,14 @@ That is `contents` mode, the arrangement the book opens in. In `cook` mode the i
 | `.recipe-book` | `flex: 1`, `position: relative` — the containing block for the timer pill, the nav arrows and `.edge-tabs` |
 | `.pages-container` | `flex: 1`, `margin: 6px`, `perspective: 800px` |
 | `.page` | `flex: 1`, `padding: 20px 28px`, `overflow-y: auto` — each page scrolls independently |
-| `.page-right` | adds `padding-bottom: 72px` so recipe content never runs under the note slip |
+| `.page-left` | `padding-bottom: var(--slip-clearance)` (slip height + offset + 10px), and its `.page-content` grows with its content, so the left page's last line scrolls clear of the slip |
 | Body padding | 30px 50px |
 
 `.book-container` has no `min-width`: with a single column, `flex: 1` inside the 1400px `.app-container` does the centring on its own. The bounded `calc(100vh - 60px)` height is load-bearing — the independent page-scroll model depends on it.
 
 ### Right Page in Recipe / Meal View
 
-`body[data-view-mode="recipe"] #page-right` (and its `"meal"` sibling) turns the right page into a grid — `grid-template-columns: minmax(0, 1fr) 150px`, `align-items: start`, `column-gap: 12px` — with `#page-right-content` in the first column and `#page-margin` in the second. In contents view there is no grid: `#page-margin` is pinned at `top: 24px; right: 24px`, 150px wide. Nor in `cook` mode: `#page-right` becomes a flex column, `#page-margin` is hidden and the method has the page to itself.
+`body[data-view-mode="recipe"] #page-right` is a flex column with `#page-right-content` sized to its content (`height: auto; flex: 0 0 auto`), in every spread mode. There is no grid and no margin column: `#page-margin` is the reply sticky, a sibling of the slip that lives at the foot of the left page (see **Reply Sticky** below). Whatever `#page-right[data-tab]` says, the method panel is what the right page shows above 600px.
 
 ### Stacking Order
 
@@ -246,13 +254,12 @@ That is `contents` mode, the arrangement the book opens in. In `cook` mode the i
 |-------|---------|
 | `.book-cover` | 0 |
 | `.pages-container` | 1 |
-| `#page-margin` (contents view) | 2 |
 | `.contents-tabs` | 4 |
 | `.page-tabs` (phone) | 5 |
-| `.note-input` | 6 |
+| `.note-input`, `#page-margin` (the reply sticky) | 6 |
 | `.edge-tabs` | 9 |
 | `.page-nav`, `.mobile-edge-nav`, `.page-turn-overlay` (set in JS) | 10 |
-| `.timer-widget`, `#recipe-book-header` (phone) | 11 |
+| `.timer-widget`, `#recipe-book-header` (phone), `#page-margin` (phone, above the edge strips) | 11 |
 | `.user-info` | 100 |
 | `.photo-preview-overlay` | 2000 |
 
@@ -266,16 +273,16 @@ Same book, same two-page spread, no stacking and no reflow of the columns — th
 |----------|-------|-------|
 | Body padding | 20px | From 30px 50px |
 | `.user-info` | `top: 10px; right: 20px` | Follows the reduced padding |
-| `.page-nav` | 36 × 36px | Larger tap target, from 29px |
-| Margin column | Collapses | `#page-right` becomes `display: flex; flex-direction: column`; `#page-right-content` goes `height: auto; flex: 0 0 auto`; `#page-margin` becomes `width: 100%; padding-top: 12px` directly beneath the content |
+| `.page-nav` | 36 × 36px visual | From 29px; its `::before` hit area is 46px at every width |
+| Right page | Flex column | `#page-right` (recipe and meal view) is `display: flex; flex-direction: column` and `#page-right-content` `height: auto; flex: 0 0 auto`, as it already is in recipe view above 600px |
 | `.index-recipe-item` | `padding: 6px 10px` | Tighter contents entries |
 | `.index-alphabet-nav` | `gap: 1px` | — |
 | `.index-alpha-letter` | 13px, `min-width: 20px`, `padding: 3px` | — |
 | Two-page spread | **Preserved** | iPad portrait (768px) still gives each page ~350px |
-| `.edge-tabs` | As desktop | Shown in recipe view, on the book's right outer edge |
-| `.note-input` | As desktop | Still absolutely positioned over the foot of the right page |
+| `.edge-tabs` | As desktop | Bookmark ribbons in recipe view, on the book's right outer edge |
+| `.note-input`, `#page-margin` | As desktop | The slip and the reply sticky absolutely positioned over the foot of the left page |
 
-There is no `flex-direction: column` on `.app-container` at this breakpoint, no `order` juggling and no height split between components. The margin collapse is the only structural change.
+There is no `flex-direction: column` on `.app-container` at this breakpoint, no `order` juggling and no height split between components. There is no structural change at all.
 
 ---
 
@@ -311,7 +318,9 @@ The book fills the screen and shows one page at a time; the note input becomes a
 | `.book-cover` | Flush (`top/left/right/bottom: 0`), `border-radius: 0`, no shadow; the leather texture (`::before`) and spine shadow (`::after`) are hidden |
 | `.pages-container` | `margin: 40px 4px 4px` — the 40px is a leather strip above the paper |
 | `#recipe-book-header` | Re-shown while generic `.section-label` stays hidden: `position: absolute; top: 12px; left: 14px`, Kalam 16px, z-index 11. Tapping it is the way back to the contents. |
-| `.timer-widget` | `top: 6px; right: 8px`, 30px tall, z-index 11 — the opposite end of the same strip |
+| `.timer-widget` | `top: 8px; right: 8px`, 30px tall, `width: min(200px, calc(100% - 130px))`, z-index 11 — the opposite end of the same strip, which has no arrow |
+| `.app-container` | `width: 100%`, so a skeleton or a refresh can never change the book's width |
+| `.user-info` | Shown on the contents page only (`body:not([data-view-mode="index"]) .user-info { display: none }`) |
 | `.page-left`, `.page-right` | `width: 100% !important`, `padding: 16px`, no radius, no shadow; the binding shadows `.page-left::after` / `.page-right::before` are hidden |
 | `.page-content` | `padding-top: 10px` |
 | `.page-nav` | Hidden — the 60px-wide `.mobile-edge-nav` zones take over |
@@ -322,14 +331,14 @@ The book fills the screen and shows one page at a time; the note input becomes a
 
 | `data-view-mode` | Left page | Right page |
 |------------------|-----------|------------|
-| `index` | The contents, `flex: 1 1 auto` | Collapsed: `flex: 0 0 auto`, `padding: 0`, with `.page-content` and `.page-tabs` hidden. It survives only to host `#page-margin` (`position: static; width: 100%; padding: 8px 16px`) beneath the contents, so the sticky reply still has somewhere to sit; `.page-margin:empty { display: none }` means nothing shows when there is no note. |
+| `index` | The contents, `flex: 1 1 auto` | `display: none`. The reply sticky does not need it: `#page-margin` is a sibling of the slip and overlays the foot of the page directly above the input bar |
 | `recipe` / `meal` | `display: none` | The page: `display: flex; flex-direction: column` |
 
-In `index` mode `.pages-container` becomes `flex-direction: column`, so the collapsed right page sits *under* the contents rather than beside them.
+In `index` mode `.pages-container` is still `flex-direction: column` (a leftover of the old collapsed-right-page layout); with the right page hidden it has no visible effect.
 
 ### One Panel at a Time
 
-`#page-right .tab-panel { display: none }`, and only the panel matching `#page-right[data-tab]` is shown. `body[data-view-mode="recipe"] #page-right[data-tab="notes"] #page-margin { display: none }` so the margin's last-three notes do not double up with the full thread on the Notes tab — scoped to the recipe page, because `#page-right[data-tab]` keeps its value when the reader goes back to the contents, where `#page-margin` is where the sticky reply lives. The title row, the meta line and the phone footer sit outside the panels, so they stay on screen on all three tabs.
+`#page-right .tab-panel { display: none }`, and only the panel matching `#page-right[data-tab]` is shown. `body[data-view-mode="recipe"]:has(#page-right[data-tab="notes"]) #page-margin { display: none }` so the reply sticky does not double up with the full thread on the Notes tab — scoped to the recipe page, because `#page-right[data-tab]` keeps its value when the reader goes back to the contents, where the sticky still shows. The title row, the meta line and the phone footer sit outside the panels, so they stay on screen on all three tabs.
 
 ### Reading Adjustments
 
@@ -337,7 +346,7 @@ In `index` mode `.pages-container` becomes `flex-direction: column`, so the coll
 |----------|-------|
 | `.ingredient-item` | `display: block` — one ingredient per line |
 | `.ingredient-sep` | Hidden |
-| `.ingredients-list`, `.prep-step .step-text` | 16px |
+| `.ingredients-list`, `.prep-list` | 17px |
 | `.recipe-meta-line` | 14px |
 | `.recipe-polaroid` | 84 × 66px, from 96 × 76px |
 | `.recipe-title-row` | `padding-right: 40px` to clear the edge-nav overlay |
@@ -386,7 +395,6 @@ The background simulates a dark wooden table surface.
 ```
 ┌──────────────────────────────────────────────┐
 │ 🖼️ Image attached                         ✕ │ ← .image-attachment, [hidden] by default
-│ ◌ Thinking...                                │ ← .loading, .active while a reply streams
 │ ✎  Write a note to the cook…      📎   ➤ p. 7│ ← .note-input-row
 └──────────────────────────────────────────────┘
 ```
@@ -395,13 +403,14 @@ The background simulates a dark wooden table surface.
 
 | Property | Value |
 |----------|-------|
-| Position | `absolute` inside `.book-container`: `left: calc(50% + 10px)` (just right of the spine), `right: 10px`, `bottom: 10px` |
+| Position | `absolute` inside `.book-container`: `left: 10px`, `right: calc(50% + 10px)` (just left of the spine), `bottom: var(--slip-bottom)` (10px) — the foot of the **left** page, in every view and every mode |
 | z-index | 6 — above `.pages-container` (1), below the page-turn overlay (10) |
 | Surface | `--color-paper-cream`, 1px `--color-border-light` top rule, `--radius-sm`, `box-shadow: 0 -2px 8px rgba(0,0,0,0.06)` |
 | Structure | Flex column, 6px gap, `padding: 8px 10px`; `.note-input-row` is a flex row, `align-items: flex-end`, 8px gap |
-| Clearance | `.page-right { padding-bottom: 72px }` keeps recipe content off the slip |
-| Cook and notes modes | Both mirror the offsets — `left: 10px`, `right: calc(50% + 10px)` — so the slip sits at the foot of the **left** page: under the ingredients in cook, under the conversation in notes. One position, so it never moves on a click. The 72px clearance follows it: `.page-left` takes it and `.page-right` goes back to `.page`'s own 20px |
-| Contents mode | Hidden outright (`display: none`) while a recipe or meal plan is open — the contents are for finding a recipe, and the Notes tab is on the same strip. On the contents page proper the slip keeps its right-page position, that view having no Contents tab to return from |
+| Clearance | `.page-left { padding-bottom: var(--slip-clearance) }` (slip height + offset + 10px) keeps the left page's last line off the slip; `.page-right` keeps `.page`'s own 20px |
+| Never hidden | The contents page, all three modes, a meal plan and the fallback after a failed load all show it in the same place, so opening a recipe or switching mode cannot move it or blink it |
+| `.note-page-number` | Fixed `width: 3.5em`, so "p. 1" becoming "p. 13" cannot narrow the textarea |
+| During a turn | The slip does not change height: the in-flight line ("Thinking…", a tool label) is on the reply sticky above it, the textarea stays enabled and focused, and Send/Enter are inert until the turn ends. The textarea grows to three lines, then scrolls |
 
 It is absolutely positioned precisely so that it does **not** scroll away with the recipe.
 
@@ -446,7 +455,8 @@ An open book showing two pages with a leather cover frame.
 │ ▓ ┌─────────────────┬─────────────────┐ ▓ │
 │ ▓ │    Left Page    │   Right Page    │ ▓ │
 │ ▓ │    Contents     │  Recipe / meal  │ ▓ │
-│ ▓ │                 │   + margin      │ ▓ │
+│ ▓ │                 │  (title, meta,  │ ▓ │
+│ ▓ │                 │   method)       │ ▓ │
 │ ▓ └─────────────────┴─────────────────┘ ▓ │
 │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │
 └─────────────────────────────────────────────┘
@@ -474,10 +484,10 @@ An open book showing two pages with a leather cover frame.
 | Min width | None — `flex: 1` inside the 1400px container | Same | 100% |
 | Page layout | Two-page flex | Two-page flex | Single page, picked by `body[data-view-mode]` |
 | Cover | Overhangs by 12px at the sides, 8px top/bottom; leather texture + spine shadow | Same | Flush with the frame, no texture, no spine; a 40px leather strip above the paper |
-| Page padding | 20px 28px (+ 72px bottom on the right page) | Same | 16px |
+| Page padding | 20px 28px (+ `--slip-clearance` bottom on the left page) | Same | 16px |
 | Spine shadow | Visible | Visible | Hidden |
-| Nav arrows | `.page-nav` 29px | `.page-nav` 36px (larger tap target) | `.page-nav` hidden; 60px `.mobile-edge-nav` zones |
-| Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; on the edge in every mode) | Same | `.page-tabs`, page top edge (all three) |
+| Nav arrows | `.page-nav` 29px, 46px hit area | `.page-nav` 36px, 46px hit area | `.page-nav` hidden; 60px `.mobile-edge-nav` zones |
+| Section tabs | `.edge-tabs`, right outer edge: inert bookmark ribbons (Ingredients / Method) | Same | `.page-tabs`, page top edge (all three) |
 | Left-edge strip | `.contents-tabs`, left page's outer edge: the contents filters while no recipe is open, Contents / Cook / Notes while one is | Same | Chip row under the contents title; filters only |
 
 ---
@@ -486,11 +496,11 @@ An open book showing two pages with a leather cover frame.
 
 The right page carries three panels — Ingredients, Method, Notes — emitted by `recipe-display.renderRecipe` as `.tab-panel[data-tab]`. The active one is recorded on `#page-right[data-tab]`, and `page-tabs.setActiveTab()` is its only writer. Both tab surfaces are shown under `body[data-view-mode="recipe"]` only, so the contents page and the meal plan show neither; nothing in JS hides them.
 
-The desktop strip offers only the first two. Notes is a left-page spread mode there, so `.edge-tab[data-tab="notes"]` is `display: none` above 600px; the phone's paper tabs keep all three, having no left page to promote anything to. `notes` stays a legal `#page-right[data-tab]` value in both layouts — only the desktop affordance is gone.
+The desktop strip shows only the first two, and only as ribbons (below). Notes is a left-page spread mode there, so `.edge-tab[data-tab="notes"]` is `display: none` above 600px; the phone's paper tabs keep all three, having no left page to promote anything to. `notes` stays a legal `#page-right[data-tab]` value in both layouts — only the desktop affordance is gone.
 
 ### Desktop / Tablet: Edge Tabs
 
-`.edge-tabs` is a child of `.recipe-book`, not of `#page-right` — the page is a scroll container and a grid, so tabs inside it would scroll away with the recipe and claim a grid cell.
+`.edge-tabs` is a child of `.recipe-book`, not of `#page-right` — the page is a scroll container, so tabs inside it would scroll away with the recipe.
 
 | Property | Value |
 |----------|-------|
@@ -499,10 +509,10 @@ The desktop strip offers only the first two. Notes is a left-page spread mode th
 | Stack | Flex column, 6px gap |
 | `.edge-tab` | `writing-mode: vertical-rl`, 26px wide, `min-height: 92px`, `padding: 10px 4px`, Kalam 14px, `border-radius: 0 var(--radius-sm) var(--radius-sm) 0`, `box-shadow: 2px 2px 5px rgba(0,0,0,0.25)` |
 | Colors | Ingredients: `--color-border` face, `--color-ink-dark` text; Method: `--color-accent-brown` face, cream text; Notes (phone `.page-tab` only): `--color-leather` face, cream text |
-| `.edge-tab.active` | Cream face, `--color-ink-dark`, weight 700, `padding-right: 8px` so it reads as pulled out of the page |
-| Visibility | `display: none` in the base sheet; `display: flex` only inside `@media (min-width: 601px)` under `body[data-view-mode="recipe"]` — and hidden again in `cook` mode, where both sections are already open on the spread |
+| Inert | `aria-hidden="true"` and `tabindex="-1"` in `chat.html`; `pointer-events: none`; no hover, focus or pressed styling, and none is drawn as active |
+| Visibility | `display: none` in the base sheet; `display: flex` only inside `@media (min-width: 601px)` under `body[data-view-mode="recipe"]`, in every spread mode |
 
-Above 600px, Ingredients and Method are both on the page: tapping either **scrolls** `#page-right` to that panel's `.section-header` rather than swapping panels. Notes is the exception — `#page-right[data-tab="notes"]` hides the other two panels and shows the thread in their place. Neither behaviour applies in `cook` mode: the two sections are on separate pages, so `setActiveTab` skips the scroll (there is no header on this page to scroll to) and the strip is not on screen to be tapped.
+Above 600px a spread mode always applies and the right page is fixed (title, meta, method), so there is nothing for the strip to switch: it is the book's furniture — an empty edge reads as a missing page — and reads as bookmark ribbons, not controls. They are exempt from the 44px rule because they are not controls. The phone's `.page-tabs` are unaffected.
 
 ### Mobile: Paper Tabs
 
@@ -510,7 +520,7 @@ Above 600px, Ingredients and Method are both on the page: tapping either **scrol
 
 | Property | Value |
 |----------|-------|
-| Visibility | `display: none` in the base sheet, so it never becomes a grid item in the desktop `#page-right` grid; `display: flex` inside `@media (max-width: 600px)` under `body[data-view-mode="recipe"]` |
+| Visibility | `display: none` in the base sheet, so it never takes room in the desktop `#page-right` column; `display: flex` inside `@media (max-width: 600px)` under `body[data-view-mode="recipe"]` |
 | Position | `sticky`, `top: 0`, z-index 5, `flex: 0 0 auto` — the tabs hold the page's top edge while the content scrolls under them, on a cream ground so nothing shows through |
 | Spacing | 4px gap, `padding-top: 4px`, `margin-bottom: 10px` |
 | `.page-tab` | `flex: 1`, `min-height: 44px`, Kalam 16px, 1px `--color-border`, `border-radius: var(--radius-sm) var(--radius-sm) 0 0`, `--color-paper-aged-dark` face with `--color-accent-brown` text |
@@ -643,20 +653,23 @@ Single scrollable column on the left page (the only visible page in contents vie
 
 ## Component: Timer Widget
 
-A cream pill clipped to the top-right edge of the recipe book cover. It lives inside `.recipe-book` (directly after `.book-cover`) and is positioned relative to the book, so it scrolls and resizes with the book and can never overlap the fixed user identity pill. There is no speech-bubble tail.
+A cream pill clipped to the top edge of the recipe book cover, **centred over the spine**. It lives inside `.recipe-book` (directly after `.book-cover`) and is positioned relative to the book, so it scrolls and resizes with the book. Centred, it can never meet a page arrow (the top corners) or the user pill. There is no speech-bubble tail.
 
 | Property | Desktop / Tablet | Mobile (≤ 600px) |
 |----------|------------------|------------------|
-| Position | `absolute; top: -10px; right: 12px` (just above the cover's top rim, clearing the fixed user pill by ~6px) | `top: 6px; right: 8px` (inside the frame, which clips overflow on phones) |
+| Position | `absolute; top: -10px; left: 50%; transform: translateX(-50%)` (just above the cover's top rim, over the spine) | `top: 8px; right: 8px; left: auto; transform: none` (inside the frame, which clips overflow on phones; the strip has no arrow) |
+| Width | Fixed per state: `.timer-time` has `min-width: 5ch` and tabular numerals, so a tick never changes it | `width: min(200px, calc(100% - 130px))`; a long label ellipsizes |
 | Height | 36px | 30px |
 | Padding | `4px 8px 4px 14px` | `2px 6px 2px 10px` |
-| Text | Kalam 18px / 400, `"{label}: M:SS"` | Kalam 14px |
+| Text | Kalam 18px / 400, `"{label}: M:SS"`; at zero `"Done — {label}"` | Kalam 14px |
 | Clock icon | 18px | 14px |
-| Close target | 28 × 28px (min-width/min-height) | 28 × 28px |
+| Close target | 28 × 28px visual, a 46 × 46px transparent `::before` hit area | Same |
 | Background / border | `--color-paper-cream`, `2px solid --color-ink-dark`, `--radius-pill`, `--shadow-soft` | Same |
-| z-index | 3 (above `.pages-container` and `.book-cover`) | Same |
+| z-index | 11 (above `.page-nav` and `.mobile-edge-nav`, 10) | Same |
 
 Contents in order: clock icon, `.timer-text`, `.timer-cancel` (circular hover/focus tint). The pill is `display: none` when no timer runs.
+
+**Finishing.** At zero the pill switches to `data-state="done"` — "Done — {label}" with the border, text and icon in `--color-leather` — and **stays until tapped**. A three-note chime plays through Web Audio (oscillators, no asset); the `AudioContext` is created on the first pointer or key gesture in the page, because browsers refuse audio before one. `navigator.vibrate([200,100,200])` fires where it exists, and the `Notification` is still shown when permission was granted. If audio is unavailable the visual "Done" still shows. The step highlight is removed at zero.
 
 ### Step Highlight Band
 
@@ -666,46 +679,46 @@ When a timer carries a `step_number`, the matching `.prep-step[data-step="N"]` o
 |----------|-------|
 | Background | `--color-timer-band` (`#fff4c2`) |
 | Radius | `--radius-sm` |
-| Bleed | `margin: 0 -8px`, `padding-right: 8px`, `padding-left: 38px` (30px number gutter + 8px) |
-| Label | `::after` "timer running", Kalam 13px, `--color-ink-light`, top-right of the step |
+| Box | **Unchanged** — no padding, margin or border is added, so the step's `getBoundingClientRect()` is identical with and without the highlight and nothing below it moves |
+| Edge | `box-shadow: inset 3px 0 0 var(--color-border), inset 0 0 0 1px rgba(201,168,108,0.5)` |
+| Clock mark | A 14px clock SVG as a `background-image` in the number gutter, under the step number |
+| Label | `::before` "timer running", absolutely positioned and written up the page's left margin, so it adds no line. (`::after` is the place-keeping bracket.) |
 | Motion | None — the band appears without animation, so `prefers-reduced-motion` needs no override |
 
 The highlight is re-applied whenever the same recipe is rendered again, never shown on another recipe, and cleared when the timer completes or is cancelled.
 
 ---
 
-## Component: Margin Notes
+## Component: Reply Sticky (`#page-margin`)
 
-AI replies are handwritten in the margin of the open page rather than in a separate transcript. `#page-margin` is a static `<aside class="page-margin" aria-live="polite">` inside `#page-right`, a sibling of `#page-right-content`, so it survives page turns and re-renders. Layout is keyed off `body[data-view-mode]`, mirrored from the app's `viewMode` state, and the margin is hidden outright in `cook` mode — a note has nowhere to sit beside a method that now owns its page. While a reply is streaming the aside carries `aria-busy="true"`, so a screen reader announces the completed note once instead of re-announcing it on every chunk.
+AI replies are not printed in a page margin any more. The latest reply of the thread on display is one yellow sticky note directly above the note slip. `#page-margin` keeps its id (it is the region `margin-notes.js` writes into and the e2e suite reads), but it is now a static `<aside class="page-margin" aria-live="polite">` that is a **sibling of `#note-input`** inside `.book-container`, not part of `#page-right`. It survives page turns and re-renders. While a reply streams it carries `aria-busy="true"`, so a screen reader announces the completed note once.
 
-Every thread entry records the recipe that was open when its turn began, stamped at send time rather than at render time, so a reply that lands after the reader has paged on stays with the recipe it answers. The margin and the Notes view show only the current recipe's entries; `null` is the book-level thread. This is a display concern only — the conversation sent to the LLM is still the whole session.
+Every thread entry records the recipe that was open when its turn began, stamped at send time, so a reply that lands after the reader has paged on stays with the recipe it answers. The sticky and the Notes view show only the current recipe's entries; `null` is the book-level thread (the contents page and a meal plan). This is a display concern only — the conversation sent to the LLM is still the whole session.
 
-| Property | Desktop (> 1024px) | Tablet (601–1024px) | Mobile (≤ 600px) |
-|----------|--------------------|---------------------|------------------|
-| Layout (recipe / meal view) | `#page-right` is a grid: `minmax(0, 1fr) 150px`, 12px column gap | Grid collapses; notes render beneath the page content, full width, 12px top padding | Same as tablet — a block beneath `#page-right-content`; hidden while the Notes tab is active, where the full thread replaces it |
-| Layout (contents view) | `#page-margin` absolute, `top: 24px; right: 24px`, 150px wide | Same | `position: static`, full width, `padding: 8px 16px`, in the collapsed right page beneath the contents |
-| Visible notes | Last three non-user thread entries **for the recipe on the page**, oldest first (latest non-user entry only in contents view) | Same | Same |
+| Property | Desktop / Tablet (> 600px) | Mobile (≤ 600px) |
+|----------|----------------------------|------------------|
+| Position | `absolute`, in the slip's column (`left: 10px; right: calc(50% + 10px)`), its bottom edge 4px above the slip's top | `left: 8px; right: 8px`, directly above the input bar, z-index 11 (above the edge strips) |
+| Placement | `margin-notes.js` measures the slip and the page and hands CSS `--sticky-bottom` and `--sticky-max-height`; a `ResizeObserver` re-measures when the slip, the pages or the left-edge strip resize | Same |
+| Height | Capped at 40% of the page (and clear of the left-edge strip), with internal scroll | Same |
+| Paper | `--color-sticky`, `border-radius: 2px`, `--shadow-soft`; Kalam 15px / 1.45 in `--color-biro` | Same |
+| Dismiss | `.note-dismiss` ✕, a 48 × 48px button, `position: sticky; top: 0` so it stays in reach while a long reply scrolls under it | Same |
+| Hidden | `.page-margin:empty`; in `notes` mode, where the whole thread is on the same page above the slip | On the Notes tab (`:has(#page-right[data-tab="notes"])`) |
+| Layout effect | None: it overlays the foot of the page, so nothing moves when it appears, grows or goes | Same |
+
+**What it holds** — at most one note:
+- While a turn runs, the **in-flight line**: "Thinking…", then a friendly label per tool (`chat.js` `statusLabelFor`: "Setting a timer…", "Opening the recipe…", "Updating the recipe…", "Writing it into the book…", "Looking through the book…", "Laying out the meal…", "Looking it up…", otherwise "Working on it…"), then the reply text as it streams. The in-flight line is never stored in the thread; in `notes` mode it is the thread's last, unstored entry instead.
+- Otherwise the displayed thread's latest reply or error, unless the cook dismissed that very note. A dismissed reply stays dismissed for that recipe until a new one arrives. The contents page uses the same element.
+
+**The slip never changes height while a turn runs.** The textarea stays enabled and keeps focus, so the cook can write the next note; Send (`aria-disabled`) and Enter are inert until the turn ends, so a turn cannot be double-sent. The textarea grows to at most three lines and then scrolls.
 
 ### Note Styles
 
 | Kind | Selector | Style |
 |------|----------|-------|
-| Reply | `.margin-note[data-kind="reply"]` | Kalam 14px / 1.45, `--color-biro`, rotated ~1° (alternating direction); markdown rendered |
-| Status line | `.margin-note[data-kind="status"]` | Kalam 13px italic, `--color-ink-medium`; tool activity and timer confirmations; text escaped |
-| Error | `.margin-note[data-kind="error"]` | Kalam 14px, `--color-leather`; text escaped |
+| Reply | `.margin-note[data-kind="reply"]` | Kalam 15px / 1.45, `--color-biro`; markdown rendered |
+| In-flight line | `.margin-note[data-kind="status"]` | Kalam 13px italic, `--color-ink-medium`; text escaped; not dismissible |
+| Error | `.margin-note[data-kind="error"]` | `--color-leather`; text escaped |
 | Streaming | `.margin-note.streaming` | Blinking `\|` caret via `::after` while chunks arrive |
-
-### Sticky Note
-
-On the contents page the latest non-user note (reply, status or error) is drawn as a single `.sticky-note` (added alongside `.margin-note`) pinned to the top-right of the right page.
-
-| Property | Value |
-|----------|-------|
-| Background | `--color-sticky` (`#fbe9a0`) |
-| Text | Kalam 14px, `--color-biro` |
-| Padding / radius | `12px 14px`, `--radius-sm`-ish (2px) |
-| Shadow | `--shadow-soft` |
-| Rotation | `rotate(2deg)` |
 
 ### Motion
 
@@ -729,7 +742,7 @@ Keep animations subtle and purposeful.
 
 | Element | Animation | Duration | Easing |
 |---------|-----------|----------|--------|
-| Margin note appears | Fade in + 4px slide up | 200ms | ease-out |
+| Reply note appears on the sticky | Fade in + 4px slide up | 200ms | ease-out |
 | Section tab switch (mobile) | Crossfade of `#page-right-content` | 200ms | ease-out |
 | Recipe change (mobile) | Horizontal slide (View Transitions on `page-content`) | 250ms | ease-out |
 | Page turn (desktop / tablet) | `.page-turn-overlay` rotate | 400ms | ease-in-out |
@@ -750,18 +763,41 @@ Keep animations subtle and purposeful.
 
 ### Tap Targets
 
-All interactive elements must be at least **44px x 44px** on touch devices.
+Every control the cook taps has a hit area of at least **44px x 44px**, at every width, with floury fingers from the counter. Where the visible control should stay small, a transparent `::before` centred on it carries the rest: `width/height: max(calc(100% + 2px), 46px)` (46px rather than 44 so the hit area's outermost pixels are the control's too). The look is unchanged. The e2e helper `expectHitArea` checks a 5 × 5 grid over the 44px square with `elementFromPoint`.
 
-| Element | Desktop / Tablet Size | Mobile Minimum |
-|---------|----------------------|----------------|
-| Nav arrows | `.page-nav` 29px (36px on tablet) | Hidden; 60px-wide `.mobile-edge-nav` zones |
-| Section tabs | `.edge-tab` 26 × 92px | `.page-tab` min-height 44px, `flex: 1` |
-| Contents filter tabs | `.contents-tab` 26 × 76px | `.contents-tab` min-height 44px, min-width 66px |
-| Index recipe items | `padding: 4px 8px` | `padding: 8px 10px`, `min-height: 44px` |
-| Note textarea | min-height 34px | min-height 44px |
-| Send / clipboard buttons | 40 × 40px | 44 × 44px |
-| Phone footer links | n/a | min-height 44px |
-| Timer close button | 28 × 28px | 28 × 28px |
+| Element | Visual (Desktop / Tablet) | Hit area | Mobile |
+|---------|---------------------------|----------|--------|
+| Nav arrows | `.page-nav` 29px (36px on tablet) | 46px `::before` | Hidden; 60px-wide `.mobile-edge-nav` zones |
+| Spread / contents tabs | `.contents-tab` 26 × 76px | 46px `::before` | `.contents-tab` min-height 44px, min-width 66px |
+| Edge tabs | `.edge-tab` 26 × 92px | None: inert ribbons, not controls | `.page-tab` min-height 44px, `flex: 1` |
+| Share / photo | 44px icon buttons at the end of the meta line | 46px `::before` | Same |
+| Send / clipboard | 44 × 44px | 46px `::before` | 44 × 44px |
+| Timer close | 28 × 28px | 46px `::before` | Same |
+| Reply sticky ✕ | `.note-dismiss` 48 × 48px | Its own box | Same |
+| Phone footer links | n/a | 46px `::before` | min-height 44px |
+| Index recipe items | `padding: 4px 8px` | — | `padding: 8px 10px`, `min-height: 44px` |
+| Note textarea | min-height 34px | — | min-height 44px |
+
+Known gaps, owned elsewhere: the phone's "Recipe Book" label (81 × 16) and the full-width header hit zone above 600px (safe-page-navigation N8), the A-Z letters (`scratch:contents-page-rough-edges`), and the tablet/desktop Logout link (36 × 21).
+
+### Keeping Your Place
+
+`place-keeping.js` lets the cook keep their place with a tap, drawn without touching any box — no margin, padding, border or size change — so nothing on the page moves.
+
+| Mark | How | Look |
+|------|-----|------|
+| Ingredient tick | Tap an `.ingredient-item[data-index]`; tap again to untick | `data-ticked="true"`: struck through in `--color-pencil`, `opacity: 0.55`, and a pencil ✓ (`::before`, Kalam 15px) in the margin left of the line |
+| "You are here" | Tap a `.prep-step[data-step]`; one step at a time, tap again to clear | `aria-current="step"`: a 5px pencil bracket (`::after`) down the step's left margin. With a timer on the same step it stands further out, so both show |
+| Clear | "clear ticks" link (`.clear-ticks`, Kalam 14px, `--color-biro`), absolutely placed in the ingredients header, shown only when something is set | Clears the ticks and the step mark |
+
+- Held per recipe id in `sessionStorage['rv-place:<id>']`, so they survive a reload and paging away and back.
+- `click`, never `touchstart`, so a scroll that starts on a line does not tick it. Buttons and links inside a line keep their own job.
+- Ignored while a page turn or tab crossfade holds the animation lock.
+- **Wake lock**: `navigator.wakeLock.request('screen')` is held while a recipe or meal plan is displayed, released on the contents page, re-acquired on `visibilitychange` back to visible, and silently skipped where unsupported.
+
+### Nothing Moves Unless the Cook Acted on It
+
+The layout contract behind all of the above (`tests/e2e/tests/layout-stability.spec.ts`, 1px tolerance, every project): opening a recipe, switching spread mode, sending a note, a reply arriving, refreshing the recipe (`update_recipe`, a photo upload, a late difficulty), a timer starting, ticking and finishing, and ticking an ingredient or marking a step leave the slip, the textarea, the right page's content top, a mid-method step, the next arrow and the timer pill where they were. A refresh of the recipe already displayed shows no skeleton and restores both pages' scroll positions and the phone tab; the difficulty dots have a reserved, fixed-width slot (`.meta-difficulty`) in the meta line.
 
 ### Gestures (Mobile)
 
@@ -826,8 +862,8 @@ Responsive styles should be added via media queries at the end of `styles.css`, 
 
 ### DOM Contract
 
-1. **One column**: `.app-container > .book-container > (.section-label#recipe-book-header, .recipe-book, form.note-input)`. There is no second panel and no tab bar.
-2. **Tab surfaces**: `.edge-tabs` is a child of `.recipe-book` (outside the scroll container and outside the `#page-right` grid); `.page-tabs` is the first child of `#page-right`, before `.page-content`; `#page-margin` is its last child.
+1. **One column**: `.app-container > .book-container > (.section-label#recipe-book-header, .recipe-book, aside#page-margin, form.note-input)`. There is no second panel and no tab bar.
+2. **Tab surfaces**: `.edge-tabs` is a child of `.recipe-book` (outside the scroll container); `.page-tabs` is the first child of `#page-right`, before `.page-content`. `#page-margin` (the reply sticky) is a child of `.book-container`, directly before `form.note-input`.
 3. **Three attributes drive everything**: `body[data-view-mode]` (`index` / `recipe` / `meal`), `body[data-spread-mode]` (`contents` / `cook` / `notes`, inert at or below 600px) and `#page-right[data-tab]` (`ingredients` / `method` / `notes`).
 4. **Template tokens**: `{{user_email}}`, `/static/styles.css?v={{asset_version}}` and `/static/app.js?v={{asset_version}}` must survive verbatim in `chat.html` — a Rust unit test reads the shipped file and asserts on them.
 
@@ -858,13 +894,13 @@ Responsive styles should be added via media queries at the end of `styles.css`, 
 | Spread modes | `contents` / `cook` / `notes` on the left page | Same | None — the attribute is inert |
 | Book cover | Full leather frame | Full leather frame | Flush leather, 40px top strip |
 | Spine shadow | Yes | Yes | No |
-| Recipe nav | `.page-nav` 29px | `.page-nav` 36px | Edge zones + `.phone-footer` |
+| Recipe nav | `.page-nav` 29px (46px hit area) | `.page-nav` 36px (46px hit area) | Edge zones + `.phone-footer` |
 | Section tabs | `.edge-tabs`, right outer edge (Ingredients / Method; on the edge in every mode) | Same | `.page-tabs`, page top edge (all three) |
 | Left-edge strip | `.contents-tabs`, left page's outer edge: the contents filters while no recipe is open, Contents / Cook / Notes while one is | Same | Chip row under the contents title; filters only |
-| Note input | Slip pinned to the foot of the right page, or of the left page in notes mode | Same | Bar beneath the book |
-| Margin notes | 150px column beside the recipe; a slip pinned to the page corner in cook mode | Beneath the recipe body | Beneath the recipe body; hidden on the Notes tab |
+| Note input | Slip pinned to the foot of the left page, in every view and mode | Same | Bar beneath the book |
+| Reply sticky | Above the slip at the foot of the left page; hidden in notes mode | Same | Above the input bar; hidden on the Notes tab |
 | Wood background | Full texture | Full texture | Flat gradient |
 | Body padding | 30px 50px | 20px | 0 |
 | Book label | `.section-label` above the book | Same | `#recipe-book-header` on the leather strip |
-| User info | Fixed top-right | Fixed top-right (10 / 20) | Static header strip |
+| User info | Fixed top-right | Fixed top-right (10 / 20) | Static header strip, on the contents page only |
 | Contents | Two-column split | Two-column split | Single column on the left page |

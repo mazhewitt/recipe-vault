@@ -58,9 +58,13 @@ async function run(id, fn) { if (ONLY && !ONLY.includes(id)) return; try { await
       const { page, close } = await P.open(vp, { port: PORT });
       await openRecipe(page, las);
       if (vp === 'phone') { await page.click('.page-tab[data-tab="method"]'); await page.waitForTimeout(300); }
+      // Open the chooser first: page.click scrolls the button (top of the page) into view, which
+      // would itself reset the scroll the check is about. Then scroll down and upload.
+      const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('.add-photo-btn')]);
       await page.evaluate(() => { document.getElementById('page-right').scrollTop = 200; });
+      await page.waitForTimeout(100);
       const before = await page.evaluate(() => document.getElementById('page-right').scrollTop);
-      const r = await P.track(page, async () => { const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('.add-photo-btn')]); await fc.setFiles(FIX + 'test-photo.jpg'); }, { ms: 2000, anchors: ['#page-right-content', '.recipe-polaroid'] });
+      const r = await P.track(page, async () => { await fc.setFiles(FIX + 'test-photo.jpg'); }, { ms: 2000, anchors: ['#page-right-content', '.recipe-polaroid'] });
       const after = await page.evaluate(() => document.getElementById('page-right').scrollTop);
       parts.push(`${vp} scrollTop ${before}->${after}, content height maxDev ${r.moves['#page-right-content']?.maxDev}px`);
       await close();

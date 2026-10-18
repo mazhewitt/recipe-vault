@@ -132,55 +132,65 @@ Every `jump` and `clunky` finding, with its "before" taken from the finding's ev
 
 | finding id | before | after |
 |---|---|---|
-| `timer-highlight-reflows-method` (cook) | step 3 dy +23 on start, -23 on expiry (tablet); +27/-27 (phone); +23/-23 (landscape); 0 (desktop) | |
-| `note-input-crosses-spine-on-open` (cook) | slip dx -385 (tablet), -490 (landscape), -590 (desktop); 2 visibility flips each | |
-| `notes-tab-moves-method` (cook) | method header y 317 → 738 (+421px) on Notes and on Contents (tablet) | |
-| `edge-tabs-noop-in-cook` (cook) | 2 tab taps: page scroll and text unchanged; only the tab moved 3px | |
-| `debug-status-lines` (cook) | 2 of the visible notes are "Using tool: start_timer", "Timer set: Mock timer, 0.1 min" (tablet, phone) | |
-| `note-input-grows-while-thinking` (cook) | #note-input maxDev 28px (tablet); 26px, 757→783 (phone) | |
-| `timer-pill-width-jitter` (cook) | pill widths 149–189px over 16s (phone); maxDev 5px per tick (landscape) | |
-| `timer-pill-not-linked` (cook) | pill has no click handler; highlight 0 on another recipe | |
-| `refresh-loses-place` (counter) | scrollTop 191→0, 2 skeleton frames (tablet); 300→0, .app-container 390→315→390 (phone); step 7 maxDev 191px | |
-| `mode-switch-reflows-recipe` (counter) | step 1 ±421px, ingredients ±379px, CLS 0.103 per switch (tablet); ±488 / ±484px (landscape); slip vis 1→0 on Contents | |
-| `note-slip-crosses-spine` (counter) | slip dx -385 / -490 / -590px, 2 visibility flips | |
-| `timer-highlight-pushes-steps` (counter) | step 2 height 47→70, step 3 dy +23 (tablet); 24→47, +23 (desktop); 53→77, +23 (phone) | |
-| `debug-status-lines` (counter) | 2 status notes visible at every viewport | |
-| `edge-tabs-noop-in-cook` (counter) | Method, Ingredients, Cook taps: no visible change | |
-| `sending-shifts-layout` (counter) | slip maxDev 28px (tablet); slip 26px, .recipe-book 26px, #page-right 26px (phone) | |
-| `duration-chip-looks-tappable` (counter) | span, cursor auto, no handler | |
-| `input-jumps-across-spine` (ask) | dx -385 / -490 / -590px on open, 2 flips; Notes on the contents -385 / -590px | |
-| `input-hidden-contents-and-meal` (ask) | input shown = false in contents mode with a recipe open and after a meal plan (all wide viewports) | |
-| `halve-scroll-reset` (ask) | scrollTop 214→0, step 5 y 493→707 (tablet); 250→0 (landscape); 189→0 (desktop); 300→0, step 5 469→769 (phone) | |
-| `debug-status-lines` (ask) | 2 of 3 margin notes technical (wide); phone margin holds both status lines | |
-| `focus-lost-after-send` (ask) | textarea disabled while thinking = true; focus after reply = BODY (phone, tablet) | |
-| `reply-filed-out-of-sight` (ask) | 0 notes on the recipe "show me the lasagne" opened; meal-plan margin empty | |
-| `slip-grows-over-page` (ask) | 7 lines: slip 57→157px (tablet, desktop); 61→157px with pages-container 703→607 (phone) | |
-| `thinking-row-jump` (ask) | slip maxDev 28px (tablet, desktop); 26px, pages-container 26px (phone) | |
-| `cook-to-notes-reflow` (ask) | step 4 dy 421 (tablet), 603 (landscape), 453px (desktop) | |
-| `notes-tab-on-contents` (ask) | input dx -385, contents title dx +379 (tablet); 2 active tabs; sticky still rendered | |
-| `phone-book-thread-unreachable` (ask) | 4 book entries, 1 shown, Notes tab visible = false | |
-| `keyboard-resets-contents-scroll` (ask) | #page-left scrollTop 200→0 (phone), 157→0 (landscape) | |
-| `meal-plan-dead-end` (ask) | 3 disabled actions, 0 routes back to the plan; CLS 0.726 (phone) | |
-| `empty-send-silent` (ask) | thread 2→2, whitespace left in the textarea, no feedback | |
-| `phone-diagonal-scroll-turns-page` (find) | 31° drift turned the page; 15px sideways wobble then a scroll turned the page | |
-| `next-waits-for-list-and-ignores-prefetch` (find) | at 300ms latency: first response 341ms, new recipe 643ms; list refetched and prefetch discarded on every tap | |
-| `header-return-intermediate-frame` (find) | CLS 0.123 (tablet), 0.137 (landscape), 0.145 (desktop); left page empty 150ms after the tap | |
-| `open-recipe-moves-note-input` (find) | dx -385 / -490 / -590px, 2 flips; Contents tab vis 1→0 | |
-| `contents-tab-reflows-method` (find) | step 1 dy 421px (tablet); title width -162px and input vis 1→0 (desktop) | |
-| `contents-return-scrolls-title-away` (find) | scrollTop 157/157 (landscape), 167/167 (desktop), 271/839 (phone); A-Z strip hidden | |
-| `alphabet-strip-scrolls-away` (find) | A-Z bottom -462 vs page top 76 after jumping to M (phone) | |
-| `phone-footer-next-moves` (find) | footer-next y 719→573 (-146px); tab reset to Ingredients | |
-| `header-tap-ignored-mid-turn-phone` (find) | header tap 30 / 120 / 250ms after next: stays on the recipe (phone) | |
-| `phone-book-narrows-during-reload` (manage) | .recipe-book width maxDev 75px; CLS 0.213 ("show"), 0.927 ("halve") (phone) | |
-| `phone-rotate-landscape-loses-input` (manage) | 844x390: spread contents, note input display none, left page "~ Contents ~" | |
-| `failed-load-hides-note-input` (manage) | after a failed load: spread contents, note input display none (tablet) | |
-| `photo-upload-resets-scroll` (manage) | scrollTop 200→0 (phone), 191→0 (tablet), 189→0 (desktop) | |
-| `late-difficulty-reflow` (manage) | step 3 maxDev 27px, meta line +27px, tags 125px (phone); tags 129px (tablet) | |
-| `header-full-width-hit-zone` (manage) | hit area 770x35 (tablet), 1180x35 (desktop) for a 122px label; 81x16 (phone) | |
-| `first-paint-placeholder-jump` (manage) | phone All tab y 92→158 (66px); first-load CLS 0.14 | |
-| `share-clunky` (manage) | 2 taps → 2 distinct tokens; prompt() without clipboard grant; button 28x28 | |
-| `photo-error-far-or-hidden` (manage) | error 1011px from the button (tablet, cook); not shown (contents mode); 620px and book maxDev 44px (phone) | |
-| `breakpoint-resets-scroll` (manage) | scrollTop 189 → 0 → 0 across 1280 → 500 → 1280px | |
-| `resize-refetch-storm` (manage) | 20 resize events → 18 GET /api/recipes | |
-| `font-swap-reflow` (manage) | step 6 +29px (phone), +18px (tablet); user chip 180→198px | |
-| `deleted-recipe-opens-another` (manage) | tapping a deleted entry opened "Banana Bread", no message | |
+| `timer-highlight-reflows-method` (cook) | step 3 dy +23 on start, -23 on expiry (tablet); +27/-27 (phone); +23/-23 (landscape); 0 (desktop) | step 2 dh 0, step 3 dy 0 on start and on expiry at tablet, phone, landscape and desktop |
+| `note-input-crosses-spine-on-open` (cook) | slip dx -385 (tablet), -490 (landscape), -590 (desktop); 2 visibility flips each | dx 0, 0 flips (tablet, landscape, desktop) |
+| `notes-tab-moves-method` (cook) | method header y 317 → 738 (+421px) on Notes and on Contents (tablet) | method header y 320 in cook, notes and contents (0px) |
+| `edge-tabs-noop-in-cook` (cook) | 2 tab taps: page scroll and text unchanged; only the tab moved 3px | unchanged by design: the strip is inert ribbons (aria-hidden, tabindex -1, pointer-events none, D11); 2 taps change nothing |
+| `debug-status-lines` (cook) | 2 of the visible notes are "Using tool: start_timer", "Timer set: Mock timer, 0.1 min" (tablet, phone) | 0 technical notes (tablet, phone) |
+| `note-input-grows-while-thinking` (cook) | #note-input maxDev 28px (tablet); 26px, 757→783 (phone) | #note-input maxDev 0px (tablet) |
+| `timer-pill-width-jitter` (cook) | pill widths 149–189px over 16s (phone); maxDev 5px per tick (landscape) | one width, 200px, over 16s (phone) |
+| `timer-pill-not-linked` (cook) | pill has no click handler; highlight 0 on another recipe | n/a (scratch:timer-pill-and-duration-chips) |
+| `refresh-loses-place` (counter) | scrollTop 191→0, 2 skeleton frames (tablet); 300→0, .app-container 390→315→390 (phone); step 7 maxDev 191px | scrollTop 300→300, 0 skeleton frames (tablet, phone); .app-container 390 throughout (phone); phone tab stays method |
+| `mode-switch-reflows-recipe` (counter) | step 1 ±421px, ingredients ±379px, CLS 0.103 per switch (tablet); ±488 / ±484px (landscape); slip vis 1→0 on Contents | step 1 dy 0 / maxDev 0, slip maxDev 0 and vis 1→1, CLS 0.000 on every switch (tablet, landscape); the ingredients leave the page in notes/contents by design (D2). **Check fixed:** it read the detached ingredients panel and printed ERROR |
+| `note-slip-crosses-spine` (counter) | slip dx -385 / -490 / -590px, 2 visibility flips | dx 0, maxDev 0, 0 flips (tablet, landscape, desktop) |
+| `timer-highlight-pushes-steps` (counter) | step 2 height 47→70, step 3 dy +23 (tablet); 24→47, +23 (desktop); 53→77, +23 (phone) | step 2 height unchanged, step 3 dy 0 (tablet, landscape, desktop, phone) |
+| `debug-status-lines` (counter) | 2 status notes visible at every viewport | 0 status notes at every viewport |
+| `edge-tabs-noop-in-cook` (counter) | Method, Ingredients, Cook taps: no visible change | no change from 3 taps, now by design: ribbons aria-hidden, tabindex -1, pointer-events none (D11). **Check fixed:** `locator.tap` timed out on the inert ribbons (ERROR); it now taps by coordinates and reports the ribbons' state |
+| `sending-shifts-layout` (counter) | slip maxDev 28px (tablet); slip 26px, .recipe-book 26px, #page-right 26px (phone) | slip, .recipe-book, #page-right maxDev 0 (tablet, phone); textarea not disabled |
+| `duration-chip-looks-tappable` (counter) | span, cursor auto, no handler | n/a (scratch:timer-pill-and-duration-chips); cursor is now pointer from place-keeping (the step is tappable), still no chip handler |
+| `input-jumps-across-spine` (ask) | dx -385 / -490 / -590px on open, 2 flips; Notes on the contents -385 / -590px | dx 0, maxDev 0, 0 flips (tablet, landscape, desktop); Notes on the contents: input dx 0 |
+| `input-hidden-contents-and-meal` (ask) | input shown = false in contents mode with a recipe open and after a meal plan (all wide viewports) | shown = true in contents mode with a recipe and after a meal plan (all wide viewports) |
+| `halve-scroll-reset` (ask) | scrollTop 214→0, step 5 y 493→707 (tablet); 250→0 (landscape); 189→0 (desktop); 300→0, step 5 469→769 (phone) | scrollTop 250→250 and step 5 unmoved (603→603 tablet, 467→467 landscape, 378→378 desktop), 0 skeleton frames |
+| `debug-status-lines` (ask) | 2 of 3 margin notes technical (wide); phone margin holds both status lines | 0 technical notes (wide); phone sticky shows "Timer started for step 2." (the reply, not a status line) |
+| `focus-lost-after-send` (ask) | textarea disabled while thinking = true; focus after reply = BODY (phone, tablet) | textarea disabled while thinking = false; focus after reply = message-input (phone, tablet) |
+| `reply-filed-out-of-sight` (ask) | 0 notes on the recipe "show me the lasagne" opened; meal-plan margin empty | n/a (scratch:notes-thread-gaps); unchanged (0 notes / empty sticky) |
+| `slip-grows-over-page` (ask) | 7 lines: slip 57→157px (tablet, desktop); 61→157px with pages-container 703→607 (phone) | 7 lines: slip 61→97px (+36, the three-line cap) at every viewport; phone pages-container 703→667. Still grows by design up to 3 lines (D4); the rest is `scratch:note-input-rough-edges` |
+| `thinking-row-jump` (ask) | slip maxDev 28px (tablet, desktop); 26px, pages-container 26px (phone) | slip maxDev 0, pages-container maxDev 0 (phone, tablet, desktop) |
+| `cook-to-notes-reflow` (ask) | step 4 dy 421 (tablet), 603 (landscape), 453px (desktop) | step 4 dy 0, CLS 0.000 (tablet, landscape, desktop) |
+| `notes-tab-on-contents` (ask) | input dx -385, contents title dx +379 (tablet); 2 active tabs; sticky still rendered | input dx 0; contents title dx +369 (tablet) / +574 (desktop) and 2 active tabs remain: n/a (scratch:contents-page-rough-edges); sticky not rendered in notes = 0 |
+| `phone-book-thread-unreachable` (ask) | 4 book entries, 1 shown, Notes tab visible = false | n/a (scratch:notes-thread-gaps); unchanged |
+| `keyboard-resets-contents-scroll` (ask) | #page-left scrollTop 200→0 (phone), 157→0 (landscape) | n/a (safe-page-navigation N6); unchanged (200→0) |
+| `meal-plan-dead-end` (ask) | 3 disabled actions, 0 routes back to the plan; CLS 0.726 (phone) | n/a (scratch:meal-plan-dead-end); unchanged |
+| `empty-send-silent` (ask) | thread 2→2, whitespace left in the textarea, no feedback | n/a (scratch:note-input-rough-edges); unchanged |
+| `phone-diagonal-scroll-turns-page` (find) | 31° drift turned the page; 15px sideways wobble then a scroll turned the page | n/a (safe-page-navigation N2); unchanged |
+| `next-waits-for-list-and-ignores-prefetch` (find) | at 300ms latency: first response 341ms, new recipe 643ms; list refetched and prefetch discarded on every tap | n/a (safe-page-navigation N4); unchanged (335 / 639ms) |
+| `header-return-intermediate-frame` (find) | CLS 0.123 (tablet), 0.137 (landscape), 0.145 (desktop); left page empty 150ms after the tap | n/a (safe-page-navigation N8) for the half-state (left page still empty mid-frame); CLS 0.001 (tablet, desktop) and the input no longer jumps (D1) |
+| `open-recipe-moves-note-input` (find) | dx -385 / -490 / -590px, 2 flips; Contents tab vis 1→0 | dx 0, 0 flips (tablet, desktop) |
+| `contents-tab-reflows-method` (find) | step 1 dy 421px (tablet); title width -162px and input vis 1→0 (desktop) | step 1 dy 0px |
+| `contents-return-scrolls-title-away` (find) | scrollTop 157/157 (landscape), 167/167 (desktop), 271/839 (phone); A-Z strip hidden | n/a (scratch:contents-page-rough-edges); unchanged |
+| `alphabet-strip-scrolls-away` (find) | A-Z bottom -462 vs page top 76 after jumping to M (phone) | n/a (scratch:contents-page-rough-edges); unchanged |
+| `phone-footer-next-moves` (find) | footer-next y 719→573 (-146px); tab reset to Ingredients | n/a (scratch:phone-paging-rough-edges); footer-next y 719→607 (-113), tab reset remains |
+| `header-tap-ignored-mid-turn-phone` (find) | header tap 30 / 120 / 250ms after next: stays on the recipe (phone) | n/a (scratch:phone-paging-rough-edges); not re-measured in this run |
+| `phone-book-narrows-during-reload` (manage) | .recipe-book width maxDev 75px; CLS 0.213 ("show"), 0.927 ("halve") (phone) | .recipe-book width maxDev 0px (photo upload and update_recipe, phone) |
+| `phone-rotate-landscape-loses-input` (manage) | 844x390: spread contents, note input display none, left page "~ Contents ~" | n/a (safe-page-navigation N6) for the contents/Method part; note input now display flex (D1) |
+| `failed-load-hides-note-input` (manage) | after a failed load: spread contents, note input display none (tablet) | note input display flex after a failed load (tablet) |
+| `photo-upload-resets-scroll` (manage) | scrollTop 200→0 (phone), 191→0 (tablet), 189→0 (desktop) | scrollTop 200→200, content height maxDev 0px (phone, tablet, desktop). **Check fixed:** `page.click` on the photo button scrolled the page to the button before the upload began; the check now opens the chooser first, then scrolls, then uploads (the unfixed check printed 200→0 / 187 / 160 on this code) |
+| `late-difficulty-reflow` (manage) | step 3 maxDev 27px, meta line +27px, tags 125px (phone); tags 129px (tablet) | step 3, meta line and tags maxDev 0 (phone, tablet) |
+| `header-full-width-hit-zone` (manage) | hit area 770x35 (tablet), 1180x35 (desktop) for a 122px label; 81x16 (phone) | n/a (safe-page-navigation N8); unchanged |
+| `first-paint-placeholder-jump` (manage) | phone All tab y 92→158 (66px); first-load CLS 0.14 | n/a (scratch:first-paint-stability); unchanged |
+| `share-clunky` (manage) | 2 taps → 2 distinct tokens; prompt() without clipboard grant; button 28x28 | n/a (scratch:share-flow); button now 44x44 (D9) |
+| `photo-error-far-or-hidden` (manage) | error 1011px from the button (tablet, cook); not shown (contents mode); 620px and book maxDev 44px (phone) | n/a (scratch:photo-upload-feedback) for the distance (950px tablet, 556px phone); shown in contents mode now (D1); phone book maxDev 44px remains |
+| `breakpoint-resets-scroll` (manage) | scrollTop 189 → 0 → 0 across 1280 → 500 → 1280px | n/a (safe-page-navigation N6); unchanged |
+| `resize-refetch-storm` (manage) | 20 resize events → 18 GET /api/recipes | n/a (safe-page-navigation N6); 20 resizes → 3 GET (was 18) |
+| `font-swap-reflow` (manage) | step 6 +29px (phone), +18px (tablet); user chip 180→198px | n/a (scratch:first-paint-stability) |
+| `deleted-recipe-opens-another` (manage) | tapping a deleted entry opened "Banana Bread", no message | n/a (safe-page-navigation N5); not re-measured by run-all |
+
+How "after" was taken: `tests/usability/run-all.sh after-steady-spread` on this branch after group 8 (release build, mock LLM); output in the gitignored `tests/usability/runs/after-steady-spread/`. Checks this change broke or made misleading were fixed in `tests/usability/remeasure/` and are marked **Check fixed** above or below:
+- `cook-reply-covers-title` / `cook-margin-notes-cover-header` / `cook-reply-covers-recipe` (not rows here; blocker and majors under D3): they measured how far `#page-margin` "sticks out left" of the right page and the background of `.margin-note`. The sticky now lives on the left page by design, so they now measure its overlap with the right page and `#page-margin`'s own paper. After: overlap with the right page 0px², title 0, polaroid 0, share and photo reachable, background `#fbe9a0` (tablet, landscape, desktop). Before: margin notes covering the title, share, photo and polaroid with no background.
+- `small-touch-targets` (counter and cook): counted bounding boxes, which D9 deliberately leaves small. They now count controls whose 44px square (5x5 `elementFromPoint` grid) misses the control, and list the ribbons as not controls. After (cook): tablet only `#recipe-book-header` 770x35 (N8); phone only `#recipe-book-header` 81x16 (N8). After (counter): tablet and landscape Logout 36x21 and Recipe Book; phone Recipe Book. Before: 9 under 44px on tablet.
+- `timer-expiry-silent-and-fleeting` (cook): counted `new AudioContext()` after the context had already been created on the first gesture; it now counts oscillator starts. After: 3 chime notes, 1 vibration, "Done" shown for the whole ~5s window. `timer-done-vanishes` (counter) waited for the pill to hide forever; it now stops 8s after Done: still shown after 8s at every viewport.
+- `no-place-keeping-or-wake-lock` (cook): instrumented the wake lock after the recipe had opened; it now instruments on the contents page first. After: 1 wake-lock request, 1 element marked.
+- `phone-reply-offscreen` (counter): `.margin-note:last-child` is now the ✕; it takes the last note. After: reply on screen (top 712, bottom 779 of 844). `phone-reply-offscreen` (cook): reply visible at y=712.
+- Text sizes (`recipe-text-small`, `small-text-at-arms-length`): ingredients and steps 18px on tablet, landscape and desktop, 17px on the phone, durations 15px (before: 14px / 12px).
+- Timer collision (`timer-pill-over-next-arrow`, `timer-pill-covers-next-arrow`, `timer-pill-covers-next`): pill ∩ next arrow 0px², ✕ ∩ arrow 0px², next arrow reachable at every wide viewport; ✕ hit area 25/25 (before: 37-46% covered, centre on the timer).
+- Still not fixed and owned elsewhere: every N-covered phone finding (edge strips, diagonal swipe, history, prefetch), the contents-page rough edges, and `logout-above-timer-cancel` (cancel is still a 28px visual, now with a 46px hit area; Logout 36x21 is not in D9's list).

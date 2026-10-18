@@ -56,10 +56,12 @@ const pageRect = (page) => page.evaluate(() => { const r = document.querySelecto
         if (ix > 2 && iy > 2) covered++;
         if (/btn|photo/.test(s)) { const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); if (t && !el.contains(t)) hits.push(s); }
       }
-      const note = m.querySelector('.margin-note');
-      return { w: Math.round(rm.width), h: Math.round(rm.height), leftOverhang: Math.round(pr.left - rm.left), covered, blocked: hits, bg: note ? getComputedStyle(note).backgroundColor : null };
+      // The sticky sits on the LEFT page by design (D3): measure its overlap with the right page, and
+      // its own paper (the background is on #page-margin, not the note inside it)
+      const onRight = Math.max(0, Math.min(rm.right, pr.right) - Math.max(rm.left, pr.left)) * Math.max(0, Math.min(rm.bottom, pr.bottom) - Math.max(rm.top, pr.top));
+      return { w: Math.round(rm.width), h: Math.round(rm.height), onRight: Math.round(onRight), covered, blocked: hits, bg: getComputedStyle(m).backgroundColor };
     });
-    out('cook-reply-covers-recipe', `${vp} 3 replies: margin ${cover.w}x${cover.h}px, overhangs page left edge by ${cover.leftOverhang}px, overlaps ${cover.covered} recipe elements, taps blocked on [${cover.blocked.join(' ')}], note background=${cover.bg}`);
+    out('cook-reply-covers-recipe', `${vp} 3 replies: sticky ${cover.w}x${cover.h}px, overlaps page-right ${cover.onRight}px², overlaps ${cover.covered} recipe elements, taps blocked on [${cover.blocked.join(' ')}], sticky background=${cover.bg}`);
 
     // debug-status-lines: timer + update
     await send(page, 'set a timer for this step', 1500);

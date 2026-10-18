@@ -73,11 +73,14 @@ const checks = {
           const hit = document.elementFromPoint(b.x + b.width / 2, b.y + Math.min(b.height / 2, 20));
           if (hit && hit.closest('#page-margin')) covered.push(s);
         }
+        // The reply is a sticky above the slip on the LEFT page now (D3), so what matters is whether it
+        // reaches the right page at all, not how far it sits from the right page's left edge.
         const m = document.getElementById('page-margin').getBoundingClientRect();
         const pr = document.getElementById('page-right').getBoundingClientRect();
-        return { covered, marginW: Math.round(m.width), overflowLeftOfPage: Math.round(Math.max(0, pr.left - m.left)) };
+        const ix = Math.max(0, Math.min(m.right, pr.right) - Math.max(m.left, pr.left)) * Math.max(0, Math.min(m.bottom, pr.bottom) - Math.max(m.top, pr.top));
+        return { covered, marginW: Math.round(m.width), overRightPage: Math.round(ix), bg: getComputedStyle(document.getElementById('page-margin')).backgroundColor };
       });
-      res.push(`${vp} marginW=${h.marginW} overflowsPageLeftBy=${h.overflowLeftOfPage} covered=[${h.covered.join(',')}]`);
+      res.push(`${vp} stickyW=${h.marginW} overlapsPageRight=${h.overRightPage}px² bg=${h.bg} covered=[${h.covered.join(',')}]`);
       await close();
     }
     return res.join('; ');
@@ -121,7 +124,8 @@ const checks = {
     const { page, close } = await openRecipe('tablet');
     await page.evaluate(() => {
       window.__audio = 0; window.__vib = 0;
-      const A = window.AudioContext; if (A) window.AudioContext = function (...a) { window.__audio++; return new A(...a); };
+      // The chime is oscillators on a context created at the first gesture (D7), so count note starts
+      const os = window.OscillatorNode && OscillatorNode.prototype.start; if (os) OscillatorNode.prototype.start = function (...a) { window.__audio++; return os.apply(this, a); };
       const pl = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { window.__audio++; return pl.call(this); };
       if (navigator.vibrate) navigator.vibrate = () => { window.__vib++; return true; };
       window.startTimer(0.02, 'T', 2);
@@ -134,7 +138,7 @@ const checks = {
     }
     const a = await page.evaluate(() => [window.__audio, window.__vib, Notification.permission]);
     await close();
-    return `audioPlays=${a[0]} vibrations=${a[1]} notificationPermission=${a[2]} doneShownFor≈${doneVisibleMs}ms`;
+    return `audioPlays=${a[0]} vibrations=${a[1]} notificationPermission=${a[2]} doneShownFor≈${doneVisibleMs}ms (of a ~4.8s window after expiry)`;
   },
   // 7. Phone: 60px nav overlays cover the recipe text; a tap on a quantity turns the page, drags there do not scroll
   async 'phone-edge-nav-covers-content'() {
@@ -238,10 +242,17 @@ const checks = {
     for (const vp of ['tablet', 'phone']) {
       const { page, close } = await openRecipe(vp);
       await page.evaluate(() => window.startTimer(5, 'T', 2));
+      // Counted by hit area, not the visual box: D9 gives small visuals a transparent 44px ::before.
+      // A 5x5 grid over the 44x44 square centred on the control must all land on it. The edge tabs are
+      // inert ribbons (D11), not controls, so they are listed as such.
       const t = await page.evaluate(() => ['#page-prev', '#page-next', '.spread-tab[data-mode="cook"]', '.edge-tab[data-tab="method"]', '.timer-cancel', '.share-btn', '.add-photo-btn', '#send-button', '#recipe-book-header'].map((s) => {
         const el = document.querySelector(s); const r = el.getBoundingClientRect();
-        return r.width && r.height && getComputedStyle(el).display !== 'none' ? `${s}=${Math.round(r.width)}x${Math.round(r.height)}` : null;
-      }).filter(Boolean).filter((x) => /=(\d+)x(\d+)/.exec(x).slice(1).some((n) => +n < 44)).join(' '));
+        if (!(r.width && r.height && getComputedStyle(el).display !== 'none')) return null;
+        if (getComputedStyle(el).pointerEvents === 'none') return `${s}=ribbon(not a control)`;
+        const cx = r.x + r.width / 2, cy = r.y + r.height / 2; let miss = 0;
+        for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) { const x = cx - 22 + i * 11, y = cy - 22 + j * 11; if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue; const e = document.elementFromPoint(x, y); if (!(e && (e === el || el.contains(e)))) miss++; }
+        return miss ? `${s}=${Math.round(r.width)}x${Math.round(r.height)}(hit44 misses ${miss}/25)` : null;
+      }).filter(Boolean).join(' '));
       res.push(`${vp}: ${t}`);
       await close();
     }
@@ -249,8 +260,11 @@ const checks = {
   },
   // 15. Nothing keeps the cook's place or the screen awake
   async 'no-place-keeping-or-wake-lock'() {
-    const { page, close } = await openRecipe('tablet');
+    // Instrument on the contents page, then open: the lock is requested as the recipe opens (D10)
+    const { page, close } = await P.open('tablet', { port });
     await page.evaluate(() => { window.__wl = 0; if (navigator.wakeLock) { const o = navigator.wakeLock.request.bind(navigator.wakeLock); navigator.wakeLock.request = (...a) => { window.__wl++; return o(...a); }; } });
+    await P.openFromContents(page, 0);
+    await page.waitForTimeout(500);
     const b = await page.locator('.ingredient-item').nth(2).boundingBox();
     await page.touchscreen.tap(b.x + 30, b.y + b.height / 2);
     const s = await page.locator('.prep-step').nth(3).boundingBox();

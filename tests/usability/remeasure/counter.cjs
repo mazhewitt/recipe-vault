@@ -23,6 +23,12 @@ const rect = (page, sel) => page.evaluate((s) => { const e = document.querySelec
 const overlap = (a, b) => (a && b ? Math.max(0, Math.min(a.r, b.r) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.y, b.y)) : 0);
 const hit = (page, sel) => page.evaluate((s) => { const b = document.querySelector(s); if (!b) return 'absent'; const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); if (!e) return 'offscreen'; if (e === b || b.contains(e)) return 'reachable'; return 'BLOCKED by ' + (e.closest('#page-margin') ? '#page-margin' : e.closest('#timer-widget') ? '#timer-widget' : (e.id || e.className)); }, sel);
 
+// The 44px hit area: a 5x5 grid over the 44x44 square centred on the control (steady-cooking-spread D9
+// gives small visuals a transparent ::before, so the bounding box is not the target any more).
+const HIT44 = `(el) => { const r = el.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; let miss = 0;
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) { const x = cx - 22 + i * 11, y = cy - 22 + j * 11; if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+    const e = document.elementFromPoint(x, y); if (!(e && (e === el || el.contains(e)))) miss++; } return miss; }`;
+
 async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' + e.message.split('\n')[0]); } }
 
 (async () => {
@@ -35,8 +41,8 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
       const t = await rect(page, '#page-right .recipe-title');
       const pol = await rect(page, '#page-right .recipe-polaroid');
       const pr = await rect(page, '#page-right');
-      const bg = await page.evaluate(() => getComputedStyle(document.querySelector('#page-margin .margin-note')).backgroundColor);
-      out('cook-reply-covers-title', `${vp}: margin ${m.w}x${m.h} at x=${m.x} (page-right x=${pr.x}, sticks out left by ${Math.max(0, pr.x - m.x)}px); overlap title=${overlap(m, t)}px² polaroid=${overlap(m, pol)}px²; note bg=${bg}; share-btn ${await hit(page, '.share-btn')}; add-photo ${await hit(page, '.add-photo-btn')}`);
+      const bg = await page.evaluate(() => getComputedStyle(document.querySelector('#page-margin')).backgroundColor);
+      out('cook-reply-covers-title', `${vp}: sticky ${m.w}x${m.h} at x=${m.x} (page-right x=${pr.x}); overlap page-right=${overlap(m, pr)}px² title=${overlap(m, t)}px² polaroid=${overlap(m, pol)}px²; sticky bg=${bg}; share-btn ${await hit(page, '.share-btn')}; add-photo ${await hit(page, '.add-photo-btn')}`);
       await close();
     }
   });
@@ -105,7 +111,8 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
         const r = await P.track(page, () => tapSel(page, vp, `.spread-tab[data-mode="${mode}"]`), { ms: 900, anchors: A });
         const s = r.moves['.prep-step[data-step="1"]'], ing = r.moves['.tab-panel[data-tab="ingredients"]'], ni = r.moves['#note-input'];
         const cls = r.shifts.reduce((a, x) => a + x.value, 0);
-        parts.push(`->${mode}: step1 dy=${s && s.end ? s.end[1] - s.start[1] : '?'} ingredients dx=${ing && ing.end ? ing.end[0] - ing.start[0] : '?'} input vis ${ni.start[4]}->${ni.end[4]} CLS=${cls.toFixed(3)}`);
+        const dx = (m) => (m && m.start && m.end ? m.end[0] - m.start[0] : m && m.end ? 'appeared' : m && m.start ? 'left' : 'absent');
+        parts.push(`->${mode}: step1 dy=${s && s.end && s.start ? s.end[1] - s.start[1] : '?'} step1 maxDev=${s ? s.maxDev : '?'} ingredients dx=${dx(ing)} input vis ${ni.start[4]}->${ni.end[4]} maxDev=${ni.maxDev} CLS=${cls.toFixed(3)}`);
       }
       out('mode-switch-reflows-recipe', `${vp}: ${parts.join(' | ')}`);
       await close();
@@ -133,7 +140,7 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
       out('timer-highlight-pushes-steps', `${vp}: step2 height ${s2.start[3]}->${s2.end[3]}px, step3 dy=${s3.end[1] - s3.start[1]}px`);
       const nb = vp === 'phone' ? 'n/a (no arrow)' : await hit(page, '#page-next');
       const pill = await rect(page, '#timer-widget');
-      out('timer-pill-covers-next', `${vp}: pill ${pill.w}x${pill.h} at ${pill.x},${pill.y}; #page-next ${nb}; cancel ${JSON.stringify(await rect(page, '.timer-cancel')).replace(/"/g, '')}`);
+      out('timer-pill-covers-next', `${vp}: pill ${pill.w}x${pill.h} at ${pill.x},${pill.y}; #page-next ${nb}; cancel ${JSON.stringify(await rect(page, '.timer-cancel')).replace(/"/g, '')} hit44 misses=${await page.evaluate(`(${HIT44})(document.querySelector('.timer-cancel'))`)}/25`);
       const statuses = await page.evaluate(() => [...document.querySelectorAll('.margin-note[data-kind="status"]')].map((n) => n.innerText));
       out('debug-status-lines', `${vp}: ${statuses.length} status notes shown: ${JSON.stringify(statuses)}`);
       // wait for "Done" then time how long it stays
@@ -142,12 +149,13 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
         const t0 = performance.now(); let doneAt = null;
         while (performance.now() - t0 < 15000) {
           if (doneAt === null && /Done/.test(txt.textContent)) doneAt = performance.now();
+          if (doneAt !== null && performance.now() - doneAt > 8000) break;
           if (doneAt !== null && getComputedStyle(w).display === 'none') return Math.round(performance.now() - doneAt);
           await new Promise((r) => setTimeout(r, 50));
         }
-        return -1;
+        return doneAt === null ? -1 : 'still shown after ' + Math.round(performance.now() - doneAt);
       });
-      out('timer-done-vanishes', `${vp}: "Done!" visible for ${t}ms then pill hidden; audio alert code present=${/Audio|AudioContext|vibrate/.test(fs.readFileSync(STATIC + '/timer.js', 'utf8'))}`);
+      out('timer-done-vanishes', `${vp}: "Done" visible for ${t}ms then pill hidden (-1 = never reached Done); audio alert code present=${/Audio|AudioContext|vibrate/.test(fs.readFileSync(STATIC + '/timer.js', 'utf8'))}`);
       await close();
     }
   });
@@ -174,17 +182,18 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
   await guard('small-touch-targets', async () => {
     for (const vp of ['tablet', 'tablet-landscape', 'phone']) {
       const { page, close } = await openRecipe(vp, 'Lemon');
-      const small = await page.evaluate(() => {
-        const o = [];
+      const small = await page.evaluate((src) => {
+        const hit44 = eval(src); const o = [];
         document.querySelectorAll('button, a, [role=tab], #recipe-book-header, .mobile-edge-nav').forEach((el) => {
           const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
           if (r.width < 1 || r.height < 1 || cs.display === 'none' || cs.visibility === 'hidden') return;
           if (r.bottom < 0 || r.top > innerHeight) return;
-          if (r.width < 44 || r.height < 44) o.push(`${(el.getAttribute('aria-label') || el.innerText || el.id).trim().slice(0, 14)} ${Math.round(r.width)}x${Math.round(r.height)}`);
+          if (el.getAttribute('aria-hidden') === 'true' || cs.pointerEvents === 'none') return; // ribbons are not controls (D11)
+          if ((r.width < 44 || r.height < 44) && hit44(el) > 0) o.push(`${(el.getAttribute('aria-label') || el.innerText || el.id).trim().slice(0, 14)} ${Math.round(r.width)}x${Math.round(r.height)} (hit44 misses ${hit44(el)}/25)`);
         });
         return o;
-      });
-      out('small-touch-targets', `${vp}: ${small.length} under 44px: ${small.join('; ')}`);
+      }, HIT44);
+      out('small-touch-targets', `${vp}: ${small.length} with a hit area under 44px: ${small.join('; ')}`);
       await close();
     }
   });
@@ -193,8 +202,11 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
   await guard('edge-tabs-noop-in-cook', async () => {
     const { page, close } = await openRecipe('tablet', 'Lemon');
     const shot = () => page.evaluate(() => JSON.stringify([document.getElementById('page-right').scrollTop, ...['.tab-panel[data-tab="method"]', '.tab-panel[data-tab="ingredients"]'].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.height)]; })]));
-    const a = await shot(); await page.locator('.edge-tab[data-tab="method"]').tap(); await page.waitForTimeout(600); const b = await shot();
-    await page.locator('.edge-tab[data-tab="ingredients"]').tap(); await page.waitForTimeout(600); const c = await shot();
+    const ribbon = await page.evaluate(() => [...document.querySelectorAll('.edge-tab')].map((e) => `${e.dataset.tab}:aria-hidden=${e.getAttribute('aria-hidden')},tabindex=${e.getAttribute('tabindex')},pe=${getComputedStyle(e).pointerEvents}`).join(' '));
+    out('edge-tabs-noop-in-cook', `tablet: ribbons ${ribbon}`);
+    const tapAt = async (sel) => { const r = await rect(page, sel); await page.touchscreen.tap(r.x + r.w / 2, r.y + r.h / 2); };
+    const a = await shot(); await tapAt('.edge-tab[data-tab="method"]'); await page.waitForTimeout(600); const b = await shot();
+    await tapAt('.edge-tab[data-tab="ingredients"]'); await page.waitForTimeout(600); const c = await shot();
     await page.locator('.spread-tab[data-mode="cook"]').tap(); await page.waitForTimeout(600); const d = await shot();
     out('edge-tabs-noop-in-cook', `tablet: panels before=${a} afterMethod=${b} afterIngredients=${c} afterCook=${d} -> ${a === b && b === c && c === d ? 'NO visible change from 3 taps' : 'changed'}`);
     await close();
@@ -204,7 +216,7 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
   await guard('phone-reply-offscreen', async () => {
     const { page, close } = await openRecipe('phone', 'Lasagne');
     await P.sendNote(page, 'how thick should the sauce be?');
-    const m = await page.evaluate(() => { const n = document.querySelector('#page-margin .margin-note:last-child'); const r = n.getBoundingClientRect(); const pr = document.getElementById('page-right').getBoundingClientRect(); return `reply top=${Math.round(r.top)} vs visible page bottom=${Math.round(pr.bottom)} (inside scroller, ${Math.round(r.top - pr.bottom)}px below)`; });
+    const m = await page.evaluate(() => { const ns = document.querySelectorAll('#page-margin .margin-note'); const n = ns[ns.length - 1]; const r = n.getBoundingClientRect(); const pr = document.getElementById('page-right').getBoundingClientRect(); return `reply top=${Math.round(r.top)} bottom=${Math.round(r.bottom)} vs viewport ${innerHeight}, visible page bottom=${Math.round(pr.bottom)} (${r.bottom <= innerHeight && r.top >= 0 ? 'on screen' : Math.round(r.top - pr.bottom) + 'px below'})`; });
     out('phone-reply-offscreen', `phone: ${m}`);
     await close();
   });
