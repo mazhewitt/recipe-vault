@@ -268,13 +268,29 @@ function placeSticky() {
             return page ? page.clientHeight : 0;
         })
     );
+    // Above 600px the left-edge tab strip sits over the sticky's corner of the
+    // page; on a short desktop a capped sticky would otherwise cover its lower
+    // tabs (Notes among them), so the cap also stops STICKY_GAP below the strip
+    let maxHeight = pageHeight * STICKY_MAX_FRACTION;
+    const strip = document.querySelector('.contents-tabs');
+    if (strip && window.getComputedStyle(strip).position === 'sticky') {
+        const stripBottom = Math.max(0, ...[...strip.querySelectorAll('.contents-tab')]
+            .map(tab => tab.getBoundingClientRect())
+            .filter(r => r.height > 0)
+            .map(r => r.bottom));
+        if (stripBottom > 0) {
+            const clearance = input.getBoundingClientRect().top - 2 * STICKY_GAP - stripBottom;
+            maxHeight = Math.max(0, Math.min(maxHeight, clearance));
+        }
+    }
     container.style.setProperty('--sticky-bottom', `${bottom}px`);
-    container.style.setProperty('--sticky-max-height', `${pageHeight * STICKY_MAX_FRACTION}px`);
+    container.style.setProperty('--sticky-max-height', `${maxHeight}px`);
 
     if (!placementObserved && typeof window.ResizeObserver !== 'undefined') {
         placementObserved = true;
         const observer = new window.ResizeObserver(() => placeSticky());
-        [input, host, document.getElementById('page-left'), document.getElementById('page-right')]
+        [input, host, document.getElementById('page-left'), document.getElementById('page-right'),
+            ...document.querySelectorAll('.contents-tabs .contents-tab')]
             .forEach(el => { if (el) observer.observe(el); });
     }
 }

@@ -334,11 +334,15 @@ export async function ANCHORS(page: Page): Promise<Anchor[]> {
     { name: 'message-input', selector: '#message-input' },
     { name: 'recipe-title', selector: '#page-right-content .recipe-title' },
   ];
+  // The phone's Ingredients tab does not display the method, so its mid-step is
+  // tracked only where it is on screen when the anchors are taken
   if (steps > 0) {
     const m = Math.ceil(steps / 2);
-    anchors.push({ name: `mid-step-${m}`, selector: `#page-right-content .prep-step[data-step="${m}"]` });
+    const selector = `#page-right-content .prep-step[data-step="${m}"]`;
+    if (await page.locator(selector).isVisible()) anchors.push({ name: `mid-step-${m}`, selector });
   }
-  anchors.push({ name: 'page-next', selector: '#page-next' });
+  // The page arrows are not displayed at ≤600px (the phone turns pages by edge tap)
+  if (!isPhone(page)) anchors.push({ name: 'page-next', selector: '#page-next' });
   anchors.push({ name: 'timer-widget', selector: '#timer-widget' });
   return anchors;
 }
@@ -434,12 +438,23 @@ export async function trackAnchors(
 }
 
 /**
- * Asserts that no tracked anchor moved more than `tolerance` px in x, y, width
- * or height, nor was hidden on any frame after it was first shown.
+ * Asserts that every tracked anchor was displayed on the first frame and then
+ * neither moved more than `tolerance` px in x, y, width or height nor was
+ * hidden on any frame. Anchors named in `late` (default: the timer pill, which
+ * appears only once a timer starts) may first appear mid-interaction and are
+ * judged from their first displayed frame instead.
  */
-export function expectAnchorsStill(result: AnchorResult, tolerance = 1): void {
+export function expectAnchorsStill(
+  result: AnchorResult,
+  tolerance = 1,
+  late: string[] = ['timer-widget'],
+): void {
   const moved: string[] = [];
   for (const [name, d] of Object.entries(result)) {
+    if (!d.shownAtStart && !late.includes(name)) {
+      moved.push(`${name} (${d.selector}): not displayed when the interaction started`);
+      continue;
+    }
     const deltas = { dx: d.dx, dy: d.dy, dwidth: d.dwidth, dheight: d.dheight };
     const over = Object.entries(deltas)
       .filter(([, v]) => v > tolerance)

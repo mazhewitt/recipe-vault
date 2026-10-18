@@ -164,6 +164,35 @@ test.describe('The reply sticky', () => {
     expect(m.scrolls).toBe(true);
   });
 
+  test('a long reply on a short desktop leaves every contents-page tab tappable', async ({ page }) => {
+    test.skip(isPhone(page), 'the tab strip is a row above the contents at ≤600px');
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await newRecipe(page, 'Sticky Tabs');
+    await page.reload();
+    await expect(page.locator('.index-title')).toBeVisible();
+    let body = '';
+    for (let i = 1; i <= 40; i++) body += `event: chunk\ndata: {"text":"Line ${i} of a very long reply.\\n"}\n\n`;
+    body += 'event: done\ndata: {"conversation_id":"tabs"}\n\n';
+    await page.route('**/api/chat', route => route.fulfill({
+      status: 200, headers: { 'content-type': 'text/event-stream' }, body,
+    }));
+    await sendNote(page, 'tell me everything');
+    await expect(sticky(page)).toContainText('Line 40', { timeout: 10000 });
+    await expect(sticky(page)).toBeVisible();
+    expect(await sticky(page).evaluate(el => el.scrollHeight > el.clientHeight + 1), 'sticky is capped').toBe(true);
+
+    const tabs = page.locator('.contents-tab:visible');
+    const count = await tabs.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const sel = await tabs.nth(i).evaluate((el, n) => {
+        el.setAttribute('data-hit-probe', String(n));
+        return `[data-hit-probe="${n}"]`;
+      }, i);
+      await expectHitArea(page, sel);
+    }
+  });
+
   test('can be dismissed, stays dismissed across a recipe and mode switch, and a new reply shows again', async ({ page }) => {
     const a = await newRecipe(page, 'Dismiss A');
     const b = await newRecipe(page, 'Dismiss B');

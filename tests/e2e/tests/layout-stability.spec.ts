@@ -8,23 +8,15 @@ import {
   isPhone,
   openRecipe,
   openTab,
+  paceChat,
   sendNote,
   trackAnchors,
 } from './helpers';
 
 /**
  * family-recipe-ui › Nothing on the page moves unless the cook acted on it.
- * One test per scenario. Cases that are red on today's code carry a
- * per-project `test.fail` naming the group that fixes them; Playwright errors
- * when such a case passes, so the annotation cannot outlive its fix.
+ * One test per scenario.
  */
-
-const ALL = ['chromium', 'mobile-chrome', 'ipad'];
-
-/** Marks the running case as expected to fail on these projects until `why` lands. */
-function failOn(projects: string[], why: string) {
-  test.fail(projects.includes(test.info().project.name), why);
-}
 
 /** Selects a spread mode from the left-edge strip, retrying through a page turn's animation lock. */
 async function selectMode(page: Page, mode: 'contents' | 'cook' | 'notes') {
@@ -156,6 +148,8 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
       });
     });
     await chat.ready;
+    // One chunk per frame or slower, so the sticky's growth is sampled while it streams
+    await paceChat(page, 50);
 
     await sendNote(page, 'tell me everything about this stew');
     await chat.requested;
