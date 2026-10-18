@@ -120,7 +120,7 @@ async function run(id, fn) { if (ONLY && !ONLY.includes(id)) return; try { await
   await run('phone-edge-strip-over-content', async () => {
     const { page, close } = await P.open('phone', { port: PORT });
     await openRecipe(page, las);
-    const q = await page.evaluate(() => { const r = document.querySelectorAll('.ingredient-qty')[2].getBoundingClientRect(); const e = document.elementFromPoint(r.x + 6, r.y + r.height / 2); const s = document.getElementById('mobile-edge-prev').getBoundingClientRect(); return { x: r.x + 6, y: r.y + r.height / 2, hit: e.id || e.className, strip: `${Math.round(s.width)}x${Math.round(s.height)}` }; });
+    const q = await page.evaluate(() => { const r = document.querySelectorAll('.ingredient-qty')[2].getBoundingClientRect(); const e = document.elementFromPoint(r.x + 6, r.y + r.height / 2); const se = document.getElementById('mobile-edge-prev'); const s = se && se.getBoundingClientRect(); return { x: r.x + 6, y: r.y + r.height / 2, hit: e.id || e.className, strip: s ? `${Math.round(s.width)}x${Math.round(s.height)}` : 'none' }; });
     await page.touchscreen.tap(q.x, q.y); await page.waitForTimeout(1500);
     const t = await page.evaluate(() => document.querySelector('.recipe-title')?.textContent);
     out('phone-edge-strip-over-content', `3rd ingredient qty hit=${q.hit} strip=${q.strip}; tapping it -> "${t}" (expected Granny's Beef Lasagne)`);

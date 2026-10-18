@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createCookingRecipe, isPhone, openRecipe, openTab } from './helpers';
+import { authenticate, createCookingRecipe, expectHitArea, isPhone, openRecipe, openTab } from './helpers';
 
 /**
  * cooking-guidance › The cook can keep their place in a recipe, and
@@ -246,6 +246,17 @@ test.describe('Keeping your place', () => {
     await expect(page.locator('.prep-step[aria-current="step"]')).toHaveCount(0);
     await expect(clear).toBeHidden();
     expect(await stored(page, r.id)).toBeNull();
+  });
+
+  test('clear ticks has a 44px hit area', async ({ page }) => {
+    const r = await createCookingRecipe(page);
+    await authenticate(page);
+    await openCooking(page, r.id);
+    await tap(page, ingredient(page, 0));
+    const sel = '.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks';
+    await expect(page.locator(sel)).toBeVisible();
+    await page.locator(sel).scrollIntoViewIfNeeded();
+    await expectHitArea(page, sel);
   });
 
   test('a touch drag that starts on an item ticks nothing', async ({ page }) => {

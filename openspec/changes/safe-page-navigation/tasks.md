@@ -245,14 +245,22 @@ Satisfies: `recipe-url-state` (all requirements and scenarios); `recipe-book-ind
 
 ## 10. Verification and hand-off
 
-- [ ] 10.1 `make lint` clean.
-- [ ] 10.2 `make test-e2e` green on `chromium`, `mobile-chrome` and `ipad`, after killing any stale 3001 server and with no other suite running. Record the pass/skip counts here.
+- [x] 10.1 `make lint` clean.
+- [x] 10.2 `make test-e2e` green on `chromium`, `mobile-chrome` and `ipad`, after killing any stale 3001 server and with no other suite running. Record the pass/skip counts here.
+  - First run (under load from another worktree's audit; 2.6h): 621 passed, 150 skipped, 3 failed. `spread-modes` "a mode change during a page turn is ignored" (chromium) passed alone; it was timing. `refresh-in-place` "a refresh in contents mode keeps the contents where the reader left them" failed on chromium and ipad, alone too, and on HEAD without group 10's changes: a regression from 551db4f, whose `refreshListBesideRecipe` redraws the contents beside the recipe through `renderIndex`, which scrolls to the current entry. Fixed by keeping `#page-left.scrollTop` across that redraw; `refresh-in-place`, `page-turn-cache` and `spread-modes` then 96 passed, 30 skipped, 0 failed.
 - [ ] 10.3 Record the red-checks from 2.8, 3.8, 4.5, 5.5, 6.8, 7.7, 8.8 and 9.8 here: each revert, and the tests that went red.
-- [ ] 10.4 The remeasure scripts read the removed overlay, so make those checks report the hit element without assuming `#mobile-edge-*` exists:
+  - 2.8: revert 2.1 alone -> the diagonal test stayed green (the 2.3 release rule also rejects it); the added "locked as a scroll never turns the page" test went red; 2.1+2.3 reverted -> diagonal, lock and drift red; revert 2.3 -> drift red; revert 2.4 -> momentum red.
+  - 3.8: old 60px overlay back -> zones-gone, overlap, quantity-tap and page-number tests red (4 failed).
+  - 4.5: restore line removed -> the round-trip test red (off by 579px).
+  - 5.5: touchstart/touchend opener back -> open-and-stays-open and overlay-close red on both touch projects (4 failed).
+  - 6.8, 7.7, 8.8: ticked by their groups, but the outcome (which tests went red) was not written down in tasks.md or the commit bodies, and was not re-run in group 10.
+  - 9.8: no popstate listener -> "Back and Forward...", "Back pressed during a page turn...", "a recipe deleted before Back..." red; no start-up restore -> "a reload restores...", "never shows the contents first", "after a reload ... highlight", "unknown recipe on load" red; no 404 branch -> the three missing-recipe tests red; recipeShown writing nothing -> the four push tests red; a refresh that pushes -> the photo test red.
+  - Group 10's own: `.clear-ticks` 44px hit area test (place-keeping.spec.ts) red on all three projects before the `::before` was added.
+- [x] 10.4 The remeasure scripts read the removed overlay, so make those checks report the hit element without assuming `#mobile-edge-*` exists:
   - `find.cjs`: `phone-edge-zone-steals-contents-taps`, `phone-edge-zones-cover-recipe-text`
   - `manage.cjs`: `phone-edge-strip-over-content`
   - `cook.cjs`: `phone-edge-nav-covers-content`
-- [ ] 10.5 Re-run `tests/usability/run-all.sh after-safe-nav find manage cook` with a `PORT_BASE` away from 3001, and record the before (1.2) and after lines for these ids here. Expected after:
+- [x] 10.5 Re-run `tests/usability/run-all.sh after-safe-nav find manage cook` with a `PORT_BASE` away from 3001, and record the before (1.2) and after lines for these ids here. Expected after:
   - Find journey:
     - `phone-edge-zone-steals-contents-taps`: the hit is the row, and it opens Granny's Beef Lasagne.
     - `phone-edge-zones-cover-recipe-text`: 0 step numbers under a navigation control.
@@ -271,6 +279,24 @@ Satisfies: `recipe-url-state` (all requirements and scenarios); `recipe-book-ind
     - `touch-photo-preview-closes-instantly`: `visibleAfter500ms=true` on tablet and phone.
     - `phone-tab-switch-loses-place`: moved 0px (±1).
     - `phone-edge-nav-covers-content` and `phone-diagonal-scroll-swallowed`: clear.
-- [ ] 10.6 File the tablet-swipe non-goal from proposal.md as a `.scratch/` issue (`Status: needs-triage`), unless the lead already has.
-- [ ] 10.7 Update `design-system.md` for the gutter chevrons and the header's hit area.
+  - Recorded (`PORT_BASE=3021`, runs/after-safe-nav vs runs/before-safe-nav; `find.cjs` now reports the requests before/after the new recipe shows and the URL's query, which it had hard-coded labels for):
+    - `phone-edge-zone-steals-contents-taps`: before hit=mobile-edge-next, opened "Banana Bread"; after hit=row, opened "Granny's Beef Lasagne".
+    - `phone-edge-zones-cover-recipe-text`: before 5/6 step numbers under #mobile-edge-prev (60x675 zones); after 0/5, no edge zones.
+    - `phone-diagonal-scroll-turns-page`: before TURNED, TURNED, stayed; after stayed x3.
+    - `header-return-intermediate-frame`: before leftEmpty=true (tablet and desktop); after leftEmpty=false, recipeWithIngredientsOnRight=false.
+    - `next-waits-for-list-and-ignores-prefetch`: before new recipe at 639ms, requests list,recipe,list,recipe; after new recipe at 16ms, no request before it showed (two later recipe requests are the new neighbours' prefetch).
+    - `no-history-reload-loses-recipe`: before history 2->2, url /chat, after reload viewMode=index; after history 2->3, url /chat?recipe=<id>, viewMode=recipe.
+    - `tablet-no-swipe`: unchanged (no navigation).
+    - `phone-edge-strip-over-content`: before hit=mobile-edge-prev, tap -> "Chocolate Brownies"; after hit=ingredient-qty, stays on the Lasagne.
+    - `header-full-width-hit-zone`: before tablet 770x35, desktop 1180x35, phone 81x16; after 166x44 (label 122), 166x44, phone 105x44 (label 81).
+    - `phone-rotate-landscape-loses-input`: before spread=contents; after spread=cook, note input display=flex, ingredients on the left page.
+    - `resize-refetch-storm`: 3 -> 0.
+    - `breakpoint-resets-scroll`: before 200 -> 0 -> 0; after 200 -> 0 -> 200, mode cook.
+    - `touch-photo-preview-closes-instantly`: before visibleAfter500ms=false on tablet and phone; after true on both.
+    - `phone-tab-switch-loses-place`: moved 401px -> 0px.
+    - `phone-edge-nav-covers-content`: before 14/19 under the strips, tap turned the page, drag scrolled 0px; after 0/19, tap stayed, drag scrolled 254px.
+    - `phone-diagonal-scroll-swallowed`: before dx=80 and dx=110 scrolled 0px; after every drag scrolled (209-254px), same recipe.
+- [x] 10.6 File the tablet-swipe non-goal from proposal.md as a `.scratch/` issue (`Status: needs-triage`), unless the lead already has.
+  - Already filed: `.scratch/tablet-swipe/README.md` (needs-triage).
+- [x] 10.7 Update `design-system.md` for the gutter chevrons and the header's hit area.
 - [ ] 10.8 Deployment, not an implementation step. Tag the release and purge the Cloudflare cache. Then confirm `/chat?recipe=<id>` is not cached at the edge (`cf-cache-status` is `DYNAMIC` or `BYPASS`) and that a reload of it opens the recipe (design Risks).

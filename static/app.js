@@ -528,8 +528,8 @@ let spreadGeneration = 0;
  * left page holds:
  *   contents - the contents, one column while a recipe or meal plan is open
  *   cook     - the open recipe's ingredients, moved off the right page
- *   notes    - the conversation for the recipe on the page, plus the input
- *              (which CSS alone slides across the spine)
+ *   notes    - the conversation for the recipe on the page, above the input
+ *              (whose slip stays at the foot of the left page in every mode)
  *
  * @param {'contents'|'cook'|'notes'} mode - the mode just applied
  */
@@ -604,7 +604,12 @@ async function refreshListBesideRecipe() {
     const idx = list.findIndex(r => String(r.id) === String(currentRecipeId));
     RecipeDisplay.setNotePageNumber(idx >= 0 ? RecipeDisplay.pageNumberFor(idx) : null);
     if (generation === spreadGeneration && SpreadModes.getSpreadMode() === 'contents') {
+        // renderIndex scrolls the contents to the current entry; this redraw
+        // was not the reader's doing, so they keep the place they had
+        const pageLeft = document.getElementById('page-left');
+        const scrollTop = pageLeft ? pageLeft.scrollTop : 0;
         drawContents(list, 'contents');
+        if (pageLeft) pageLeft.scrollTop = scrollTop;
     }
 }
 

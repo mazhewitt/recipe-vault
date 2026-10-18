@@ -21,7 +21,7 @@ const checks = {
   async 'phone-edge-zone-steals-contents-taps'() {
     const { page, close } = await P.open('phone', { port });
     const b = await page.locator('.index-recipe-item').nth(2).locator('.index-page-number').boundingBox();
-    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.mobile-edge-nav')?.id || 'row', [b.x + b.width / 2, b.y + b.height / 2]);
+    const hit = await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); if (!e) return 'none'; const nav = e.closest('.mobile-edge-nav, .gutter-chevron, .page-tabs'); if (nav) return nav.id || nav.className; return e.closest('.index-recipe-item') ? 'row' : (e.id || e.className || e.tagName); }, [b.x + b.width / 2, b.y + b.height / 2]);
     await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); await page.waitForTimeout(1200);
     const t = await title(page); await close();
     return `tap "p. 7" on Granny's Beef Lasagne row: hit=${hit}, opened="${t}" (expected Granny's Beef Lasagne)`;
@@ -33,9 +33,10 @@ const checks = {
     await page.locator('.page-tab[data-tab="method"]').tap(); await page.waitForTimeout(500);
     const r = await page.evaluate(() => {
       const steps = [...document.querySelectorAll('.prep-step')];
-      const under = steps.filter(s => { const n = s.querySelector('.step-number').getBoundingClientRect(); const e = document.elementFromPoint(n.left + n.width / 2, n.top + n.height / 2); return e && e.closest('.mobile-edge-nav'); }).length;
-      const en = document.getElementById('mobile-edge-next').getBoundingClientRect(); const pg = document.getElementById('page-right').getBoundingClientRect();
-      return `${under}/${steps.filter(s => s.getBoundingClientRect().top < innerHeight).length} visible step numbers sit under #mobile-edge-prev; each edge zone ${Math.round(en.width)}x${Math.round(en.height)}px = ${Math.round(200 * en.width / pg.width)}% of page width, opacity ${getComputedStyle(document.getElementById('mobile-edge-next')).opacity}`;
+      const under = steps.filter(s => { const n = s.querySelector('.step-number').getBoundingClientRect(); const e = document.elementFromPoint(n.left + n.width / 2, n.top + n.height / 2); return e && e.closest('.mobile-edge-nav, button, [role=tab]'); }).length;
+      const en = document.getElementById('mobile-edge-next'); const pg = document.getElementById('page-right').getBoundingClientRect();
+      const zone = en ? (() => { const b = en.getBoundingClientRect(); return `each edge zone ${Math.round(b.width)}x${Math.round(b.height)}px = ${Math.round(200 * b.width / pg.width)}% of page width, opacity ${getComputedStyle(en).opacity}`; })() : 'no edge zones in the DOM';
+      return `${under}/${steps.filter(s => s.getBoundingClientRect().top < innerHeight).length} visible step numbers sit under a navigation control; ${zone}`;
     });
     await close(); return r;
   },
@@ -90,9 +91,10 @@ const checks = {
   async 'next-waits-for-list-and-ignores-prefetch'() {
     const { page, close } = await P.open('tablet', { port });
     await P.openFromContents(page, 2); await page.waitForTimeout(2000);
-    const reqs = []; page.on('request', r => { const p = new URL(r.url()).pathname; if (/^\/api\/recipes(\/[^/]+)?$/.test(p)) reqs.push(p === '/api/recipes' ? 'list' : 'recipe'); });
+    let t0 = Date.now();
+    const reqs = []; page.on('request', r => { const p = new URL(r.url()).pathname; if (/^\/api\/recipes(\/[^/]+)?$/.test(p)) reqs.push({ k: p === '/api/recipes' ? 'list' : 'recipe', t: Date.now() - t0 }); });
     await page.route(/\/api\/recipes(\/[^/]+)?$/, async (route) => { await new Promise(res => setTimeout(res, 300)); route.continue(); });
-    const t0 = Date.now();
+    t0 = Date.now();
     await page.locator('#page-next').click();
     let firstMotion = null, contentAt = null;
     while (Date.now() - t0 < 4000) {
@@ -102,18 +104,18 @@ const checks = {
       await page.waitForTimeout(20);
     }
     await page.waitForTimeout(800); await close();
-    return `300ms API latency: first visible response ${firstMotion}ms, new recipe at ${contentAt}ms; requests during first 1.6s: ${reqs.slice(0, 4).join(',')} (recipe fetched despite prefetch)`;
+    return `300ms API latency: first visible response ${firstMotion}ms, new recipe at ${contentAt}ms; requests during first 1.6s: ${reqs.slice(0, 4).map(r => r.k).join(',')}${(() => { const before = reqs.filter(r => contentAt === null || r.t <= contentAt); return before.length ? ` (${before.map(r => r.k).join(',')} before the new recipe showed${before.some(r => r.k === 'recipe') ? ': recipe fetched despite prefetch' : ''})` : ' (none before the new recipe showed; later ones are neighbour prefetches)'; })()}`;
   },
   // No URL/history state: reload and Back lose the recipe
   async 'no-history-reload-loses-recipe'() {
     const { page, close } = await P.open('tablet', { port });
     const h0 = await page.evaluate(() => history.length);
     await P.openFromContents(page, 2);
-    const h1 = await page.evaluate(() => [history.length, location.pathname + location.hash]);
+    const h1 = await page.evaluate(() => [history.length, location.pathname + location.search + location.hash]);
     await page.reload(); await page.waitForSelector('.app-container'); await page.waitForTimeout(900);
     const vm = await page.evaluate(() => document.body.dataset.viewMode);
     await close();
-    return `history.length ${h0}->${h1[0]} on open (url ${h1[1]}); after reload viewMode=${vm} (recipe lost)`;
+    return `history.length ${h0}->${h1[0]} on open (url ${h1[1]}); after reload viewMode=${vm}${vm === 'recipe' ? '' : ' (recipe lost)'}`;
   },
   // Returning to the contents scrolls the title and A-Z off even when the highlighted row was already visible
   async 'contents-return-scrolls-title-away'() {

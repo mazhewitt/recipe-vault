@@ -258,8 +258,8 @@ A recipe open in `cook` mode, the arrangement every recipe opens in. The left pa
 | `.page-tabs` (phone) | 5 |
 | `.note-input`, `#page-margin` (the reply sticky) | 6 |
 | `.edge-tabs` | 9 |
-| `.page-nav`, `.mobile-edge-nav`, `.page-turn-overlay` (set in JS) | 10 |
-| `.timer-widget`, `#recipe-book-header` (phone), `#page-margin` (phone, above the edge strips) | 11 |
+| `.page-nav`, `.page-turn-overlay` (set in JS) | 10 |
+| `.timer-widget`, `#recipe-book-header` (phone), `#page-margin` (phone) | 11 |
 | `.user-info` | 100 |
 | `.photo-preview-overlay` | 2000 |
 
@@ -317,14 +317,14 @@ The book fills the screen and shows one page at a time; the note input becomes a
 | Background | Flat wood gradient — the noise texture and the `body::before` grain lines are dropped |
 | `.book-cover` | Flush (`top/left/right/bottom: 0`), `border-radius: 0`, no shadow; the leather texture (`::before`) and spine shadow (`::after`) are hidden |
 | `.pages-container` | `margin: 40px 4px 4px` — the 40px is a leather strip above the paper |
-| `#recipe-book-header` | Re-shown while generic `.section-label` stays hidden: `position: absolute; top: 12px; left: 14px`, Kalam 16px, z-index 11. Tapping it is the way back to the contents. |
+| `#recipe-book-header` | Re-shown while generic `.section-label` stays hidden: `position: absolute; top: 0; left: 2px; padding: 0 12px`, a 44px-tall line (`min-height`/`line-height: 44px`) so the text sits where it did on the 40px strip, Kalam 16px, z-index 11. The hit area is the label plus its padding, never the strip's full width. Tapping it is the way back to the contents. |
 | `.timer-widget` | `top: 8px; right: 8px`, 30px tall, `width: min(200px, calc(100% - 130px))`, z-index 11 — the opposite end of the same strip, which has no arrow |
 | `.app-container` | `width: 100%`, so a skeleton or a refresh can never change the book's width |
 | `.user-info` | Shown on the contents page only (`body:not([data-view-mode="index"]) .user-info { display: none }`) |
 | `.page-left`, `.page-right` | `width: 100% !important`, `padding: 16px`, no radius, no shadow; the binding shadows `.page-left::after` / `.page-right::before` are hidden |
 | `.page-content` | `padding-top: 10px` |
-| `.page-nav` | Hidden — the 60px-wide `.mobile-edge-nav` zones take over |
-| `.mobile-edge-nav` | `padding-top: 48px`; in recipe view `top: 108px` (40 strip + 4 margin + 16 padding + 48 tabs) so it cannot swallow taps on the paper tabs |
+| `.page-nav` | Hidden — the gutter chevrons in the tab row take over |
+| `.gutter-chevron` (`#gutter-prev`, `#gutter-next`) | Two 46 × 46px buttons (a 44px hit area with a pixel to spare) at the right-hand end of the `.page-tabs` row, a 28px `.edge-chevron` glyph inside, transparent background; `:disabled` is `opacity: 0.3`. They live in `.page-tabs`, so they show only on the phone's recipe page, and they are not tabs (no `role="tab"`, no `data-tab`). Nothing lies over the page text. |
 | `.pages-container` | Carries `view-transition-name: page-content` — phone only |
 
 ### Which Page Shows
@@ -366,16 +366,16 @@ In `index` mode `.pages-container` is still `flex-direction: column` (a leftover
 
 ### Mobile Navigation Behavior
 
-The edge zones and the footer links drive the same recipe sequence as the desktop arrows.
+The gutter chevrons and the footer links drive the same recipe sequence as the desktop arrows.
 
-| State | Left (`.mobile-edge-prev` / `.footer-prev`) | Right (`.mobile-edge-next` / `.footer-next`) |
+| State | Previous (`#gutter-prev` / `.footer-prev`) | Next (`#gutter-next` / `.footer-next`) |
 |-------|------------|-------------|
 | Contents | Disabled | → First recipe |
 | First recipe | → Contents | → Next recipe |
 | Middle recipe | → Prev recipe | → Next recipe |
 | Last recipe | → Prev recipe | Disabled |
 
-Going back past the first recipe returns to the contents; that and tapping `#recipe-book-header` are the only two ways back. Swipes on `.pages-container` change the recipe, never the tab: a recipe change runs the View Transitions slide, a tab change runs a 200ms crossfade.
+Going back past the first recipe returns to the contents; that and tapping `#recipe-book-header` are the only two ways back. Swipes on `.pages-container` change the recipe, never the tab, and only when unmistakably sideways (the direction locks at 30px of travel, horizontal only if `|dx| > 2·|dy|`; release needs `|dx| ≥ 30%` of the container and `|dy| < |dx| / 2`; a touch within 300ms of a page scroll is ignored). A recipe change runs the View Transitions slide, a tab change runs a 200ms crossfade.
 
 ---
 
@@ -486,7 +486,7 @@ An open book showing two pages with a leather cover frame.
 | Cover | Overhangs by 12px at the sides, 8px top/bottom; leather texture + spine shadow | Same | Flush with the frame, no texture, no spine; a 40px leather strip above the paper |
 | Page padding | 20px 28px (+ `--slip-clearance` bottom on the left page) | Same | 16px |
 | Spine shadow | Visible | Visible | Hidden |
-| Nav arrows | `.page-nav` 29px, 46px hit area | `.page-nav` 36px, 46px hit area | `.page-nav` hidden; 60px `.mobile-edge-nav` zones |
+| Nav arrows | `.page-nav` 29px, 46px hit area | `.page-nav` 36px, 46px hit area | `.page-nav` hidden; 46px `.gutter-chevron` buttons in the `.page-tabs` row |
 | Section tabs | `.edge-tabs`, right outer edge: inert bookmark ribbons (Ingredients / Method) | Same | `.page-tabs`, page top edge (all three) |
 | Left-edge strip | `.contents-tabs`, left page's outer edge: the contents filters while no recipe is open, Contents / Cook / Notes while one is | Same | Chip row under the contents title; filters only |
 
@@ -665,7 +665,7 @@ A cream pill clipped to the top edge of the recipe book cover, **centred over th
 | Clock icon | 18px | 14px |
 | Close target | 28 × 28px visual, a 46 × 46px transparent `::before` hit area | Same |
 | Background / border | `--color-paper-cream`, `2px solid --color-ink-dark`, `--radius-pill`, `--shadow-soft` | Same |
-| z-index | 11 (above `.page-nav` and `.mobile-edge-nav`, 10) | Same |
+| z-index | 11 (above `.page-nav`, 10) | Same |
 
 Contents in order: clock icon, `.timer-text`, `.timer-cancel` (circular hover/focus tint). The pill is `display: none` when no timer runs.
 
@@ -697,7 +697,7 @@ Every thread entry records the recipe that was open when its turn began, stamped
 
 | Property | Desktop / Tablet (> 600px) | Mobile (≤ 600px) |
 |----------|----------------------------|------------------|
-| Position | `absolute`, in the slip's column (`left: 10px; right: calc(50% + 10px)`), its bottom edge 4px above the slip's top | `left: 8px; right: 8px`, directly above the input bar, z-index 11 (above the edge strips) |
+| Position | `absolute`, in the slip's column (`left: 10px; right: calc(50% + 10px)`), its bottom edge 4px above the slip's top | `left: 8px; right: 8px`, directly above the input bar, z-index 11 |
 | Placement | `margin-notes.js` measures the slip and the page and hands CSS `--sticky-bottom` and `--sticky-max-height`; a `ResizeObserver` re-measures when the slip, the pages or the left-edge strip resize | Same |
 | Height | Capped at 40% of the page (and clear of the left-edge strip), with internal scroll | Same |
 | Paper | `--color-sticky`, `border-radius: 2px`, `--shadow-soft`; Kalam 15px / 1.45 in `--color-biro` | Same |
@@ -767,7 +767,7 @@ Every control the cook taps has a hit area of at least **44px x 44px**, at every
 
 | Element | Visual (Desktop / Tablet) | Hit area | Mobile |
 |---------|---------------------------|----------|--------|
-| Nav arrows | `.page-nav` 29px (36px on tablet) | 46px `::before` | Hidden; 60px-wide `.mobile-edge-nav` zones |
+| Nav arrows | `.page-nav` 29px (36px on tablet) | 46px `::before` | 46px `.gutter-chevron` buttons in the tab row |
 | Spread / contents tabs | `.contents-tab` 26 × 76px | 46px `::before` | `.contents-tab` min-height 44px, min-width 66px |
 | Edge tabs | `.edge-tab` 26 × 92px | None: inert ribbons, not controls | `.page-tab` min-height 44px, `flex: 1` |
 | Share / photo | 44px icon buttons at the end of the meta line | 46px `::before` | Same |
@@ -777,8 +777,10 @@ Every control the cook taps has a hit area of at least **44px x 44px**, at every
 | Phone footer links | n/a | 46px `::before` | min-height 44px |
 | Index recipe items | `padding: 4px 8px` | — | `padding: 8px 10px`, `min-height: 44px` |
 | Note textarea | min-height 34px | — | min-height 44px |
+| Book label | `#recipe-book-header` text, `width: fit-content`, centred | Its own box: `padding: 0 22px`, 44px tall (`margin-top: -9px` puts the extra height above the book) | Its own box: `padding: 0 12px`, 44px tall |
+| Clear ticks | `.clear-ticks` text link | 46px `::before` | Same |
 
-Known gaps, owned elsewhere: the phone's "Recipe Book" label (81 × 16) and the full-width header hit zone above 600px (safe-page-navigation N8), the A-Z letters (`scratch:contents-page-rough-edges`), and the tablet/desktop Logout link (36 × 21).
+Known gaps, owned elsewhere: the A-Z letters (`scratch:contents-page-rough-edges`), and the tablet/desktop Logout link (36 × 21).
 
 ### Keeping Your Place
 
@@ -804,7 +806,7 @@ The layout contract behind all of the above (`tests/e2e/tests/layout-stability.s
 | Gesture | Action |
 |---------|--------|
 | Tap a contents entry | Open that recipe |
-| Tap a `.mobile-edge-nav` zone | Previous / next recipe |
+| Tap `#gutter-prev` / `#gutter-next` | Previous / next recipe |
 | Tap `.footer-prev` / `.footer-next` | Previous / next recipe |
 | Tap a `.page-tab` | Switch section (200ms crossfade) |
 | Tap `#recipe-book-header` | Back to the contents |
@@ -839,7 +841,7 @@ Gestures and taps that navigate are ignored while a page turn or a tab crossfade
 ### Screen Reader
 
 - Semantic HTML (`<main>`, `<nav>`, `<article>`)
-- `aria-label` on the navigation arrows, the mobile edge zones, the note textarea and its buttons
+- `aria-label` on the navigation arrows, the phone gutter chevrons, the note textarea and its buttons
 - `aria-live="polite"` on `#page-margin`, with `aria-busy="true"` while a reply streams, so a screen reader announces the completed note once
 - Both tab surfaces are a `role="tablist"` of `role="tab"` buttons carrying `aria-selected` and `aria-controls="page-right-content"`; `page-tabs.setActiveTab()` updates every `[role="tab"][data-tab]` in the document, so the edge tabs and paper tabs never disagree
 - The open recipe's contents entry carries `aria-current="page"`

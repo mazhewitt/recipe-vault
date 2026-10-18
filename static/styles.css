@@ -1438,7 +1438,8 @@ body[data-feature-meals] .contents-tab-meals {
 .note-send::before,
 .clipboard-button::before,
 .footer-prev::before,
-.footer-next::before {
+.footer-next::before,
+.clear-ticks::before {
     content: "";
     position: absolute;
     top: 50%;

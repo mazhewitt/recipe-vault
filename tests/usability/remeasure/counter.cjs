@@ -29,7 +29,16 @@ const HIT44 = `(el) => { const r = el.getBoundingClientRect(); const cx = r.x + 
   for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) { const x = cx - 22 + i * 11, y = cy - 22 + j * 11; if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
     const e = document.elementFromPoint(x, y); if (!(e && (e === el || el.contains(e)))) miss++; } return miss; }`;
 
-async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' + e.message.split('\n')[0]); } }
+// Every browser a check opens is tracked, and guard closes whatever is still open in a finally, so a
+// check that throws before its own close() cannot leave a browser running and hang the script.
+const live = new Set();
+const rawOpen = P.open;
+P.open = async (...a) => { const o = await rawOpen(...a); live.add(o); const c = o.close; o.close = async () => { live.delete(o); await c(); }; return o; };
+async function guard(id, fn) {
+  try { await fn(); } catch (e) { out(id, 'ERROR ' + e.message.split('\n')[0]); } finally {
+    for (const o of [...live]) await o.close().catch(() => {});
+  }
+}
 
 (async () => {
   // 1. A reply sent in cook mode lands on top of the recipe title / photo / share buttons
@@ -267,4 +276,4 @@ async function guard(id, fn) { try { await fn(); } catch (e) { out(id, 'ERROR ' 
       await close();
     }
   });
-})();
+})().finally(() => process.exit(0));

@@ -146,8 +146,8 @@ const checks = {
     const g = await page.evaluate(() => {
       const items = [...document.querySelectorAll('.ingredient-item')];
       let covered = 0;
-      for (const it of items) { const q = it.querySelector('.ingredient-qty') || it; const r = q.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + 4, r.y + r.height / 2); if (hit && hit.closest('.mobile-edge-nav')) covered++; }
-      const p = document.getElementById('mobile-edge-prev').getBoundingClientRect();
+      for (const it of items) { const q = it.querySelector('.ingredient-qty') || it; const r = q.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + 4, r.y + r.height / 2); if (hit && hit.closest('.mobile-edge-nav, .gutter-chevron, .page-tabs')) covered++; }
+      const pe = document.getElementById('mobile-edge-prev'); const p = pe ? pe.getBoundingClientRect() : { width: 0, height: 0 };
       return { covered, total: items.length, w: Math.round(p.width), h: Math.round(p.height) };
     });
     const before = await title(page);
