@@ -1,5 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createCookingRecipe, expectHitArea, isPhone, openRecipe, openTab } from './helpers';
+import {
+  authenticate, chimes, createCookingRecipe, expectHitArea, installAudioStub, isPhone, openRecipe, openTab,
+} from './helpers';
 
 /**
  * cooking-guidance › A step's duration starts its timer. One test per scenario.
@@ -101,10 +103,10 @@ test.describe("A step's duration starts its timer", () => {
     for (const k of ['x', 'y', 'width', 'height'] as const) {
       expect(Math.abs(confirmBox[k] - box[k]), `pill ${k}`).toBeLessThanOrEqual(1);
     }
-    const shown = await page.locator('#timer-widget .timer-time').textContent();
-    await page.clock.runFor(2000);
-    await expect(page.locator('#timer-widget .timer-time'), 'the running timer keeps counting').not.toHaveText(shown!);
-    await expect(page.locator('#timer-widget .timer-time')).toHaveText(/^9:5\d$/);
+    // The prompt is readable in full: the label gets the pill to itself
+    await expect(page.locator('#timer-widget .timer-time')).toHaveCount(0);
+    const fit = await label(page).evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(fit.scroll, `"Tap again to replace" is cut off: ${JSON.stringify(fit)}`).toBeLessThanOrEqual(fit.client);
 
     // A second tap within the window replaces it
     await chip(page, 3).click();
@@ -119,6 +121,7 @@ test.describe("A step's duration starts its timer", () => {
     await expect(chip(page, 4)).toHaveAttribute('data-confirm', '');
     await page.clock.runFor(4100);
     await expect(label(page)).toHaveText('Step 3');
+    await expect(page.locator('#timer-widget .timer-time'), 'the running timer kept counting').toHaveText(/^7:5\d$/);
     await expect(chip(page, 4)).not.toHaveAttribute('data-confirm');
     await chip(page, 4).click();
     await expect(label(page)).toHaveText('Tap again to replace');
@@ -126,6 +129,7 @@ test.describe("A step's duration starts its timer", () => {
   });
 
   test('a finished timer is replaced at once', async ({ page }) => {
+    await installAudioStub(page);
     await page.clock.install();
     await page.reload();
     await openDurationRecipe(page);
@@ -139,6 +143,36 @@ test.describe("A step's duration starts its timer", () => {
     await expect(page.locator('#timer-widget')).toHaveAttribute('data-state', 'running');
     await expect(label(page)).toHaveText('Step 4');
     await expect(chip(page, 4)).not.toHaveAttribute('data-confirm');
+    // The finished timer is acknowledged: its chime repeats stop
+    const after = await chimes(page);
+    await page.clock.runFor(60 * 1000);
+    expect(await chimes(page), 'the finished chime kept repeating over the new timer').toBe(after);
+    await page.locator('.timer-cancel').click();
+  });
+
+  test('the confirm belongs to the recipe it was asked on', async ({ page }) => {
+    await page.clock.install();
+    await page.reload();
+    const first = await openDurationRecipe(page);
+    const second = await createCookingRecipe(page, { durations: { 3: 8, 4: 2 } });
+    await page.evaluate(() => {
+      // @ts-ignore
+      startTimer(10, 'Simmer', 5);
+    });
+    await chip(page, 3).click();
+    await expect(label(page)).toHaveText('Tap again to replace');
+    const asked = await page.evaluate(() => Date.now());
+
+    await openRecipe(page, second.id);
+    await expect(page.locator('#page-right-content .recipe-title')).toHaveText(second.title);
+    if (isPhone(page)) {
+      await openTab(page, 'method');
+      await page.waitForTimeout(400);
+    }
+    await chip(page, 3).click();
+    const tapped = await page.evaluate(() => Date.now());
+    expect(tapped - asked, 'the second tap must land inside the 4-second window').toBeLessThan(4000);
+    await expect(label(page), `step 3 of ${first.title} was confirmed, not this recipe's`).toHaveText('Tap again to replace');
     await page.locator('.timer-cancel').click();
   });
 

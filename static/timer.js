@@ -152,7 +152,7 @@ function chimeAndVibrate() {
 // "Tap again to replace": a step's duration tapped while a timer runs.
 const CONFIRM_MS = 4000;
 const CONFIRM_LABEL = 'Tap again to replace';
-let pendingConfirm = null; // { button, step, timeout }
+let pendingConfirm = null; // { button, step, recipeId, timeout }
 
 function clearConfirm() {
     if (!pendingConfirm) return;
@@ -256,11 +256,16 @@ export function startTimer(durationMinutes, label, stepNumber) {
     const step = Number.isInteger(stepNumber) && stepNumber > 0 ? stepNumber : null;
     const shownLabel = pillLabel(label, step);
 
-    // Update display; the time keeps counting under "Tap again to replace"
+    // Update display. The time keeps counting under "Tap again to replace",
+    // but the prompt has the pill to itself so it is read in full.
     const updateDisplay = () => {
+        if (pendingConfirm) {
+            setTimerText(CONFIRM_LABEL, null);
+            return;
+        }
         const mins = Math.floor(secondsLeft / 60);
         const secs = secondsLeft % 60;
-        setTimerText(pendingConfirm ? CONFIRM_LABEL : shownLabel, `${mins}:${secs.toString().padStart(2, '0')}`);
+        setTimerText(shownLabel, `${mins}:${secs.toString().padStart(2, '0')}`);
     };
 
     updateDisplay();
@@ -292,11 +297,13 @@ export function startTimer(durationMinutes, label, stepNumber) {
  */
 export function startStepTimer(stepNumber, minutes, button) {
     if (isAnimating()) return;
-    // The same step's button (a re-render may have replaced the element)
-    if (activeTimer && !(pendingConfirm && pendingConfirm.step === stepNumber)) {
+    // The same step's button of the same recipe (a re-render may have
+    // replaced the element)
+    const recipeId = state ? state.currentRecipeId : null;
+    if (activeTimer && !(pendingConfirm && pendingConfirm.step === stepNumber && pendingConfirm.recipeId === recipeId)) {
         clearConfirm();
         button.dataset.confirm = '';
-        pendingConfirm = { button, step: stepNumber, timeout: setTimeout(clearConfirm, CONFIRM_MS) };
+        pendingConfirm = { button, step: stepNumber, recipeId, timeout: setTimeout(clearConfirm, CONFIRM_MS) };
         activeTimer.render();
         return;
     }

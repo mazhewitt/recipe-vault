@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   authenticate, createCookingRecipe, createRecipe, expectAnchorsStill, expectHitArea, openTab, paceChat,
-  sendNote, spineX, trackAnchors,
+  chimes, installAudioStub, sendNote, spineX, trackAnchors,
 } from './helpers';
 
 function isPhone(page: any): boolean {
@@ -418,40 +418,6 @@ test.describe('Timer cover pill (Journal 2.0)', () => {
     await expect(page.locator('#timer-widget')).toBeHidden();
   });
 });
-
-/** Counts OscillatorNode.start() calls and vibrations (window.__audioLog). */
-async function installAudioStub(page: any) {
-  await page.addInitScript(() => {
-    const log: any = { starts: 0, vibrations: 0 };
-    // @ts-ignore
-    window.__audioLog = log;
-    class FakeParam { setValueAtTime() {} linearRampToValueAtTime() {} exponentialRampToValueAtTime() {} }
-    class FakeNode { connect() { return this; } disconnect() {} }
-    class FakeOsc extends FakeNode {
-      type = 'sine'; frequency = new FakeParam();
-      start() { log.starts++; } stop() {}
-    }
-    class FakeGain extends FakeNode { gain = new FakeParam(); }
-    class FakeCtx {
-      state = 'running'; currentTime = 0; destination = new FakeNode();
-      resume() { return Promise.resolve(); }
-      createOscillator() { return new FakeOsc(); }
-      createGain() { return new FakeGain(); }
-    }
-    // @ts-ignore
-    window.AudioContext = FakeCtx;
-    // @ts-ignore
-    window.webkitAudioContext = FakeCtx;
-    Object.defineProperty(navigator, 'vibrate', {
-      configurable: true,
-      value: () => { log.vibrations++; return true; },
-    });
-  });
-}
-
-async function chimes(page: any): Promise<number> {
-  return page.evaluate(() => (window as any).__audioLog.starts);
-}
 
 async function boxOf(page: any, selector: string) {
   return (await page.locator(selector).boundingBox())!;

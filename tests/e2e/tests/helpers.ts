@@ -589,3 +589,37 @@ export async function paceChat(page: Page, gapMs = 600): Promise<void> {
     };
   }, gapMs);
 }
+
+/** Counts OscillatorNode.start() calls and vibrations (window.__audioLog). */
+export async function installAudioStub(page: any) {
+  await page.addInitScript(() => {
+    const log: any = { starts: 0, vibrations: 0 };
+    // @ts-ignore
+    window.__audioLog = log;
+    class FakeParam { setValueAtTime() {} linearRampToValueAtTime() {} exponentialRampToValueAtTime() {} }
+    class FakeNode { connect() { return this; } disconnect() {} }
+    class FakeOsc extends FakeNode {
+      type = 'sine'; frequency = new FakeParam();
+      start() { log.starts++; } stop() {}
+    }
+    class FakeGain extends FakeNode { gain = new FakeParam(); }
+    class FakeCtx {
+      state = 'running'; currentTime = 0; destination = new FakeNode();
+      resume() { return Promise.resolve(); }
+      createOscillator() { return new FakeOsc(); }
+      createGain() { return new FakeGain(); }
+    }
+    // @ts-ignore
+    window.AudioContext = FakeCtx;
+    // @ts-ignore
+    window.webkitAudioContext = FakeCtx;
+    Object.defineProperty(navigator, 'vibrate', {
+      configurable: true,
+      value: () => { log.vibrations++; return true; },
+    });
+  });
+}
+
+export async function chimes(page: any): Promise<number> {
+  return page.evaluate(() => (window as any).__audioLog.starts);
+}

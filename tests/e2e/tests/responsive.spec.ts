@@ -164,13 +164,29 @@ test.describe('Responsive Layout (book only)', () => {
     expect(fit.text, JSON.stringify(fit)).toBeLessThanOrEqual(fit.content);
 
     // The freed slot is the textarea's: at 810px it is 217px wide, where it
-    // was 164px beside the page number. The spec's 40-character note needs
-    // ~284px of Kalam at 16px, more than the slip's column holds with the
-    // pencil and the two 44px buttons, so the case is a placeholder-length
-    // question (escalated with the group 1 report).
+    // was 164px beside the page number. A placeholder-length question fits it.
+    // (The spec's 40-character note does not: see the fixme case below.)
     expect(await page.locator('#message-input').evaluate(el => el.clientWidth)).toBeGreaterThanOrEqual(210);
     const before = (await page.locator('#note-input').boundingBox())!;
     await page.locator('#message-input').fill('how long should it rest?');
+    await page.waitForTimeout(200);
+    const after = (await page.locator('#note-input').boundingBox())!;
+    expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
+  });
+
+  // family-recipe-ui › Note input lives in the book › The tablet slip gives the
+  // page number's room to the textarea: "typing a 40-character note leaves
+  // #note-input's height unchanged" (design G4). NOT MET: at 810px the row is
+  // pencil 16 + textarea 217 + two 44px buttons + gaps; 40 characters of Kalam
+  // at 16px need ~300px. Meeting it needs a design decision (drop or move a
+  // control, widen the slip past the spine, or a font under iOS's 16px
+  // no-zoom size) - escalated to the change owner. Kept as fixme so the
+  // scenario is visibly unmet rather than quietly weakened.
+  test.fixme('the tablet slip holds a 40-character note on one line', async ({ page }) => {
+    test.skip(!isTablet(page), 'tablet band only');
+    await seedAndOpen(page);
+    const before = (await page.locator('#note-input').boundingBox())!;
+    await page.locator('#message-input').fill('Can I swap the beef for lamb in this one?');
     await page.waitForTimeout(200);
     const after = (await page.locator('#note-input').boundingBox())!;
     expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
