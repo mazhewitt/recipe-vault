@@ -93,9 +93,27 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     const result = await trackAnchors(page, [
       { name: 'note-input', selector: '#note-input' },
       { name: 'message-input', selector: '#message-input' },
+      ...(isPhone(page) ? [{ name: 'book-container', selector: '.book-container' }] : []),
     ], async () => {
       await entry.click();
       await expect(page.locator('#page-right-content .recipe-title')).toContainText(recipe.title, { timeout: 10000 });
+    });
+    expectAnchorsStill(result);
+  });
+
+  test('returning to the contents on the phone', async ({ page }) => {
+    test.skip(!isPhone(page), 'the chip only hides at ≤600px');
+    await openCookingRecipe(page);
+    await expect(page.locator('.user-info')).toBeHidden();
+
+    const result = await trackAnchors(page, [
+      { name: 'book-container', selector: '.book-container' },
+      { name: 'note-input', selector: '#note-input' },
+      { name: 'message-input', selector: '#message-input' },
+    ], async () => {
+      await page.locator('#recipe-book-header').click();
+      await expect(page.locator('.index-title')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.user-info')).toBeVisible();
     });
     expectAnchorsStill(result);
   });
@@ -163,6 +181,59 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     expectAnchorsStill(result);
   });
 
+  test('a reply sticky over a page scrolled to its end', async ({ page }) => {
+    await openCookingRecipe(page);
+    // The page the sticky lies over: the left page above 600px, the phone's one page
+    const scroller = isPhone(page) ? '#page-right' : '#page-left';
+    await page.route('**/api/chat', route => route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+      body: longReplyBody(3),
+    }));
+    const scrollToEnd = async () => {
+      await page.locator(scroller).evaluate(el => { el.scrollTop = el.scrollHeight; });
+      await page.waitForTimeout(300);
+    };
+    /** Tracks the anchors and every frame's scrollTop of the page under the sticky through `action`. */
+    const trackWithScroll = async (action: () => Promise<void>) => {
+      const anchors = await ANCHORS(page);
+      await page.locator(scroller).evaluate((el) => {
+        const w = window as any;
+        w.__scrollTops = [];
+        w.__scrollSampling = true;
+        const sample = () => {
+          if (!w.__scrollSampling) return;
+          w.__scrollTops.push(el.scrollTop);
+          requestAnimationFrame(sample);
+        };
+        sample();
+      });
+      const result = await trackAnchors(page, anchors, action);
+      const tops: number[] = await page.evaluate(() => {
+        const w = window as any;
+        w.__scrollSampling = false;
+        return w.__scrollTops;
+      });
+      expectAnchorsStill(result);
+      const drift = Math.max(...tops) - Math.min(...tops);
+      expect(drift, `${scroller} scrollTop moved ${tops[0]} → ${tops[tops.length - 1]}`).toBeLessThanOrEqual(1);
+    };
+
+    // The reply streams in and completes over a page scrolled to its end...
+    await scrollToEnd();
+    await trackWithScroll(async () => {
+      await sendNote(page, 'tell me about it');
+      await expect(page.locator('#page-margin')).toContainText('Line 3 of a long reply', { timeout: 10000 });
+      await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
+    });
+    // ...and is dismissed with the page scrolled to its new end, the sticky's clearance included
+    await scrollToEnd();
+    await trackWithScroll(async () => {
+      await page.locator('#page-margin .note-dismiss').click();
+      await expect(page.locator('#page-margin')).toBeHidden();
+    });
+  });
+
   test('refreshing the recipe', async ({ page }) => {
     const recipe = await openCookingRecipe(page);
     if (isPhone(page)) await openTab(page, 'method');
@@ -215,6 +286,38 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     expect(dTop, `#timer-widget top moved ${dTop.toFixed(1)}px at zero`).toBeLessThanOrEqual(1);
   });
 
+  test("starting a timer from a step's duration", async ({ page }) => {
+    const recipe = await createCookingRecipe(page, { durations: { 3: 8, 4: 2 } });
+    await openRecipe(page, recipe.id);
+    if (!isPhone(page)) await selectMode(page, 'cook');
+    if (isPhone(page)) {
+      await openTab(page, 'method');
+      await page.waitForTimeout(400); // the tab crossfade holds the animation lock
+    }
+    const chip = (n: number) => page.locator(`#page-right-content .prep-step[data-step="${n}"] .step-duration`);
+    await chip(3).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const anchors = await ANCHORS(page);
+
+    const result = await trackAnchors(page, anchors, async () => {
+      await chip(3).click();
+      await expect(page.locator('#timer-widget .timer-label')).toHaveText('Step 3');
+      await chip(4).click();
+      await expect(page.locator('#timer-widget .timer-label')).toHaveText('Tap again to replace');
+      await chip(4).click();
+      await expect(page.locator('#timer-widget .timer-label')).toHaveText('Step 4');
+    });
+
+    expectAnchorsStill(withoutAnchor(result, 'timer-widget'));
+    const frames = result['timer-widget'].frames.filter(f => f.shown);
+    expect(frames.length, 'timer pill never shown').toBeGreaterThan(0);
+    const base = frames[0];
+    const drift = Math.max(...frames.map(f => Math.max(
+      Math.abs(f.x - base.x), Math.abs(f.y - base.y),
+      Math.abs(f.width - base.width), Math.abs(f.height - base.height))));
+    expect(drift, `#timer-widget moved ${drift.toFixed(1)}px`).toBeLessThanOrEqual(1);
+    await page.locator('.timer-cancel').click();
+  });
+
   test('ticking an ingredient and marking a step', async ({ page }) => {
     // Red on 9f28329 (no anchor moved, but data-ticked was never set); fixed in group 8 (D10).
     const recipe = await openCookingRecipe(page);
@@ -256,5 +359,38 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     });
     expectAnchorsStill(stepResult);
     await expect(page.locator(stepSel)).toHaveAttribute('aria-current', 'step');
+
+    // "Clear ticks" then "Undo" moves no anchor, nor the header and its lines
+    if (isPhone(page)) {
+      await openTab(page, 'ingredients');
+      await expect.poll(() => page.evaluate(async () => {
+        // @ts-ignore - module path served by the app
+        const M = await import('/static/page-transitions.js');
+        return M.isAnimating();
+      })).toBe(false);
+    }
+    const headerSel = '.tab-panel[data-tab="ingredients"] .section-header:visible';
+    const clear = page.locator(`${headerSel} .clear-ticks`);
+    await clear.scrollIntoViewIfNeeded();
+    const clearAnchors = [
+      ...(await ANCHORS(page)),
+      { name: 'ingredients-header', selector: await page.locator(headerSel).evaluate(el => {
+        el.setAttribute('data-layout-probe', 'header');
+        return '[data-layout-probe="header"]';
+      }) },
+      { name: 'ingredient-0', selector: await page.locator('.ingredient-item:visible').first().evaluate(el => {
+        el.setAttribute('data-layout-probe', 'first-ingredient');
+        return '[data-layout-probe="first-ingredient"]';
+      }) },
+      { name: 'tapped-ingredient', selector: '[data-layout-probe="ingredient"]' },
+    ];
+    const clearResult = await trackAnchors(page, clearAnchors, async () => {
+      await clear.click();
+      await expect(clear).toHaveText('Undo');
+      await clear.click();
+      await expect(clear).toHaveText('clear ticks');
+    });
+    expectAnchorsStill(clearResult);
+    await expect(tappedIngredient).toHaveAttribute('data-ticked', 'true');
   });
 });

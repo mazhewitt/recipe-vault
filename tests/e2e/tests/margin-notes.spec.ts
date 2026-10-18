@@ -1,5 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, expectHitArea, threadEntries, isTablet, paceChat, useContentsMode } from './helpers';
+import {
+  authenticate, createRecipe, expectHitArea, threadEntries, isTablet, paceChat, useContentsMode,
+  createCookingRecipe, isPhone, openNotesView, openTab, notesThread, ANCHORS, trackAnchors, expectAnchorsStill,
+} from './helpers';
 
 /**
  * These cover the reply sticky (#page-margin) of the wide layout, where it sits
@@ -544,5 +547,241 @@ test.describe('Margin notes', () => {
     // The turn really happened (and landed on the recipe page)
     await expect(page.locator('.recipe-title')).toBeVisible({ timeout: 10000 });
     expect(pinned, 'index-mode turn must not pin #page-right-content').toEqual([]);
+  });
+});
+
+/**
+ * web-chat › The Notes thread follows the conversation. The thread is on screen
+ * in notes mode above 600px (#page-left scrolls) and on the phone's Notes tab
+ * (#page-right scrolls).
+ */
+test.describe('The Notes thread follows the conversation', () => {
+  /** A reply of `lines` paragraphs, one chunk per line. */
+  function replyBody(tag: string, lines: number): string {
+    let body = '';
+    for (let i = 1; i <= lines; i++) {
+      body += `event: chunk\ndata: ${JSON.stringify({ text: `${tag} line ${i} of the reply, long enough to wrap now and then.\n\n` })}\n\n`;
+    }
+    return body + `event: done\ndata: {"conversation_id":"follow-${tag}"}\n\n`;
+  }
+
+  /**
+   * Answers every /api/chat with a `lines`-line reply. With `hold`, each answer
+   * waits for `release()`.
+   */
+  async function routeReplies(page: Page, hold = false) {
+    // Short enough on the narrow phone page to be seen whole above its footer
+    const lines = isPhone(page) ? 5 : 10;
+    let n = 0;
+    const held: Array<() => void> = [];
+    await page.route('**/api/chat', async route => {
+      n++;
+      const tag = `R${n}`;
+      if (hold) await new Promise<void>(res => held.push(res));
+      await route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: replyBody(tag, lines) });
+    });
+    return { release: () => { while (held.length) held.shift()!(); } };
+  }
+
+  const container = (page: Page) => page.locator(isPhone(page) ? '#page-right' : '#page-left');
+
+  async function sendAndFinish(page: Page, text: string) {
+    const replies = async () => (await threadEntries(page)).filter(n => n.kind === 'reply').length;
+    const before = await replies();
+    await send(page, text);
+    await expect.poll(replies, { timeout: 15000 }).toBe(before + 1);
+    await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 15000 });
+  }
+
+  /** Where the last entry sits against the container's visible box and the slip. */
+  function geometry(page: Page) {
+    return page.evaluate((phone) => {
+      const box = document.getElementById(phone ? 'page-right' : 'page-left')!;
+      const entries = box.querySelectorAll('.notes-thread .thread-note');
+      const last = entries[entries.length - 1] as HTMLElement | undefined;
+      const b = box.getBoundingClientRect();
+      const input = document.getElementById('note-input')!.getBoundingClientRect();
+      const visibleBottom = Math.min(b.bottom, input.top);
+      const l = last ? last.getBoundingClientRect() : null;
+      return {
+        scrollTop: box.scrollTop,
+        overflow: box.scrollHeight - box.clientHeight,
+        lastTop: l ? l.top : 0,
+        lastBottom: l ? l.bottom : 0,
+        lastText: last ? last.innerText : '',
+        boxTop: b.top,
+        visibleBottom,
+        inputTop: input.top,
+      };
+    }, isPhone(page));
+  }
+
+  function expectLastWhollyVisible(g: Awaited<ReturnType<typeof geometry>>, what: string) {
+    // A reply taller than the visible box cannot be wholly in it: its end is what shows
+    if (g.lastBottom - g.lastTop <= g.visibleBottom - g.boxTop) {
+      expect(g.lastTop, `${what}: last entry starts above the container`).toBeGreaterThanOrEqual(g.boxTop - 0.5);
+    }
+    expect(g.lastBottom, `${what}: last entry ends below the visible box`).toBeLessThanOrEqual(g.visibleBottom + 0.5);
+    expect(g.lastBottom, `${what}: last entry is under the slip`).toBeLessThanOrEqual(g.inputTop + 0.5);
+  }
+
+  /**
+   * Records, after every update of the thread, how far the last entry's bottom
+   * is from the container's visible bottom, and the container's scrollTop.
+   */
+  async function recordUpdates(page: Page) {
+    await page.evaluate((phone) => {
+      const box = document.getElementById(phone ? 'page-right' : 'page-left')!;
+      const w = window as any;
+      w.__followLog = [];
+      const obs = new MutationObserver(() => {
+        const entries = box.querySelectorAll('.notes-thread .thread-note');
+        const last = entries[entries.length - 1];
+        if (!last) return;
+        const input = document.getElementById('note-input')!.getBoundingClientRect();
+        const visibleBottom = Math.min(box.getBoundingClientRect().bottom, input.top);
+        w.__followLog.push({
+          gap: visibleBottom - last.getBoundingClientRect().bottom,
+          scrollTop: box.scrollTop,
+          overflows: box.scrollHeight > box.clientHeight,
+          end: box.scrollHeight - box.scrollTop - box.clientHeight,
+        });
+      });
+      obs.observe(box, { childList: true, subtree: true, characterData: true });
+      w.__followObs = obs;
+    }, isPhone(page));
+  }
+
+  async function updates(page: Page): Promise<Array<{ gap: number; scrollTop: number; overflows: boolean; end: number }>> {
+    return page.evaluate(() => {
+      const w = window as any;
+      w.__followObs.disconnect();
+      return w.__followLog;
+    });
+  }
+
+  /** A recipe open with the thread on screen and longer than its container. */
+  async function longThread(page: Page) {
+    const r = await createCookingRecipe(page);
+    await openRecipe(page, r.id);
+    await openNotesView(page);
+    for (const t of ['one', 'two', 'three']) await sendAndFinish(page, `note ${t}`);
+    const g = await geometry(page);
+    expect(g.overflow, 'the seeded thread overflows its container').toBeGreaterThan(200);
+    return r;
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  test('the cook\'s own note scrolls into view', async ({ page }) => {
+    const chat = await routeReplies(page, true);
+    // The seeding replies are released as they come
+    const releaser = setInterval(() => chat.release(), 50);
+    await longThread(page);
+    clearInterval(releaser);
+    await container(page).evaluate(el => { el.scrollTop = 0; });
+
+    await send(page, 'and now?');
+    await expect(notesThread(page).locator('.thread-note').last()).toHaveAttribute('data-kind', 'status');
+    expectLastWhollyVisible(await geometry(page), 'after the send');
+    chat.release();
+    await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 15000 });
+  });
+
+  test('a reply arriving is followed while pinned, through four sends', async ({ page }) => {
+    await routeReplies(page);
+    const r = await createCookingRecipe(page);
+    await openRecipe(page, r.id);
+    await openNotesView(page);
+    await paceChat(page, 150);
+    for (let i = 1; i <= 4; i++) {
+      await recordUpdates(page);
+      await sendAndFinish(page, `question ${i}`);
+      const log = await updates(page);
+      expect(log.length).toBeGreaterThan(3);
+      for (const [k, u] of log.entries()) {
+        // "Pinned" only means something once the thread is longer than its page
+        if (!u.overflows) continue;
+        expect(u.gap, `send ${i}, update ${k}: last entry below the visible bottom`).toBeGreaterThanOrEqual(-0.5);
+        expect(u.end, `send ${i}, update ${k}: container not pinned`).toBeLessThanOrEqual(48);
+        // On the phone the recipe's prev/next footer sits under the thread, so
+        // the end of the page is that far below the last entry
+        if (!isPhone(page)) expect(u.gap, `send ${i}, update ${k}: last entry not pinned`).toBeLessThanOrEqual(48);
+      }
+      const g = await geometry(page);
+      expect(g.lastText).toContain(`R${i} line ${isPhone(page) ? 5 : 10}`);
+      expectLastWhollyVisible(g, `after send ${i}`);
+    }
+  });
+
+  test('reading earlier notes is not interrupted', async ({ page }) => {
+    const chat = await routeReplies(page, true);
+    const releaser = setInterval(() => chat.release(), 50);
+    await longThread(page);
+    clearInterval(releaser);
+    await paceChat(page, 150);
+
+    await send(page, 'one more');
+    await expect(notesThread(page).locator('.thread-note').last()).toHaveAttribute('data-kind', 'status');
+    // The cook scrolls up to read, then the reply streams in
+    const top = await container(page).evaluate(el => { el.scrollTop = Math.max(0, el.scrollTop - 200); return el.scrollTop; });
+    await recordUpdates(page);
+    chat.release();
+    await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 15000 });
+    const log = await updates(page);
+    expect(log.length).toBeGreaterThan(3);
+    for (const u of log) expect(Math.abs(u.scrollTop - top)).toBeLessThanOrEqual(1);
+    expect(Math.abs((await geometry(page)).scrollTop - top)).toBeLessThanOrEqual(1);
+  });
+
+  test('opening the thread shows the newest entry', async ({ page }) => {
+    await routeReplies(page);
+    await longThread(page);
+    // Read from the top, leave the thread, and talk from elsewhere
+    await container(page).evaluate(el => { el.scrollTop = 0; });
+    if (isPhone(page)) await openTab(page, 'ingredients');
+    else {
+      await expect(async () => {
+        await page.locator('.spread-tab[data-mode="cook"]').click();
+        await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook', { timeout: 1000 });
+      }).toPass({ timeout: 15000 });
+    }
+    await sendAndFinish(page, 'from the stove');
+
+    // The page turn or tab crossfade must let go before the tap counts
+    await expect.poll(() => page.evaluate(async () => {
+      // @ts-ignore - module path served by the app
+      const M = await import('/static/page-transitions.js');
+      return M.isAnimating();
+    })).toBe(false);
+    await openNotesView(page);
+    await expect.poll(async () => (await geometry(page)).lastText).toContain(`R4 line ${isPhone(page) ? 5 : 10}`);
+    expectLastWhollyVisible(await geometry(page), 'on opening');
+  });
+
+  test('phone: the first opening of the Notes tab shows the newest entry', async ({ page }) => {
+    test.skip(!isPhone(page), 'the Notes tab is the phone\'s');
+    await routeReplies(page);
+    const r = await createCookingRecipe(page);
+    await openRecipe(page, r.id);
+    for (const t of ['one', 'two', 'three']) await sendAndFinish(page, `note ${t}`);
+    await openNotesView(page);
+    await expect.poll(async () => (await geometry(page)).lastText).toContain(`R3 line ${isPhone(page) ? 5 : 10}`);
+    expectLastWhollyVisible(await geometry(page), 'first opening');
+  });
+
+  test('following the thread moves nothing else', async ({ page }) => {
+    await routeReplies(page);
+    await longThread(page);
+    await paceChat(page, 150);
+    const anchors = (await ANCHORS(page)).filter(a => isPhone(page) ? !a.selector.startsWith('#page-right-content') : true);
+    const before = (await geometry(page)).scrollTop;
+    const result = await trackAnchors(page, anchors, async () => {
+      await sendAndFinish(page, 'does it move?');
+    });
+    expectAnchorsStill(result);
+    expect((await geometry(page)).scrollTop, 'the thread did follow').toBeGreaterThan(before);
   });
 });

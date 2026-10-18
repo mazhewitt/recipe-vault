@@ -100,7 +100,8 @@ Load via Google Fonts: `Kalam:wght@300;400;700` and `Libre+Baskerville:ital,wght
 | Section Tab | Kalam | 14px (edge) / 16px (paper) | 400 | 1 | ink-dark |
 | Contents Filter Tab | Kalam | 14px (edge) / 15px (chip) | 400 | 1 | per tab (see Index View) |
 | Recipe Tag Chip | Kalam | 12px | 400 | 1 | ink-light |
-| Timer Display | Kalam | 18px, tabular numerals | 400 | 1 | ink-dark (leather when done) |
+| Timer Label | Kalam | 16px | 400 | 1 | ink-dark (cream on leather when done) |
+| Timer Time | Kalam | 26px, tabular numerals | 400 | 1 | ink-dark (cream on leather when done) |
 
 **Contrast rule:** on paper, nothing under 16px may be lighter than `--color-ink-light` (`#6b5a4a`). `--color-ink-muted` (`#8a7a60`) is decorative only (separators, disabled letters).
 
@@ -120,7 +121,7 @@ On mobile (≤ 600px) the reading text stays large and the chrome comes down:
 | Notes Thread | 15px | 15px |
 | Meta Line | 15px | 14px |
 | Book Label (`#recipe-book-header`) | 22px | 16px |
-| Timer Display | 18px | 14px |
+| Timer Label / Time | 16px / 26px | 14px / 22px |
 | Note Page Number | 13px | 12px |
 | User Email / Logout | 14px / 13px | 12px |
 
@@ -318,9 +319,9 @@ The book fills the screen and shows one page at a time; the note input becomes a
 | `.book-cover` | Flush (`top/left/right/bottom: 0`), `border-radius: 0`, no shadow; the leather texture (`::before`) and spine shadow (`::after`) are hidden |
 | `.pages-container` | `margin: 40px 4px 4px` — the 40px is a leather strip above the paper |
 | `#recipe-book-header` | Re-shown while generic `.section-label` stays hidden: `position: absolute; top: 0; left: 2px; padding: 0 12px`, a 44px-tall line (`min-height`/`line-height: 44px`) so the text sits where it did on the 40px strip, Kalam 16px, z-index 11. The hit area is the label plus its padding, never the strip's full width. Tapping it is the way back to the contents. |
-| `.timer-widget` | `top: 8px; right: 8px`, 30px tall, `width: min(200px, calc(100% - 130px))`, z-index 11 — the opposite end of the same strip, which has no arrow |
+| `.timer-widget` | `top: 8px; right: 8px`, 44px tall, `width: min(200px, calc(100% - 130px))`, z-index 11 — the opposite end of the same strip, which has no arrow |
 | `.app-container` | `width: 100%`, so a skeleton or a refresh can never change the book's width |
-| `.user-info` | Shown on the contents page only (`body:not([data-view-mode="index"]) .user-info { display: none }`) |
+| `.user-info` | Shown on the contents page only (`body:not([data-view-mode="index"]) .user-info { visibility: hidden }`): the chip keeps its slot, so opening a recipe and going back to the contents move `.book-container` 0px. Out of flow it would lie over the Recipe Book label and the timer pill |
 | `.page-left`, `.page-right` | `width: 100% !important`, `padding: 16px`, no radius, no shadow; the binding shadows `.page-left::after` / `.page-right::before` are hidden |
 | `.page-content` | `padding-top: 10px` |
 | `.page-nav` | Hidden — the gutter chevrons in the tab row take over |
@@ -428,6 +429,7 @@ There is exactly one `<form class="note-input">` in the document in every mode, 
 | `.note-send` | 44 × 44px, filled `--color-leather` with a `--color-paper-cream` glyph |
 | `.clipboard-button` | Raised to 44 × 44px |
 | `.note-page-number` | 12px |
+| `.note-send[aria-disabled="true"]` | During a turn: `opacity: 0.45`, `cursor: not-allowed`, and a hover keeps the leather fill, so it never looks ready |
 
 ### Controls
 
@@ -436,7 +438,8 @@ There is exactly one `<form class="note-input">` in the document in every mode, 
 | `.note-pencil` | 16px SVG, `--color-ink-muted`, decorative (`aria-hidden`) |
 | `.note-textarea` | Kalam 16px / 1.4, `--color-ink-dark`, transparent, borderless except a 1px `--color-border-light` bottom rule that darkens to `--color-ink-medium` on focus; `resize: none`, `min-height: 34px`, `max-height: 140px` — `rows="1"` plus the auto-resize handler in `app.js` |
 | `.clipboard-button`, `.note-send` | 40 × 40px, white face, 2px `--color-border`, `--radius-sm`; hover fills `--color-paper-aged-light`; `:active` scales to 0.95 |
-| `.note-page-number` | Kalam 13px, `--color-ink-muted`, `p. N` — cosmetic; `recipe-display.setNotePageNumber()` is its only writer |
+| `.note-page-number` | Kalam 13px, `--color-ink-muted`, `p. N` — cosmetic; `recipe-display.setNotePageNumber()` is its only writer. **Not displayed at 601–1024px**: the tablet slip is a narrow column, and its room goes to the textarea (the contents and the footer already give the page) |
+| `.note-send[aria-disabled="true"]` | While a turn is in flight: `opacity: 0.45`, `cursor: not-allowed`, no hover fill and no `:active` scale. The follow-up stays in the textarea and is not sent when the turn ends |
 | `.image-attachment` | Aged-paper chip. It is toggled with the `hidden` attribute, so `.image-attachment[hidden] { display: none !important }` is required to beat the author `display: flex` |
 | `.loading` | `display: none` until `.active`; a 14px spinner plus `#loading-text` |
 | `.paste-error` | Inserted as the form's first child by `app.js showError()` and removed after 3s |
@@ -508,8 +511,8 @@ The desktop strip shows only the first two, and only as ribbons (below). Notes i
 | z-index | 9 — below `.page-nav` (10) and the timer pill (11) |
 | Stack | Flex column, 6px gap |
 | `.edge-tab` | `writing-mode: vertical-rl`, 26px wide, `min-height: 92px`, `padding: 10px 4px`, Kalam 14px, `border-radius: 0 var(--radius-sm) var(--radius-sm) 0`, `box-shadow: 2px 2px 5px rgba(0,0,0,0.25)` |
-| Colors | Ingredients: `--color-border` face, `--color-ink-dark` text; Method: `--color-accent-brown` face, cream text; Notes (phone `.page-tab` only): `--color-leather` face, cream text |
-| Inert | `aria-hidden="true"` and `tabindex="-1"` in `chat.html`; `pointer-events: none`; no hover, focus or pressed styling, and none is drawn as active |
+| Colors | Both ribbons the same plain `--color-border` face with no text (the buttons are empty in `chat.html`), so neither reads as the selected tab; Notes (phone `.page-tab` only): `--color-leather` face, cream text |
+| Inert | `aria-hidden="true"` and `tabindex="-1"` in `chat.html`; `pointer-events: none`; no hover, focus or pressed styling. They carry no `aria-selected`, and `page-tabs.js` `setActiveTab` skips `.edge-tab`, so none ever gets `active` |
 | Visibility | `display: none` in the base sheet; `display: flex` only inside `@media (min-width: 601px)` under `body[data-view-mode="recipe"]`, in every spread mode |
 
 Above 600px a spread mode always applies and the right page is fixed (title, meta, method), so there is nothing for the strip to switch: it is the book's furniture — an empty edge reads as a missing page — and reads as bookmark ribbons, not controls. They are exempt from the 44px rule because they are not controls. The phone's `.page-tabs` are unaffected.
@@ -658,10 +661,10 @@ A cream pill clipped to the top edge of the recipe book cover, **centred over th
 | Property | Desktop / Tablet | Mobile (≤ 600px) |
 |----------|------------------|------------------|
 | Position | `absolute; top: -10px; left: 50%; transform: translateX(-50%)` (just above the cover's top rim, over the spine) | `top: 8px; right: 8px; left: auto; transform: none` (inside the frame, which clips overflow on phones; the strip has no arrow) |
-| Width | Fixed per state: `.timer-time` has `min-width: 5ch` and tabular numerals, so a tick never changes it | `width: min(200px, calc(100% - 130px))`; a long label ellipsizes |
-| Height | 36px | 30px |
+| Width | `280px`, one width in every state (running, Done, "Tap again to replace"), so its centre and edges never move; a long label ellipsizes | `width: min(200px, calc(100% - 130px))`, likewise in every state |
+| Height | 48px | 44px |
 | Padding | `4px 8px 4px 14px` | `2px 6px 2px 10px` |
-| Text | Kalam 18px / 400, `"{label}: M:SS"`; at zero `"Done — {label}"` | Kalam 14px |
+| Text | Two spans in `.timer-text`: `.timer-label` (Kalam 16px, `flex: 1 1 auto`, ellipsizes) and `.timer-time` (26px, tabular numerals, right-aligned, `flex: none`). No text sits between them; the " · " is the time's `::before`, drawn in its 18px left margin, so the pill reads "Step 2 · 7:42". The label is "Step N" for a step's timer, "Step N · {label}" for an assistant timer on step N, "{label}" with no step. At zero `"Done · {label}"`, no time | Label 14px, time 22px with a 14px margin |
 | Clock icon | 18px | 14px |
 | Close target | 28 × 28px visual, a 46 × 46px transparent `::before` hit area | Same |
 | Background / border | `--color-paper-cream`, `2px solid --color-ink-dark`, `--radius-pill`, `--shadow-soft` | Same |
@@ -669,7 +672,13 @@ A cream pill clipped to the top edge of the recipe book cover, **centred over th
 
 Contents in order: clock icon, `.timer-text`, `.timer-cancel` (circular hover/focus tint). The pill is `display: none` when no timer runs.
 
-**Finishing.** At zero the pill switches to `data-state="done"` — "Done — {label}" with the border, text and icon in `--color-leather` — and **stays until tapped**. A three-note chime plays through Web Audio (oscillators, no asset); the `AudioContext` is created on the first pointer or key gesture in the page, because browsers refuse audio before one. `navigator.vibrate([200,100,200])` fires where it exists, and the `Notification` is still shown when permission was granted. If audio is unavailable the visual "Done" still shows. The step highlight is removed at zero.
+**Running.** `data-state="running"` has `cursor: pointer`: tapping the pill (not its ✕) scrolls the timer's step into view when its recipe is open (only `#page-right.scrollTop` changes; on the phone it first switches to the Method tab), or opens the timer's recipe the way a contents row does and then scrolls to the step.
+
+**Finishing.** At zero the pill switches to `data-state="done"` — "Done · {label}", filled `--color-leather` with the text, ✕ and icon in `--color-paper-cream` — pulses (`timer-done-pulse`, 1.6s, a box-shadow ring only, so its box never changes; off under `prefers-reduced-motion`) and **stays until tapped**. The chime and vibration repeat every 15s until the pill is tapped, cancelled or replaced, and stop by themselves 5 minutes after zero (the pill stays). A three-note chime plays through Web Audio (oscillators, no asset); the `AudioContext` is created on the first pointer or key gesture in the page, because browsers refuse audio before one. `navigator.vibrate([200,100,200])` fires where it exists, and the `Notification` is still shown when permission was granted. If audio is unavailable the visual "Done" still shows. The step highlight is removed at zero.
+
+### Step Duration Buttons
+
+A step's "N min" is a `<button type="button" class="step-duration" data-minutes="N">` (`recipe-display.js`), labelled "Start a N minute timer for step S". It keeps the chip look the span had (`--color-paper-aged` face, `--color-ink-medium` text, 15px, `2px 6px` padding, 3px radius, no border, `font: inherit`), so the step's box is unchanged; it adds `cursor: pointer` and the 46px `::before` hit area. Tapping it starts a local timer for that step ("Step S"). While any timer runs, the first tap only asks: the pill reads "Tap again to replace" (same width) for 4 seconds and the button carries `data-confirm`; a second tap on the same step of the same recipe within that time replaces the timer. A duration tap never marks the step.
 
 ### Step Highlight Band
 
@@ -682,7 +691,8 @@ When a timer carries a `step_number`, the matching `.prep-step[data-step="N"]` o
 | Box | **Unchanged** — no padding, margin or border is added, so the step's `getBoundingClientRect()` is identical with and without the highlight and nothing below it moves |
 | Edge | `box-shadow: inset 3px 0 0 var(--color-border), inset 0 0 0 1px rgba(201,168,108,0.5)` |
 | Clock mark | A 14px clock SVG as a `background-image` in the number gutter, under the step number |
-| Label | `::before` "timer running", absolutely positioned and written up the page's left margin, so it adds no line. (`::after` is the place-keeping bracket.) |
+| Label | `::before` "timer running", absolutely positioned and written up the page's left margin, so it adds no line. (`::after` is the place-keeping step mark.) |
+| With the step mark | `.prep-step.timer-active[aria-current="step"]` keeps the band as its background; the mark's bar stands outside the tag |
 | Motion | None — the band appears without animation, so `prefers-reduced-motion` needs no override |
 
 The highlight is re-applied whenever the same recipe is rendered again, never shown on another recipe, and cleared when the timer completes or is cancelled.
@@ -704,6 +714,7 @@ Every thread entry records the recipe that was open when its turn began, stamped
 | Dismiss | `.note-dismiss` ✕, a 48 × 48px button, `position: sticky; top: 0` so it stays in reach while a long reply scrolls under it | Same |
 | Hidden | `.page-margin:empty`; in `notes` mode, where the whole thread is on the same page above the slip | On the Notes tab (`:has(#page-right[data-tab="notes"])`) |
 | Layout effect | None: it overlays the foot of the page, so nothing moves when it appears, grows or goes | Same |
+| Foot clearance | `margin-notes.js` publishes `--sticky-clearance` on the book (the sticky's height plus its gap above the slip; `0px` with no sticky, in `notes` mode and on the phone Notes tab). `.page-left` adds it to its bottom padding, so with the page scrolled to its end the last ingredient and the last contents row lie above the sticky. Padding at the foot only, so nothing above moves. It never shrinks while the view lasts (a dismissal at scroll end cannot clamp `scrollTop`), and starts from 0 for a different recipe, the contents, a spread mode change or a phone tab | `#page-right` adds it (`padding-bottom: calc(16px + var(--sticky-clearance))`), so the footer's previous/next links scroll clear of the sticky |
 
 **What it holds** — at most one note:
 - While a turn runs, the **in-flight line**: "Thinking…", then a friendly label per tool (`chat.js` `statusLabelFor`: "Setting a timer…", "Opening the recipe…", "Updating the recipe…", "Writing it into the book…", "Looking through the book…", "Laying out the meal…", "Looking it up…", otherwise "Working on it…"), then the reply text as it streams. The in-flight line is never stored in the thread; in `notes` mode it is the thread's last, unstored entry instead.
@@ -773,6 +784,8 @@ Every control the cook taps has a hit area of at least **44px x 44px**, at every
 | Share / photo | 44px icon buttons at the end of the meta line | 46px `::before` | Same |
 | Send / clipboard | 44 × 44px | 46px `::before` | 44 × 44px |
 | Timer close | 28 × 28px | 46px `::before` | Same |
+| Step duration | `.step-duration` button, the chip's 57 × 29px | 46px `::before` | Same |
+| Clear ticks / Undo | `.clear-ticks` 72 × 14px | 46px `::before` | Same |
 | Reply sticky ✕ | `.note-dismiss` 48 × 48px | Its own box | Same |
 | Phone footer links | n/a | 46px `::before` | min-height 44px |
 | Index recipe items | `padding: 4px 8px` | — | `padding: 8px 10px`, `min-height: 44px` |
@@ -789,8 +802,8 @@ Known gaps, owned elsewhere: the A-Z letters (`scratch:contents-page-rough-edges
 | Mark | How | Look |
 |------|-----|------|
 | Ingredient tick | Tap an `.ingredient-item[data-index]`; tap again to untick | `data-ticked="true"`: struck through in `--color-pencil`, `opacity: 0.55`, and a pencil ✓ (`::before`, Kalam 15px) in the margin left of the line |
-| "You are here" | Tap a `.prep-step[data-step]`; one step at a time, tap again to clear | `aria-current="step"`: a 5px pencil bracket (`::after`) down the step's left margin. With a timer on the same step it stands further out, so both show |
-| Clear | "clear ticks" link (`.clear-ticks`, Kalam 14px, `--color-biro`), absolutely placed in the ingredients header, shown only when something is set | Clears the ticks and the step mark |
+| "You are here" | Tap a `.prep-step[data-step]`; one step at a time, tap again to clear. A tap on the step's duration button does not mark it (buttons inside a line keep their own job) | `aria-current="step"`: a 4px `--color-leather` bar (`::after`, `left: -10px`) down the step's left margin and a faint warm tint (`rgba(139, 45, 26, 0.07)`, `--radius-sm`) behind the step, no box change. With a timer on the same step the bar stands further out (`left: -21px`; phone `-16px`), so both show |
+| Clear | "clear ticks" link (`.clear-ticks`, Kalam 14px, `--color-biro`, a fixed 72px width, right-aligned), absolutely placed in the ingredients header, with a 46px `::before` hit area; shown only while something is ticked | Clears the **ticks only**; the step mark stays (clear it by tapping the step). For 6 seconds the link reads "Undo" (same box) and a tap restores the cleared ticks; a new tick ends the chance |
 
 - Held per recipe id in `sessionStorage['rv-place:<id>']`, so they survive a reload and paging away and back.
 - `click`, never `touchstart`, so a scroll that starts on a line does not tick it. Buttons and links inside a line keep their own job.

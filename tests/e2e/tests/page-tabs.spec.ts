@@ -247,6 +247,36 @@ test.describe('Page tabs', () => {
       await expect(page.locator('#page-right')).toHaveAttribute('data-tab', tabBefore!);
     }
 
+    // Ribbons render on a recipe: plain ribbons, alike, without text, where they
+    // were (measured on e35a58c: 26x92, 12px in from the right page's outer
+    // edge, at 70px and 168px below its top)
+    const ribbons = await page.evaluate(() => {
+      const pr = document.getElementById('page-right')!.getBoundingClientRect();
+      return [...document.querySelectorAll<HTMLElement>('.edge-tab')]
+        .filter(el => getComputedStyle(el).display !== 'none')
+        .map(el => {
+          const cs = getComputedStyle(el);
+          const b = el.getBoundingClientRect();
+          return {
+            tab: el.dataset.tab,
+            text: el.innerText,
+            active: el.classList.contains('active'),
+            selected: el.getAttribute('aria-selected'),
+            look: [cs.backgroundColor, cs.width, cs.transform, cs.boxShadow].join(' | '),
+            rect: [b.x - pr.right, b.y - pr.top, b.width, b.height],
+          };
+        });
+    });
+    expect(ribbons.map(r => r.tab)).toEqual(['ingredients', 'method']);
+    const expected: Record<string, number[]> = { ingredients: [-12, 70, 26, 92], method: [-12, 168, 26, 92] };
+    for (const r of ribbons) {
+      expect(r.text, `${r.tab} ribbon text`).toBe('');
+      expect(r.active, `${r.tab} ribbon is drawn active`).toBe(false);
+      expect(r.selected).not.toBe('true');
+      r.rect.forEach((v, i) => expect(Math.abs(v - expected[r.tab!][i]), `${r.tab} ribbon rect[${i}]`).toBeLessThanOrEqual(1));
+    }
+    expect(ribbons[0].look).toBe(ribbons[1].look);
+
     // Keyboard focus never lands on a ribbon
     for (let i = 0; i < 40; i++) {
       await page.keyboard.press('Tab');
@@ -366,8 +396,11 @@ test.describe('Page tabs', () => {
     // Only this assertion separates the reset from chat.html's static markup:
     // the tab was demonstrably 'method' one line earlier
     await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
-    await expect(page.locator(tabSelector(page, 'ingredients'))).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator(tabSelector(page, 'method'))).toHaveAttribute('aria-selected', 'false');
+    // The paper tabs carry the selection; the wide layout's edge ribbons are
+    // plain page edges and never show one
+    await expect(page.locator('.page-tab[data-tab="ingredients"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.page-tab[data-tab="method"]')).toHaveAttribute('aria-selected', 'false');
+    if (!isPhone(page)) await expect(page.locator('.edge-tab[aria-selected="true"], .edge-tab.active')).toHaveCount(0);
     // ...and the new recipe opens in cook mode, so above 600px the ingredients
     // are on the left page rather than the right
     const ingredientsPage = isPhone(page) ? '#page-right-content' : '#page-left-content';

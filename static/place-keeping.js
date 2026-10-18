@@ -8,12 +8,24 @@
  * styles draw them without touching any box, so nothing on the page moves.
  */
 
+/* global clearTimeout */
 import { isAnimating } from './page-transitions.js';
 
 const STORAGE_PREFIX = 'rv-place:';
 
 /** The recipe whose ticks the page is showing (set by applyPlace). */
 let placeRecipeId = null;
+
+/** How long "Clear ticks" offers "Undo" after a clear. */
+const UNDO_MS = 6000;
+
+/** The last clear, while it can be undone: { recipeId, ticked, timer }. */
+let pendingUndo = null;
+
+function dropUndo() {
+    if (pendingUndo) clearTimeout(pendingUndo.timer);
+    pendingUndo = null;
+}
 
 // --- Storage (every access guarded: storage can be unavailable) ---
 
@@ -70,8 +82,11 @@ function drawPlace(place, roots = placeRoots()) {
             if (Number(step.dataset.step) === place.step) step.setAttribute('aria-current', 'step');
             else step.removeAttribute('aria-current');
         });
+        // Shown only while something is ticked, or as "Undo" just after a clear
+        const undoable = pendingUndo != null && pendingUndo.recipeId === placeRecipeId;
         root.querySelectorAll('.clear-ticks').forEach(btn => {
-            btn.hidden = place.ticked.length === 0 && place.step == null;
+            btn.hidden = place.ticked.length === 0 && !undoable;
+            btn.textContent = undoable ? 'Undo' : 'clear ticks';
         });
     }
 }
@@ -105,9 +120,27 @@ function onClick(e) {
 
     const clear = target.closest('.clear-ticks');
     if (clear) {
+        if (pendingUndo && pendingUndo.recipeId === placeRecipeId) {
+            const restore = pendingUndo.ticked;
+            dropUndo();
+            update(place => {
+                place.ticked = restore;
+            });
+            return;
+        }
+        // Ticks only: the step mark is cleared by tapping the marked step
+        const cleared = readPlace(placeRecipeId).ticked;
+        dropUndo();
+        pendingUndo = {
+            recipeId: placeRecipeId,
+            ticked: cleared,
+            timer: setTimeout(() => {
+                pendingUndo = null;
+                if (placeRecipeId != null) drawPlace(readPlace(placeRecipeId));
+            }, UNDO_MS),
+        };
         update(place => {
             place.ticked = [];
-            place.step = null;
         });
         return;
     }
@@ -119,6 +152,8 @@ function onClick(e) {
     const item = target.closest('.ingredient-item[data-index]');
     if (item) {
         const index = Number(item.dataset.index);
+        // A new tick ends the chance to undo the last clear
+        dropUndo();
         update(place => {
             place.ticked = place.ticked.includes(index)
                 ? place.ticked.filter(i => i !== index)

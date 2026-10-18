@@ -56,6 +56,8 @@ function normalizeRecipeId(recipeId) {
  * @returns {object} The stored thread entry
  */
 export function addNote(text, kind = 'reply', recipeId = null) {
+    // The cook's own note brings an on-screen thread to its end
+    if (kind === 'user') followOwnSend = true;
     const note = {
         id: nextId++,
         kind,
@@ -285,6 +287,7 @@ function placeSticky() {
     }
     container.style.setProperty('--sticky-bottom', `${bottom}px`);
     container.style.setProperty('--sticky-max-height', `${maxHeight}px`);
+    updateStickyClearance(container, host);
 
     if (!placementObserved && typeof window.ResizeObserver !== 'undefined') {
         placementObserved = true;
@@ -293,6 +296,47 @@ function placeSticky() {
             ...document.querySelectorAll('.contents-tabs .contents-tab')]
             .forEach(el => { if (el) observer.observe(el); });
     }
+    if (!viewObserved && typeof window.MutationObserver !== 'undefined') {
+        viewObserved = true;
+        // A spread mode change or a phone tab switch draws a different view
+        // without re-rendering the sticky, and the clearance belongs to the view
+        const observer = new window.MutationObserver(() => placeSticky());
+        observer.observe(document.body, { attributes: true, attributeFilter: ['data-spread-mode', 'data-view-mode'] });
+        const pageRight = document.getElementById('page-right');
+        if (pageRight) observer.observe(pageRight, { attributes: true, attributeFilter: ['data-tab'] });
+    }
+}
+
+let viewObserved = false;
+// The foot clearance published for the view it was measured in
+let stickyClearance = 0;
+let clearanceView = null;
+
+/**
+ * Publishes --sticky-clearance on the book: the sticky's height plus its gap
+ * above the slip, which the page under the sticky adds to its foot padding so
+ * its last line can be scrolled clear. It never shrinks while the view lasts
+ * (a dismissal at scroll end would otherwise clamp scrollTop and move the
+ * page); a different recipe, the contents, a spread mode change or a phone tab
+ * starts it again from 0. The Notes views have no sticky, so no clearance.
+ */
+function updateStickyClearance(container, host) {
+    const phone = window.matchMedia('(max-width: 600px)').matches;
+    const pageRight = document.getElementById('page-right');
+    const phoneTab = phone && pageRight ? pageRight.dataset.tab : '';
+    const spreadMode = phone ? '' : document.body.dataset.spreadMode;
+    const view = [currentViewMode(), displayedRecipeId(), spreadMode, phoneTab, phone].join('|');
+    if (view !== clearanceView) {
+        clearanceView = view;
+        stickyClearance = 0;
+    }
+    const noSticky = spreadMode === 'notes'
+        || (phone && currentViewMode() === 'recipe' && phoneTab === 'notes');
+    if (!noSticky && window.getComputedStyle(container).display !== 'none') {
+        const height = container.getBoundingClientRect().height;
+        if (height > 0) stickyClearance = Math.max(stickyClearance, Math.ceil(height + STICKY_GAP));
+    }
+    host.style.setProperty('--sticky-clearance', `${noSticky ? 0 : stickyClearance}px`);
 }
 
 /**
@@ -306,11 +350,72 @@ function placeSticky() {
  */
 function refreshOpenThread() {
     const pageRight = document.getElementById('page-right');
+    const ownSend = followOwnSend;
+    followOwnSend = false;
     if (pageRight && pageRight.dataset.tab === 'notes') {
-        renderThread(document.querySelector('#page-right-content .notes-thread'));
+        followThread(document.querySelector('#page-right-content .notes-thread'), pageRight, ownSend);
     }
     const leftThread = document.querySelector('#page-left-content .notes-thread');
-    if (leftThread) renderThread(leftThread);
+    if (leftThread) followThread(leftThread, document.getElementById('page-left'), ownSend);
+}
+
+/** How close to its end (px) a thread's container counts as pinned. */
+const PIN_SLACK = 48;
+
+/** Set by the cook's own note: the next re-render scrolls to the end regardless. */
+let followOwnSend = false;
+
+/**
+ * Per thread (key as `dismissed`), the id of the newest entry the cook has had
+ * on screen in the phone's Notes tab: opening the tab again shows the newest
+ * entry only if something was added since.
+ */
+const seenOnTab = new Map();
+
+function newestId() {
+    const notes = threadForDisplayedRecipe();
+    return notes.length ? notes[notes.length - 1].id : 0;
+}
+
+function scrollToEnd(scroller) {
+    scroller.scrollTop = scroller.scrollHeight;
+}
+
+/**
+ * Re-renders an on-screen thread and keeps the newest entry in view: the
+ * container scrolls to its end if it was pinned (within PIN_SLACK of the end)
+ * just before the update, or the update is the cook's own send. A cook who
+ * has scrolled up to read is left where they are.
+ */
+function followThread(container, scroller, ownSend) {
+    if (!container) return;
+    if (!scroller) {
+        renderThread(container);
+        return;
+    }
+    const top = scroller.scrollTop;
+    const pinned = scroller.scrollHeight - top - scroller.clientHeight <= PIN_SLACK;
+    renderThread(container);
+    if (pinned || ownSend) scrollToEnd(scroller);
+    else scroller.scrollTop = top;
+    if (scroller.id === 'page-right') seenOnTab.set(threadKey(displayedRecipeId()), newestId());
+}
+
+/**
+ * Renders the thread into the phone's Notes tab as it opens. It shows the
+ * newest entry on the tab's first opening for this recipe, or when an entry
+ * was added since the tab was last left; otherwise the scroll is left to the
+ * tab's own saved position.
+ * @param {Element|null} container - `#page-right-content .notes-thread`
+ */
+export function openThreadTab(container) {
+    if (!container) return;
+    renderThread(container);
+    const key = threadKey(displayedRecipeId());
+    const newest = newestId();
+    const pageRight = document.getElementById('page-right');
+    if (pageRight && (!seenOnTab.has(key) || seenOnTab.get(key) !== newest)) scrollToEnd(pageRight);
+    seenOnTab.set(key, newest);
 }
 
 /**

@@ -44,3 +44,14 @@ On touch devices the send button keeps its `:hover` style after a tap. On the ta
 - Show a thumbnail inline in the input row instead of the MB text, so the slip's height does not change.
 - Disable send while the trimmed text is empty and no image is attached, and clear whitespace-only input on submit. steady-cooking-spread D4 adds `aria-disabled` to send while a turn runs, so share that mechanism.
 - Wrap the hover rules in `@media (hover: hover) and (pointer: fine)`.
+
+## 2026-10-18: the tablet slip still wraps a 40-character question
+
+glanceable-cooking (G4) hid the slip's page number at 601–1024px, which widened the textarea from 164px to 217px at 810×1080. The placeholder now fits, and a short question ("how long should it rest?") stays on one line. A 40-character question ("Can I swap the beef for lamb in this one?") still wraps and grows the slip by one line (61 → 75px), up to the three-line cap. 40 characters of 16px Kalam need about 300px.
+
+Options for the owner:
+- move the paperclip off the row on tablet (for example into the textarea's corner), which frees about 52px: still short of 40 characters, but it holds most kitchen questions;
+- let the slip run wider than the left page on tablet, which breaks steady-cooking-spread's "one home" at the foot of the left page;
+- accept the wrap: the slip is capped at three lines and grows upward only while the cook types, which is their own action.
+
+The lead's default, if nobody decides: accept the wrap.

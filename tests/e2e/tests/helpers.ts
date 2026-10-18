@@ -10,6 +10,7 @@ export interface Ingredient {
 export interface Step {
   step_number: number;
   instruction: string;
+  duration_minutes?: number;
 }
 
 export interface Recipe {
@@ -323,7 +324,7 @@ export type AnchorResult = Record<string, AnchorDeviation>;
 /**
  * The anchors of family-recipe-ui › Nothing on the page moves unless the cook
  * acted on it. M is the mid-method step, ceil(steps ÷ 2), counted from the
- * displayed recipe. Anchors that are not displayed when tracking starts (the
+ * displayed recipe; `.book-container` is one at ≤600px. Anchors that are not displayed when tracking starts (the
  * timer pill before a timer, the mid step on the phone's Ingredients tab) are
  * judged from the first frame they are shown.
  */
@@ -343,6 +344,8 @@ export async function ANCHORS(page: Page): Promise<Anchor[]> {
   }
   // The page arrows are not displayed at ≤600px (the phone turns pages by edge tap)
   if (!isPhone(page)) anchors.push({ name: 'page-next', selector: '#page-next' });
+  // The book itself is an anchor where the chrome above it can come and go
+  else anchors.push({ name: 'book-container', selector: '.book-container' });
   anchors.push({ name: 'timer-widget', selector: '#timer-widget' });
   return anchors;
 }
@@ -500,7 +503,10 @@ export async function expectHitArea(page: Page, selector: string): Promise<void>
  * enough that any padding on `.timer-active` re-wraps it at every width.
  * `difficulty` is set, so no backfill refresh lands mid-test.
  */
-export async function createCookingRecipe(page: Page): Promise<{ id: string; title: string; steps: number }> {
+export async function createCookingRecipe(
+  page: Page,
+  opts: { durations?: Record<number, number> } = {},
+): Promise<{ id: string; title: string; steps: number }> {
   const title = `Steady Stew ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const instructions = [
     'Pat the beef dry with kitchen paper, season it well with salt and pepper, and leave it on the board for ten minutes while you prepare the vegetables.',
@@ -534,7 +540,11 @@ export async function createCookingRecipe(page: Page): Promise<{ id: string; tit
     title,
     description: 'A slow beef stew to cook from at the counter',
     ingredients,
-    steps: instructions.map((instruction, i) => ({ step_number: i + 1, instruction })),
+    steps: instructions.map((instruction, i) => ({
+      step_number: i + 1,
+      instruction,
+      ...(opts.durations?.[i + 1] ? { duration_minutes: opts.durations[i + 1] } : {}),
+    })),
     prep_time_minutes: 30,
     cook_time_minutes: 180,
     servings: 4,
@@ -646,4 +656,38 @@ export async function waitForTurn(page: Page): Promise<void> {
     const M = await import('/static/page-transitions.js');
     return M.isAnimating();
   }), { timeout: 5000 }).toBe(false);
+}
+
+/** Counts OscillatorNode.start() calls and vibrations (window.__audioLog). */
+export async function installAudioStub(page: any) {
+  await page.addInitScript(() => {
+    const log: any = { starts: 0, vibrations: 0 };
+    // @ts-ignore
+    window.__audioLog = log;
+    class FakeParam { setValueAtTime() {} linearRampToValueAtTime() {} exponentialRampToValueAtTime() {} }
+    class FakeNode { connect() { return this; } disconnect() {} }
+    class FakeOsc extends FakeNode {
+      type = 'sine'; frequency = new FakeParam();
+      start() { log.starts++; } stop() {}
+    }
+    class FakeGain extends FakeNode { gain = new FakeParam(); }
+    class FakeCtx {
+      state = 'running'; currentTime = 0; destination = new FakeNode();
+      resume() { return Promise.resolve(); }
+      createOscillator() { return new FakeOsc(); }
+      createGain() { return new FakeGain(); }
+    }
+    // @ts-ignore
+    window.AudioContext = FakeCtx;
+    // @ts-ignore
+    window.webkitAudioContext = FakeCtx;
+    Object.defineProperty(navigator, 'vibrate', {
+      configurable: true,
+      value: () => { log.vibrations++; return true; },
+    });
+  });
+}
+
+export async function chimes(page: any): Promise<number> {
+  return page.evaluate(() => (window as any).__audioLog.starts);
 }

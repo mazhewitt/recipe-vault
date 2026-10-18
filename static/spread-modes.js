@@ -49,10 +49,43 @@ function currentViewMode() {
 // The one re-render callback, registered by app.js.
 let spreadRenderer = null;
 
+// Each mode's #page-left.scrollTop, recorded as the mode is left, for the
+// recipe or meal plan on the page. `fresh` until the first mode is applied in
+// a newly opened view, so even a same-mode re-assert starts it at the top.
+let leftScroll = {};
+let freshView = true;
+// The newest thread entry on the notes page when notes was last left
+let notesSeen = null;
+
+/** The id of the last entry of the left page's thread, or null. */
+function newestThreadNote(pageLeft) {
+    const entries = pageLeft.querySelectorAll('.notes-thread .thread-note');
+    return entries.length ? entries[entries.length - 1].dataset.noteId : null;
+}
+
+/**
+ * Forgets every mode's left-page scroll: a recipe or meal plan has been opened,
+ * or the reader is back on the contents page. Called from app.js.
+ */
+export function resetLeftScroll() {
+    leftScroll = {};
+    freshView = true;
+    notesSeen = null;
+}
+
+/** Whether the left page keeps a scroll per mode: only beside an open recipe or meal plan. */
+function keepsLeftScroll() {
+    const viewMode = currentViewMode();
+    return viewMode === 'recipe' || viewMode === 'meal';
+}
+
 /**
  * Registers the callback that re-draws the spread after a mode change.
  * One callback only; registering again replaces it.
- * @param {(mode: string) => void} fn - called with the newly applied mode
+ * @param {(mode: string, options: {leftScroll?: number}) => void} fn - called
+ *        with the newly applied mode and, when the left page is to be put back
+ *        where the mode left it, that position: a renderer that draws the left
+ *        page later (the contents await the recipe list) applies it as it draws
  */
 export function registerSpreadRenderer(fn) {
     spreadRenderer = typeof fn === 'function' ? fn : null;
@@ -97,9 +130,35 @@ export function setSpreadMode(mode, options = {}) {
     // same one lock setActiveTab honours.
     if (options.force !== true && isAnimating()) return false;
 
+    // Each mode keeps its own left-page scroll: the outgoing one is recorded
+    // before the left page is swapped, the incoming one restored in the same
+    // task as the swap, so no frame shows it anywhere else.
+    const pageLeft = document.getElementById('page-left');
+    const outgoing = getSpreadMode();
+    const restore = keepsLeftScroll() && pageLeft && (outgoing !== mode || freshView);
+    if (restore && outgoing !== mode && !freshView) leftScroll[outgoing] = pageLeft.scrollTop;
+    if (restore && outgoing === 'notes' && mode !== 'notes') notesSeen = newestThreadNote(pageLeft);
+    // A mode not yet visited in this view is drawn fresh (the contents then
+    // scroll the current row into view themselves)
+    const saved = restore ? leftScroll[mode] : undefined;
+    const renderOptions = saved !== undefined ? { leftScroll: saved } : {};
+
     document.body.dataset.spreadMode = mode;
     syncStrip();
-    if (spreadRenderer && options.render !== false) spreadRenderer(mode);
+    // A caller that draws the pages itself (render: false, navigation.js
+    // showIndex) owns their scroll too
+    if (options.render === false) return true;
+    if (spreadRenderer) spreadRenderer(mode, renderOptions);
+    if (restore) {
+        pageLeft.scrollTop = saved ?? 0;
+        freshView = false;
+    }
+    // Notes opens at the newest entry when there is one the cook has not had
+    // on screen (first visit in this view, or a note added since notes was
+    // left); otherwise notes' own restored position stands
+    if (mode === 'notes' && pageLeft && (!restore || saved === undefined || newestThreadNote(pageLeft) !== notesSeen)) {
+        pageLeft.scrollTop = pageLeft.scrollHeight;
+    }
 
     return true;
 }

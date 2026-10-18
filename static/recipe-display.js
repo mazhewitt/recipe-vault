@@ -208,7 +208,7 @@ const FILTER_WORDING = {
  * Renders the contents.
  *
  * @param {Array} recipes - the full alphabetical list, unfiltered
- * @param {{currentRecipeId?: string|null, singleColumn?: boolean, page?: 'left'|'right', filter?: string}} [options]
+ * @param {{currentRecipeId?: string|null, singleColumn?: boolean, page?: 'left'|'right', filter?: string, scrollTop?: number}} [options]
  *        singleColumn - render every letter group into one page and leave the
  *        other completely untouched (it holds the open recipe, or the notes
  *        thread). Without it the contents keep the two-page split on wide
@@ -222,6 +222,9 @@ const FILTER_WORDING = {
  *        message all come from the filtered list, but page numbers keep coming
  *        from the position in the full list so a recipe reads the same on
  *        every tab.
+ *        scrollTop - the column's scroll to hand back, from a spread-mode
+ *        round trip; without it the column is reset and the current recipe's
+ *        row scrolled into view, as for contents drawn fresh.
  */
 export function renderIndex(recipes, options = {}) {
     const leftContent = document.getElementById('page-left-content');
@@ -422,15 +425,21 @@ export function renderIndex(recipes, options = {}) {
             : '';
     }
 
-    // Reset scroll, then bring the last-viewed recipe into view if present.
-    resetColumnScroll();
+    // A spread-mode round trip hands back the column's own scroll; only
+    // contents drawn fresh are reset with the last-viewed recipe in view.
+    if (typeof options.scrollTop === 'number') {
+        const container = document.getElementById(columnPage === 'right' ? 'page-right' : 'page-left');
+        if (container) container.scrollTop = options.scrollTop;
+    } else {
+        resetColumnScroll();
+    }
     if (!singleColumn) {
         const rightPage = document.getElementById('page-right');
         if (rightPage) rightPage.scrollTop = 0;
         rightContent.scrollTop = 0;
     }
 
-    const currentRow = currentRecipeId !== null
+    const currentRow = currentRecipeId !== null && typeof options.scrollTop !== 'number'
         ? document.querySelector('.index-recipe-item.current')
         : null;
     if (currentRow) {
@@ -599,8 +608,10 @@ export function renderRecipe(recipe, options = {}) {
 
     // Build preparation steps
     const stepsList = (recipe.steps || []).map((step, i) => {
-        const duration = step.duration_minutes
-            ? `<span class="step-duration">${step.duration_minutes} min</span>`
+        // A button: tapping it starts this step's timer (timer.js)
+        const minutes = Number.parseInt(step.duration_minutes, 10);
+        const duration = minutes > 0
+            ? `<button type="button" class="step-duration" data-minutes="${minutes}" aria-label="Start a ${minutes} minute timer for step ${i + 1}">${minutes} min</button>`
             : '';
         // SANITIZED: step.instruction is user input
         return `<div class="prep-step" data-step="${i + 1}"><span class="step-number">${i + 1}.</span> <span class="step-text">${escapeHtml(step.instruction)}</span>${duration}</div>`;

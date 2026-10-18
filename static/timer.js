@@ -3,10 +3,15 @@
  * Handles cooking timer functionality and the method-step highlight
  */
 
+/* global clearTimeout */
+
+import { animatePageTurn, isAnimating } from './page-transitions.js';
+import { setActiveTab } from './page-tabs.js';
+
 // Shared app state (set by app.js via initializeState)
 let state = null;
 
-// Timer state (module-scoped): { interval, label, recipeId, stepNumber }
+// Timer state (module-scoped): { interval, label, recipeId, stepNumber, render }
 let activeTimer = null;
 
 export function initializeState(sharedState) {
@@ -95,6 +100,17 @@ function playChime() {
     }
 }
 
+// "Step N" for a step's own timer, "Step N · <label>" for an assistant timer
+// on step N, "<label>" for one with no step (cooking-guidance "The pill names
+// its step").
+function pillLabel(label, step) {
+    if (step == null) return label || '';
+    const prefix = `Step ${step}`;
+    return label && label !== prefix ? `${prefix} · ${label}` : prefix;
+}
+
+// The label and the time are two spans with no text node between them; the
+// separator is drawn in the time's left margin (styles.css).
 function setTimerText(label, time) {
     const timerText = document.getElementById('timer-text');
     timerText.replaceChildren();
@@ -106,11 +122,48 @@ function setTimerText(label, time) {
         const timeSpan = document.createElement('span');
         timeSpan.className = 'timer-time';
         timeSpan.textContent = time;
-        timerText.append(': ', timeSpan);
+        timerText.appendChild(timeSpan);
     }
 }
 
+// The finished pill chimes again every 15s until it is acknowledged, and
+// gives up by itself 5 minutes after zero (the pill itself stays).
+const CHIME_REPEAT_MS = 15000;
+const CHIME_GIVE_UP_MS = 300000;
+let chimeRepeat = null;
+let chimeGiveUp = null;
+
+function stopChimeRepeats() {
+    clearInterval(chimeRepeat);
+    clearTimeout(chimeGiveUp);
+    chimeRepeat = null;
+    chimeGiveUp = null;
+}
+
+function chimeAndVibrate() {
+    playChime();
+    try {
+        navigator.vibrate?.([200, 100, 200]);
+    } catch {
+        // Vibration is optional
+    }
+}
+
+// "Tap again to replace": a step's duration tapped while a timer runs.
+const CONFIRM_MS = 4000;
+const CONFIRM_LABEL = 'Tap again to replace';
+let pendingConfirm = null; // { button, step, recipeId, timeout }
+
+function clearConfirm() {
+    if (!pendingConfirm) return;
+    clearTimeout(pendingConfirm.timeout);
+    delete pendingConfirm.button.dataset.confirm;
+    pendingConfirm = null;
+    if (activeTimer) activeTimer.render();
+}
+
 function hideWidget() {
+    stopChimeRepeats();
     const widget = document.getElementById('timer-widget');
     widget.style.display = 'none';
     delete widget.dataset.state;
@@ -118,15 +171,13 @@ function hideWidget() {
 
 function onTimerComplete(label) {
     const widget = document.getElementById('timer-widget');
-    setTimerText(`Done — ${label}`, null);
+    setTimerText(`Done · ${label}`, null);
     widget.dataset.state = 'done';
 
-    playChime();
-    try {
-        navigator.vibrate?.([200, 100, 200]);
-    } catch {
-        // Vibration is optional
-    }
+    chimeAndVibrate();
+    stopChimeRepeats();
+    chimeRepeat = setInterval(chimeAndVibrate, CHIME_REPEAT_MS);
+    chimeGiveUp = setTimeout(stopChimeRepeats, CHIME_GIVE_UP_MS);
 
     // Show browser notification if permission granted
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -142,27 +193,79 @@ function onTimerComplete(label) {
     // The finished pill stays until the cook taps it (see the click handler below)
 }
 
-// A tap anywhere on a finished pill acknowledges it
-document.getElementById('timer-widget')?.addEventListener('click', () => {
+/** Scroll the method so step n is wholly in view; only #page-right's scrollTop changes. */
+function scrollStepIntoView(stepNumber) {
+    const pageRight = document.getElementById('page-right');
+    const el = document.querySelector(`#page-right-content .prep-step[data-step="${stepNumber}"]`);
+    if (!pageRight || !el) return;
+    const pr = pageRight.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.top >= pr.top && r.bottom <= pr.bottom) return;
+    // Leave room above the step for the sticky header strip, if any
+    pageRight.scrollTop += r.top - pr.top - 16;
+}
+
+async function goToTimerStep(timer) {
+    const isPhone = window.matchMedia('(max-width: 600px)').matches;
+    const showStep = () => {
+        if (isPhone) setActiveTab('method', { force: true });
+        scrollStepIntoView(timer.stepNumber);
+    };
+    const displayed = state && state.currentRecipeId != null
+        && String(state.currentRecipeId) === String(timer.recipeId)
+        && state.viewMode === 'recipe';
+    if (displayed) {
+        showStep();
+        return;
+    }
+    if (!state || timer.recipeId == null || isAnimating()) return;
+    // The way a contents row opens a recipe
+    await animatePageTurn('forward', () => state.fetchAndDisplayRecipe(timer.recipeId));
+    showStep();
+}
+
+// A tap anywhere on a finished pill acknowledges it; a tap on a running pill
+// (not its ✕) brings the cook to the timer's step.
+document.getElementById('timer-widget')?.addEventListener('click', (e) => {
     const widget = document.getElementById('timer-widget');
-    if (widget.dataset.state === 'done') hideWidget();
+    if (widget.dataset.state === 'done') {
+        hideWidget();
+        return;
+    }
+    if (e.target.closest('.timer-cancel')) return;
+    if (widget.dataset.state === 'running' && activeTimer && activeTimer.stepNumber != null) {
+        goToTimerStep(activeTimer);
+    }
 });
 
 export function startTimer(durationMinutes, label, stepNumber) {
-    // Clear any existing timer
+    // Clear any existing timer, a finished one's chime and a pending confirm
     if (activeTimer) {
         clearInterval(activeTimer.interval);
+    }
+    stopChimeRepeats();
+    if (pendingConfirm) {
+        clearTimeout(pendingConfirm.timeout);
+        delete pendingConfirm.button.dataset.confirm;
+        pendingConfirm = null;
     }
 
     const widget = document.getElementById('timer-widget');
 
     let secondsLeft = Math.round(durationMinutes * 60);
+    const step = Number.isInteger(stepNumber) && stepNumber > 0 ? stepNumber : null;
+    const shownLabel = pillLabel(label, step);
 
-    // Update display
+    // Update display. The time keeps counting under "Tap again to replace",
+    // but the prompt has the pill to itself so it is read in full.
     const updateDisplay = () => {
+        if (pendingConfirm) {
+            setTimerText(CONFIRM_LABEL, null);
+            return;
+        }
         const mins = Math.floor(secondsLeft / 60);
         const secs = secondsLeft % 60;
-        setTimerText(label, `${mins}:${secs.toString().padStart(2, '0')}`);
+        setTimerText(shownLabel, `${mins}:${secs.toString().padStart(2, '0')}`);
     };
 
     updateDisplay();
@@ -175,20 +278,53 @@ export function startTimer(durationMinutes, label, stepNumber) {
 
         if (secondsLeft <= 0) {
             clearInterval(interval);
-            onTimerComplete(label);
+            clearConfirm();
+            onTimerComplete(shownLabel);
         } else {
             updateDisplay();
         }
     }, 1000);
 
     const recipeId = state ? state.currentRecipeId : null;
-    const step = Number.isInteger(stepNumber) && stepNumber > 0 ? stepNumber : null;
-    activeTimer = { interval, label, recipeId, stepNumber: step };
+    activeTimer = { interval, label, recipeId, stepNumber: step, render: updateDisplay };
 
     applyStepHighlight(recipeId);
 }
 
+/**
+ * A step's duration was tapped: start that step's timer, unless one is
+ * running, in which case the first tap asks for a second within 4 seconds.
+ */
+export function startStepTimer(stepNumber, minutes, button) {
+    if (isAnimating()) return;
+    // The same step's button of the same recipe (a re-render may have
+    // replaced the element)
+    const recipeId = state ? state.currentRecipeId : null;
+    if (activeTimer && !(pendingConfirm && pendingConfirm.step === stepNumber && pendingConfirm.recipeId === recipeId)) {
+        clearConfirm();
+        button.dataset.confirm = '';
+        pendingConfirm = { button, step: stepNumber, recipeId, timeout: setTimeout(clearConfirm, CONFIRM_MS) };
+        activeTimer.render();
+        return;
+    }
+    startTimer(minutes, `Step ${stepNumber}`, stepNumber);
+}
+
+document.addEventListener('click', (e) => {
+    const button = e.target && typeof e.target.closest === 'function' && e.target.closest('.step-duration');
+    if (!button) return;
+    const step = Number(button.closest('.prep-step[data-step]')?.dataset.step);
+    const minutes = Number(button.dataset.minutes);
+    if (!Number.isInteger(step) || !(minutes > 0)) return;
+    startStepTimer(step, minutes, button);
+});
+
 export function cancelTimer() {
+    if (pendingConfirm) {
+        clearTimeout(pendingConfirm.timeout);
+        delete pendingConfirm.button.dataset.confirm;
+        pendingConfirm = null;
+    }
     if (activeTimer) {
         clearInterval(activeTimer.interval);
         activeTimer = null;

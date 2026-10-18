@@ -166,15 +166,18 @@ body::before {
    spine. Positioned relative to .recipe-book (position: relative) so it
    scrolls and resizes with the book. Centred, it can never meet a page arrow
    (top corners) or the user pill. top: -10px overhangs the cover's 8px rim by
-   2px. Its width is fixed per state - a ch-based minimum on the time and
-   tabular numerals - so it does not wobble on every tick. */
+   2px. One fixed width in every state (running, Done, "Tap again to
+   replace"), so its centre and edges never move; a long label ellipsizes.
+   The time is the largest text in it, readable across the kitchen. */
 .timer-widget {
     position: absolute;
     top: -10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 11; /* above .page-nav (10) so the close target is tappable */
-    height: 36px;
+    width: 280px;
+    height: 48px;
+    box-sizing: border-box;
     background: var(--color-paper-cream);
     border: 2px solid var(--color-ink-dark);
     border-radius: var(--radius-pill);
@@ -199,8 +202,9 @@ body::before {
 }
 
 .timer-text {
+    flex: 1;
     font-family: var(--font-handwritten);
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
     color: var(--color-ink-dark);
     font-weight: 400;
@@ -211,31 +215,64 @@ body::before {
 }
 
 .timer-label {
+    flex: 1 1 auto;
     min-width: 0;
     line-height: 1.3; /* overflow clips at the line box; keep Kalam's descenders */
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+/* The separator is drawn in the time's left margin, not written as text,
+   so the pill reads "Step 2 · 7:42" and never "Step 2:7:42" */
 .timer-time {
-    display: inline-block;
-    min-width: 5ch; /* "88:88" in tabular numerals, so no tick changes the width */
+    position: relative;
+    flex: none;
+    margin-left: 18px;
+    font-size: 26px;
     font-variant-numeric: tabular-nums;
-    text-align: left;
+    text-align: right;
 }
 
-/* Finished: "Done - <label>" in the leather red, until tapped */
-.timer-widget[data-state="done"] {
-    border-color: var(--color-leather);
+.timer-time::before {
+    content: "·";
+    position: absolute;
+    left: -13px;
+    font-size: 16px;
+    bottom: 0.3em;
+}
+
+/* A running pill with a step leads to it (timer.js) */
+.timer-widget[data-state="running"] {
     cursor: pointer;
 }
 
-.timer-widget[data-state="done"] .timer-text {
-    color: var(--color-leather);
+/* Finished: "Done · <label>", cream on the leather red, pulsing until tapped */
+.timer-widget[data-state="done"] {
+    background: var(--color-leather);
+    border-color: var(--color-leather);
+    cursor: pointer;
+    animation: timer-done-pulse 1.6s ease-in-out infinite;
+}
+
+.timer-widget[data-state="done"] .timer-text,
+.timer-widget[data-state="done"] .timer-cancel {
+    color: var(--color-paper-cream);
 }
 
 .timer-widget[data-state="done"] .timer-icon svg {
-    stroke: var(--color-leather);
+    stroke: var(--color-paper-cream);
+}
+
+/* Opacity and box-shadow only: the pill never changes size or position */
+@keyframes timer-done-pulse {
+    0%, 100% { box-shadow: var(--shadow-soft), 0 0 0 0 rgba(139, 45, 26, 0.55); }
+    50% { box-shadow: var(--shadow-soft), 0 0 0 8px rgba(139, 45, 26, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timer-widget[data-state="done"] {
+        animation: none;
+    }
 }
 
 .timer-cancel {
@@ -412,6 +449,21 @@ body::before {
     cursor: not-allowed;
 }
 
+/* A turn is in flight (chat.js sets aria-disabled): dimmed, and neither a
+   hover nor a press makes it look as if it would send */
+.note-send[aria-disabled="true"],
+.note-send[aria-disabled="true"]:hover,
+.note-send[aria-disabled="true"]:active {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.note-send[aria-disabled="true"]:hover {
+    background: #fff;
+    border-color: var(--color-border);
+}
+
 .note-page-number {
     flex-shrink: 0;
     /* A fixed width, so "p. 1" becoming "p. 13" on opening a recipe cannot
@@ -423,6 +475,14 @@ body::before {
     font-size: 13px;
     color: var(--color-ink-muted);
     white-space: nowrap;
+}
+
+/* The tablet slip is a narrow column: its page number's room goes to the
+   textarea (the contents and the footer already say where you are) */
+@media (min-width: 601px) and (max-width: 1024px) {
+    .note-page-number {
+        display: none;
+    }
 }
 
 .clipboard-button {
@@ -524,6 +584,9 @@ body::before {
     --slip-bottom: 10px;
     --slip-height: 52px;
     --slip-clearance: calc(var(--slip-height) + var(--slip-bottom) + 10px);
+    /* The reply sticky's height plus its gap above the slip, set by
+       margin-notes.js while a sticky has been shown in this view */
+    --sticky-clearance: 0px;
 }
 
 .recipe-book {
@@ -628,7 +691,8 @@ body::before {
 .page-left {
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);
     box-shadow: var(--shadow-inset-left);
-    padding-bottom: var(--slip-clearance); /* clear the .note-input slip pinned to the foot */
+    /* clear the .note-input slip pinned to the foot, and the reply sticky above it */
+    padding-bottom: calc(var(--slip-clearance) + var(--sticky-clearance));
     /* Room for the leather tabs' 44px hit area: the page clips at its edge (it
        scrolls), so the 26px tab sits 10px in and its hit area reaches 9px
        either side without touching the text. */
@@ -902,14 +966,20 @@ body::before {
     font-style: italic;
 }
 
+/* A button (it starts the step's timer) that keeps the chip look the span
+   had: the reset leaves the step's box unchanged. */
 .step-duration {
+    position: relative;
     display: inline-block;
     background: var(--color-paper-aged);
     color: var(--color-ink-medium);
     padding: 2px 6px;
+    border: none;
     border-radius: 3px;
+    font: inherit;
     font-size: 15px;
-    margin-left: 4px;
+    margin: 0 0 0 4px;
+    cursor: pointer;
 }
 
 .recipe-note {
@@ -954,24 +1024,34 @@ body::before {
     pointer-events: none;
 }
 
-/* A pencil bracket down the step's left margin. ::before is the timer's
+/* "You are here": a leather-red bar in the step's left margin and a faint
+   warm tint behind the step, with no box change. ::before is the timer's
    "timer running" tag (just left of the step), so with a timer on this step
-   the bracket stands further out and both show. */
+   the bar stands further out and both show. */
+.prep-step[aria-current="step"] {
+    background-color: rgba(139, 45, 26, 0.07);
+    border-radius: var(--radius-sm);
+}
+
 .prep-step[aria-current="step"]::after {
     content: "";
     position: absolute;
     left: -10px;
-    top: 3px;
-    bottom: 3px;
-    width: 5px;
-    border: 2px solid var(--color-pencil);
-    border-right: none;
-    border-radius: 3px 0 0 3px;
+    top: 2px;
+    bottom: 2px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--color-leather);
     pointer-events: none;
 }
 
 .prep-step.timer-active[aria-current="step"]::after {
     left: -21px;
+}
+
+/* The timer's band stays the background of a marked step it belongs to */
+.prep-step.timer-active[aria-current="step"] {
+    background-color: var(--color-timer-band);
 }
 
 /* "clear ticks" sits in the ingredients header, absolutely, so showing it
@@ -984,15 +1064,29 @@ body::before {
     position: absolute;
     right: 0;
     bottom: 4px;
+    /* One width for "clear ticks" and "Undo", so the swap moves nothing */
+    width: 72px;
     padding: 0;
     border: none;
     background: none;
     font-family: var(--font-handwritten);
     font-size: 14px;
     line-height: 1;
+    text-align: right;
     color: var(--color-biro);
     text-decoration: underline;
     cursor: pointer;
+}
+
+/* The 44px hit area, as for the other small controls */
+.clear-ticks::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(calc(100% + 2px), 46px);
+    height: 46px;
+    transform: translate(-50%, -50%);
 }
 
 .clear-ticks[hidden] {
@@ -1232,11 +1326,6 @@ body::before {
     box-shadow: 2px 2px 5px rgba(0,0,0,0.25);
 }
 
-.edge-tab[data-tab="method"] {
-    background: var(--color-accent-brown);
-    color: var(--color-paper-cream);
-}
-
 .edge-tab[data-tab="notes"] {
     background: var(--color-leather);
     color: var(--color-paper-cream);
@@ -1434,6 +1523,7 @@ body[data-feature-meals] .contents-tab-meals {
 .contents-tab::before,
 .page-nav::before,
 .share-btn::before,
+.step-duration::before,
 .add-photo-btn::before,
 .note-send::before,
 .clipboard-button::before,
@@ -2345,14 +2435,23 @@ body[data-feature-meals] .contents-tab-meals {
         width: min(200px, calc(100% - 130px));
         box-sizing: border-box;
         z-index: 11;
-        height: 30px;
+        height: 44px;
         padding: 2px 6px 2px 10px;
         gap: 6px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
 
     .timer-text {
-        flex: 1;
+        font-size: 14px;
+    }
+
+    .timer-time {
+        font-size: 22px;
+        margin-left: 14px;
+    }
+
+    .timer-time::before {
+        left: -10px;
         font-size: 14px;
     }
 
@@ -2374,9 +2473,11 @@ body[data-feature-meals] .contents-tab-meals {
 
     /* The chip is 70px of chrome while cooking, and its Logout sat just
        above the timer's close control: on the phone it shows on the contents
-       page only. */
+       page only. It keeps its slot rather than leaving the flow: out of flow it
+       would lie over the Recipe Book header and the timer pill in the leather
+       strip, and taking the slot away moved the whole book 36px. */
     body:not([data-view-mode="index"]) .user-info {
-        display: none;
+        visibility: hidden;
     }
 
     .user-email {
@@ -2394,6 +2495,8 @@ body[data-feature-meals] .contents-tab-meals {
         border-radius: 0;
         box-shadow: none;
         padding: 16px;
+        /* the reply sticky overlays the page's foot, above the input bar */
+        padding-bottom: calc(16px + var(--sticky-clearance));
     }
 
     .page-right::before {
@@ -2475,11 +2578,14 @@ body[data-feature-meals] .contents-tab-meals {
         right: 44px;
     }
 
-    /* The page's 16px padding is all the margin there is: the bracket beside
-       a timer's tag stays inside it */
+    /* The page's 16px padding is all the margin there is: the bar beside
+       a timer's tag stays inside it, and the tag steps 1px in to clear it */
     .prep-step.timer-active[aria-current="step"]::after {
         left: -16px;
-        width: 2px;
+    }
+
+    .prep-step.timer-active[aria-current="step"]::before {
+        right: calc(100% + 1px);
     }
 
     .phone-footer {
@@ -2521,6 +2627,11 @@ body[data-feature-meals] .contents-tab-meals {
         background: var(--color-leather);
         border-color: var(--color-leather);
         color: var(--color-paper-cream);
+    }
+
+    .note-send[aria-disabled="true"]:hover {
+        background: var(--color-leather);
+        border-color: var(--color-leather);
     }
 
     .note-page-number {
