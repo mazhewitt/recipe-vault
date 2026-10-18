@@ -84,15 +84,16 @@ Satisfies: `swipe-navigation` "Taps on the page never turn it" (all scenarios); 
 Files: `static/page-tabs.js`, and `static/recipe-display.js` for the reset on opening a recipe.
 Satisfies: `family-recipe-ui` "Phone tabs keep their own scroll position" (all scenarios).
 
-- [ ] 4.1 On the phone, inside `setActiveTab`'s `apply`, record `#page-right.scrollTop` under the outgoing tab before switching. After the new panel is displayed, set the incoming tab's stored value, defaulting to 0. The element that scrolls is `#page-right` (`.page { overflow-y: auto }`), not `#page-right-content` as design N3 says; see design Open question 4.
-- [ ] 4.2 Export `resetTabScroll()` and call it on the non-refresh path of `fetchAndDisplayRecipe`, next to `setActiveTab('ingredients', { force: true })`, so a newly opened recipe starts every tab at 0. Revisiting a recipe is a new open and also starts at 0.
-- [ ] 4.3 Leave refreshes alone. Steady-cooking-spread D5 already keeps the active tab and scroll positions across a refresh, so the forced `setActiveTab` a refresh makes must not reset the map.
-- [ ] 4.4 Tests in `page-tabs.spec.ts` (phone only):
+- [x] 4.1 On the phone, inside `setActiveTab`'s `apply`, record `#page-right.scrollTop` under the outgoing tab before switching. After the new panel is displayed, set the incoming tab's stored value, defaulting to 0. The element that scrolls is `#page-right` (`.page { overflow-y: auto }`), not `#page-right-content` as design N3 says; see design Open question 4.
+- [x] 4.2 Export `resetTabScroll()` and call it on the non-refresh path of `fetchAndDisplayRecipe`, next to `setActiveTab('ingredients', { force: true })`, so a newly opened recipe starts every tab at 0. Revisiting a recipe is a new open and also starts at 0.
+- [x] 4.3 Leave refreshes alone. Steady-cooking-spread D5 already keeps the active tab and scroll positions across a refresh, so the forced `setActiveTab` a refresh makes must not reset the map.
+- [x] 4.4 Tests in `page-tabs.spec.ts` (phone only):
   - A round trip Method → Ingredients → Method keeps `.prep-step[data-step="7"]` within 1px of where it was.
   - Ingredients at 120 and Method at 400 are restored independently.
   - Opening the next recipe starts both Ingredients and Method at `scrollTop` 0.
-- [ ] 4.5 Red-check: drop the restore and confirm the round-trip test goes red.
-- [ ] 4.6 Gate: `make lint`, `npx playwright test tests/page-tabs.spec.ts`, `make test-e2e`.
+- [x] 4.5 Red-check: drop the restore and confirm the round-trip test goes red.
+- [x] 4.6 Gate: `make lint`, `npx playwright test tests/page-tabs.spec.ts`, `make test-e2e`.
+  - Done: lint clean; page-tabs, refresh-in-place and layout-stability 59 passed, 19 skipped, 0 failed. `resetTabScroll()` also sets the phone's `#page-right.scrollTop` to 0, because opening a recipe did not reset it before (the new-recipe test read 354 without it). It runs after the forced `setActiveTab`. Red-check: with the restore line removed, the round-trip test went red (off by 579px); restored byte-identical. The full `make test-e2e` ran once after group 5.
 
 ## 5. The photo preview works on touch (design N7)
 

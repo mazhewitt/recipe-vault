@@ -412,3 +412,70 @@ test.describe('Page tabs', () => {
     expect(log.navDirections).toBe(0);
   });
 });
+
+/**
+ * Per-tab scroll on the phone: #page-right is the element that scrolls the
+ * phone page, and each tab keeps its own position on it.
+ */
+test.describe('Phone tab scroll positions', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  const scrollTop = (page: Page) => page.locator('#page-right').evaluate(el => el.scrollTop);
+  const scrollTo = (page: Page, top: number) =>
+    page.locator('#page-right').evaluate((el, t) => { el.scrollTop = t; }, top);
+
+  /** Switches tab and waits for the crossfade's lock to clear. */
+  async function switchTab(page: Page, tab: 'ingredients' | 'method' | 'notes') {
+    await openTab(page, tab);
+    await expect.poll(() => isAnimating(page)).toBe(false);
+  }
+
+  test('phone: a round trip through Ingredients keeps the place in the method', async ({ page }) => {
+    test.skip(!isPhone(page), 'phone only: one tab panel at a time');
+    await openRecipe(page, await createLongRecipe(page, 'Round Trip'));
+    await switchTab(page, 'method');
+    await page.locator('#page-right-content .prep-step[data-step="7"]').scrollIntoViewIfNeeded();
+    await scrollTo(page, (await scrollTop(page)) + 150);
+    const step7 = page.locator('#page-right-content .prep-step[data-step="7"]');
+    const before = { y: (await step7.boundingBox())!.y, top: await scrollTop(page) };
+    expect(before.top).toBeGreaterThan(100);
+
+    await switchTab(page, 'ingredients');
+    await switchTab(page, 'method');
+
+    expect(Math.abs((await step7.boundingBox())!.y - before.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs((await scrollTop(page)) - before.top)).toBeLessThanOrEqual(1);
+  });
+
+  test('phone: Ingredients and Method keep their own positions', async ({ page }) => {
+    test.skip(!isPhone(page), 'phone only: one tab panel at a time');
+    await openRecipe(page, await createLongRecipe(page, 'Two Places'));
+    await scrollTo(page, 120);
+    await switchTab(page, 'method');
+    await scrollTo(page, 400);
+    await switchTab(page, 'ingredients');
+    expect(Math.abs((await scrollTop(page)) - 120)).toBeLessThanOrEqual(1);
+    await switchTab(page, 'method');
+    expect(Math.abs((await scrollTop(page)) - 400)).toBeLessThanOrEqual(1);
+  });
+
+  test('phone: a newly opened recipe starts every tab at the top', async ({ page }) => {
+    test.skip(!isPhone(page), 'phone only: one tab panel at a time');
+    const first = await createLongRecipe(page, 'First Open');
+    const second = await createLongRecipe(page, 'Second Open');
+    await openRecipe(page, first);
+    await scrollTo(page, 200);
+    await switchTab(page, 'method');
+    await scrollTo(page, 400);
+
+    await openRecipe(page, second);
+    await expect(page.locator('#page-right-content .recipe-title')).toContainText('Second Open');
+    await expect.poll(() => isAnimating(page)).toBe(false);
+    await expect(page.locator('#page-right')).toHaveAttribute('data-tab', 'ingredients');
+    expect(await scrollTop(page)).toBe(0);
+    await switchTab(page, 'method');
+    expect(await scrollTop(page)).toBe(0);
+  });
+});

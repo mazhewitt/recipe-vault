@@ -7,7 +7,7 @@ import { escapeHtml } from './utils.js';
 import { getCachedRecipe, prefetchAdjacent, animatePageTurn } from './page-transitions.js';
 import { applyStepHighlight } from './timer.js';
 import { applyPlace, holdWakeLock } from './place-keeping.js';
-import { setActiveTab } from './page-tabs.js';
+import { setActiveTab, resetTabScroll } from './page-tabs.js';
 import { getSpreadMode, setSpreadMode } from './spread-modes.js';
 
 // Import global state accessors (these will be set by app.js)
@@ -863,6 +863,8 @@ export async function fetchAndDisplayRecipe(recipeId) {
         // choice of mode after navigating.
         if (!isRefresh) {
             setActiveTab('ingredients', { force: true });
+            // After the forced switch, which records the outgoing tab's place
+            resetTabScroll();
             setSpreadMode('cook', { force: true });
         }
         setNotePageNumber(pageNumber);

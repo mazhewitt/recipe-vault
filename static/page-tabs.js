@@ -30,6 +30,23 @@ function isPhone() {
 
 let bound = false;
 
+// Phone only: each tab's own scroll position of #page-right, the element that
+// scrolls the phone page. Recorded on the way out of a tab, restored on the
+// way back in; resetTabScroll empties it when a different recipe opens.
+const tabScroll = new Map();
+
+/**
+ * A newly opened recipe starts every tab at the top. Called on the
+ * non-refresh path of fetchAndDisplayRecipe, never on a refresh, which keeps
+ * its tab and scroll positions.
+ */
+export function resetTabScroll() {
+    tabScroll.clear();
+    if (!isPhone()) return;
+    const pageRight = document.getElementById('page-right');
+    if (pageRight) pageRight.scrollTop = 0;
+}
+
 /**
  * Binds ONE delegated click listener on `document` that routes clicks on
  * `[role="tab"][data-tab]` (both `.page-tabs` and `.edge-tabs`) to setActiveTab.
@@ -69,7 +86,15 @@ export function setActiveTab(tab, options = {}) {
     if (!force && isAnimating()) return false;
 
     const apply = () => {
+        const outgoing = pageRight.dataset.tab;
+        const switching = isPhone() && outgoing !== tab;
+        if (switching) tabScroll.set(outgoing, pageRight.scrollTop);
+
         pageRight.dataset.tab = tab;
+
+        // The incoming panel is displayed now (CSS keys off data-tab), so its
+        // height is there to scroll; the browser clamps a stale position.
+        if (switching) pageRight.scrollTop = tabScroll.get(tab) ?? 0;
 
         document.querySelectorAll('[role="tab"][data-tab]').forEach(el => {
             const selected = el.dataset.tab === tab;
