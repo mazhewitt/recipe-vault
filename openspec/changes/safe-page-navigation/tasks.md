@@ -100,16 +100,17 @@ Satisfies: `family-recipe-ui` "Phone tabs keep their own scroll position" (all s
 Files: `static/app.js` (the photo handlers in `setupNavigationButtons`).
 Satisfies: `family-recipe-ui` "Recipe photo opens full-window preview on click" (all scenarios).
 
-- [ ] 5.1 Delete the `touchstart`/`touchend` photo handlers on `.pages-container`.
-- [ ] 5.2 Open the preview on any `click` on `.recipe-photo`, and drop the `e.pointerType === 'mouse'` condition. A tap's click has `pointerType` `touch`, and older iOS Safari click events carry no `pointerType` at all, so that condition is why a tap never opens the preview today.
-- [ ] 5.3 Dismissal stays click-only on the overlay (`recipe-display.js` `setupOverlayDismissal`), plus Escape. Keep swipe's `.recipe-photo` exclusion in `page-transitions.js`.
-- [ ] 5.4 Tests in `ui-improvements.spec.ts`, on the touch projects only (`test.skip(!isPhone(page) && !isTablet(page))`). Use `locator.tap()`, not `click()`: Playwright's `click()` sends mouse events even on a touch project, which is why the existing test never caught this.
+- [x] 5.1 Delete the `touchstart`/`touchend` photo handlers on `.pages-container`.
+- [x] 5.2 Open the preview on any `click` on `.recipe-photo`, and drop the `e.pointerType === 'mouse'` condition. A tap's click has `pointerType` `touch`, and older iOS Safari click events carry no `pointerType` at all, so that condition is why a tap never opens the preview today.
+- [x] 5.3 Dismissal stays click-only on the overlay (`recipe-display.js` `setupOverlayDismissal`), plus Escape. Keep swipe's `.recipe-photo` exclusion in `page-transitions.js`.
+- [x] 5.4 Tests in `ui-improvements.spec.ts`, on the touch projects only (`test.skip(!isPhone(page) && !isTablet(page))`). Use `locator.tap()`, not `click()`: Playwright's `click()` sends mouse events even on a touch project, which is why the existing test never caught this.
   - Tap the photo: the overlay is `visible`, and still `visible` 500ms later.
   - Tap the overlay: it closes and stays closed 500ms later.
   - A 40px `touchGesture` that starts on the photo opens nothing.
   - The existing click and Escape tests stay as they are.
-- [ ] 5.5 Red-check: restore the `touchend` opener and confirm the "still visible 500ms later" test goes red.
-- [ ] 5.6 Gate: `make lint`, `npx playwright test tests/ui-improvements.spec.ts`, `make test-e2e`.
+- [x] 5.5 Red-check: restore the `touchend` opener and confirm the "still visible 500ms later" test goes red.
+- [x] 5.6 Gate: `make lint`, `npx playwright test tests/ui-improvements.spec.ts`, `make test-e2e`.
+  - Done: lint clean; ui-improvements 18 passed, 3 skipped, 0 failed. Red-check: with the touchstart/touchend opener back, the open-and-stays-open and the overlay-close tests went red on both touch projects (4 failed); restored byte-identical. The full `make test-e2e` ran once after this group.
 
 ## 6. Page turns use the list already held; a refresh keeps the prefetch (design N4)
 

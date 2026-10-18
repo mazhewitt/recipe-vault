@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, useContentsMode, Recipe } from './helpers';
+import { authenticate, createRecipe, useContentsMode, Recipe, isPhone, isTablet, line, touchGesture } from './helpers';
 
 // Helper to create a test recipe with unique title
 async function createTestRecipe(page: Page, title: string): Promise<string> {
@@ -156,5 +156,53 @@ test.describe('UI Improvements', () => {
     // ...and the recipe is off the page
     await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'index');
     await expect(page.locator('#page-right-content .recipe-title')).toHaveCount(0);
+  });
+});
+
+/**
+ * The photo preview on a touch screen. locator.tap(), not click(): Playwright's
+ * click() sends mouse events even on a touch project, which is how a tap that
+ * never opened the preview went unnoticed.
+ */
+test.describe('Photo preview on touch', () => {
+  test.beforeEach(async ({ page }) => {
+    test.skip(!isPhone(page) && !isTablet(page), 'touch projects only');
+    await authenticate(page);
+    const recipeId = await createTestRecipe(page, 'Photo Tap Test');
+    await page.request.post(`/api/recipes/${recipeId}/photo`, {
+      headers: { 'X-API-Key': 'test-api-key-for-playwright' },
+      multipart: { photo: { name: 'test.jpg', mimeType: 'image/jpeg', buffer: RED_DOT_JPEG } },
+    });
+    await navigateToRecipe(page, recipeId);
+    await expect(page.locator('#page-right-content .recipe-polaroid .recipe-photo')).toBeVisible({ timeout: 10000 });
+  });
+
+  const photo = (page: Page) => page.locator('#page-right-content .recipe-polaroid .recipe-photo');
+  const overlay = (page: Page) => page.locator('#photo-preview-overlay');
+
+  test('tapping the photo opens the preview and it stays open', async ({ page }) => {
+    await photo(page).tap();
+    await expect(overlay(page)).toHaveClass(/visible/);
+    await expect(overlay(page)).toBeVisible();
+    await page.waitForTimeout(500);
+    await expect(overlay(page)).toHaveClass(/visible/);
+    await expect(overlay(page)).toBeVisible();
+  });
+
+  test('tapping the overlay closes the preview and it stays closed', async ({ page }) => {
+    await photo(page).tap();
+    await expect(overlay(page)).toHaveClass(/visible/);
+    await page.waitForTimeout(300);
+    await overlay(page).tap({ position: { x: 10, y: 10 } });
+    await expect(overlay(page)).not.toHaveClass(/visible/);
+    await page.waitForTimeout(500);
+    await expect(overlay(page)).not.toHaveClass(/visible/);
+  });
+
+  test('a 40px drag that starts on the photo opens nothing', async ({ page }) => {
+    const box = (await photo(page).boundingBox())!;
+    await touchGesture(page, box.x + box.width / 2, box.y + box.height / 2, line(6, -40, 0));
+    await page.waitForTimeout(500);
+    await expect(overlay(page)).not.toHaveClass(/visible/);
   });
 });

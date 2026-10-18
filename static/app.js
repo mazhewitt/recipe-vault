@@ -314,39 +314,14 @@ function setupNavigationButtons() {
     if (nextBtn) nextBtn.addEventListener('click', Navigation.loadNextRecipe);
     if (header) header.addEventListener('click', Navigation.showIndex);
 
-    // Delegated click listener for recipe photos
+    // Delegated click listener for recipe photos. Click only, for mouse and
+    // touch alike: a tap's click has pointerType 'touch' (and none at all on
+    // older iOS Safari), and a touchend opener would be closed again by the
+    // click synthesised after it. A drag produces no click, and swipe ignores
+    // gestures that start on the photo (page-transitions.js).
     if (pagesContainer) {
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let isTouch = false;
-
-        pagesContainer.addEventListener('touchstart', (e) => {
-            if (e.target.classList.contains('recipe-photo')) {
-                touchStartX = e.touches[0].clientX;
-                touchStartY = e.touches[0].clientY;
-                isTouch = true;
-            }
-        }, { passive: true });
-
-        pagesContainer.addEventListener('touchend', (e) => {
-            if (isTouch && e.target.classList.contains('recipe-photo')) {
-                const dx = e.changedTouches[0].clientX - touchStartX;
-                const dy = e.changedTouches[0].clientY - touchStartY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                // If movement is small (a tap), show preview
-                if (distance < 10) {
-                    const url = e.target.getAttribute('data-preview-url') || e.target.src;
-                    const alt = e.target.alt;
-                    RecipeDisplay.showPhotoPreview(url, alt);
-                }
-            }
-            isTouch = false;
-        }, { passive: true });
-
-        // Also handle mouse clicks for desktop
         pagesContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('recipe-photo') && e.pointerType === 'mouse') {
+            if (e.target.classList.contains('recipe-photo')) {
                 const url = e.target.getAttribute('data-preview-url') || e.target.src;
                 const alt = e.target.alt;
                 RecipeDisplay.showPhotoPreview(url, alt);
