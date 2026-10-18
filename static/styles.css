@@ -368,8 +368,8 @@ body::before {
 
 .note-send {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     padding: 8px;
     display: flex;
     align-items: center;
@@ -411,8 +411,8 @@ body::before {
 
 .clipboard-button {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     padding: 8px;
     border: 2px solid var(--color-border);
     border-radius: var(--radius-sm);
@@ -613,6 +613,10 @@ body::before {
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);
     box-shadow: var(--shadow-inset-left);
     padding-bottom: var(--slip-clearance); /* clear the .note-input slip pinned to the foot */
+    /* Room for the leather tabs' 44px hit area: the page clips at its edge (it
+       scrolls), so the 26px tab sits 10px in and its hit area reaches 9px
+       either side without touching the text. */
+    padding-left: 48px;
 }
 
 /* The content grows with what it holds rather than overflowing a box fixed at
@@ -702,25 +706,32 @@ body::before {
 }
 
 .recipe-title-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
+    display: flow-root; /* contains the floated polaroid */
     margin-bottom: var(--space-md);
     position: relative;
 }
 
+/* The title takes the width of the page and wraps by words around the
+   polaroid floated to its right. */
 .recipe-title {
     font-family: var(--font-handwritten);
     font-size: 27px;
+    line-height: 1.3;
     color: var(--color-ink-dark);
     font-weight: 400;
-    flex: 1;
+}
+
+/* Share and add-photo end the meta line as 44px icon buttons, pushed to its
+   right end. */
+.recipe-meta-line .share-btn {
+    margin-left: auto;
 }
 
 /* Add photo button */
 .add-photo-btn {
     flex-shrink: 0;
+    width: 44px;
+    height: 44px;
     background: none;
     border: 1.5px solid var(--color-border-light);
     border-radius: var(--radius-sm);
@@ -747,6 +758,8 @@ body::before {
 /* Share button */
 .share-btn {
     flex-shrink: 0;
+    width: 44px;
+    height: 44px;
     background: none;
     border: 1.5px solid var(--color-border-light);
     border-radius: var(--radius-sm);
@@ -841,10 +854,12 @@ body::before {
     font-weight: 700;
 }
 
-/* Method steps (serif text, handwritten red step numbers) */
+/* Method steps (serif text, handwritten red step numbers). Read from the
+   counter, so 18px (17px on the phone) - and in every spread mode, so a mode
+   switch never reflows the method being read. */
 .prep-list {
     font-family: var(--font-serif);
-    font-size: 14px;
+    font-size: 18px;
     line-height: 1.65;
     color: var(--color-ink-dark);
 }
@@ -858,7 +873,7 @@ body::before {
 .step-number {
     position: absolute;
     left: 0;
-    top: -3px;
+    top: 1px; /* sits on the first line of the 18px step text */
     font-family: var(--font-handwritten);
     font-size: 18px;
     font-weight: 700;
@@ -877,7 +892,7 @@ body::before {
     color: var(--color-ink-medium);
     padding: 2px 6px;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 15px;
     margin-left: 4px;
 }
 
@@ -891,6 +906,7 @@ body::before {
 /* ==================== RECIPE METADATA ==================== */
 /* Single handwritten line under the title: total · serves · difficulty (prep · cook) */
 .recipe-meta-line {
+    position: relative; /* the share toast is placed against its button */
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -965,10 +981,11 @@ body::before {
 }
 
 /* ==================== JOURNAL RECIPE BODY ==================== */
-/* A small polaroid pinned at the end of the title row. 96x76 including the
+/* A small polaroid floated at the right of the title row. 96x76 including the
    white border, so it never competes with the handwritten title. */
 .recipe-polaroid {
-    flex-shrink: 0;
+    float: right;
+    margin: 0 0 6px 10px;
     display: block;
     width: 96px;
     height: 76px;
@@ -1187,7 +1204,7 @@ body::before {
     z-index: 4;
     align-self: flex-start;
     height: 0;
-    margin-left: -28px;
+    margin-left: -38px; /* 10px in from the page's edge; see .page-left */
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1269,6 +1286,41 @@ body[data-feature-meals] .contents-tab-meals {
     box-shadow: -3px 2px 6px rgba(0,0,0,0.3);
 }
 
+/* ==================== HIT AREAS ==================== */
+/* Every control the cook taps reaches at least 44x44px, with floury fingers
+   from the counter. Where the visible control is smaller - the 26px leather
+   tabs, the page arrows - a transparent ::before centred on it carries the
+   rest of the hit area, so the look is unchanged. (.page-nav is already
+   absolutely positioned; the others need a positioned parent.) */
+.contents-tab,
+.share-btn,
+.add-photo-btn,
+.note-send,
+.clipboard-button,
+.footer-prev,
+.footer-next {
+    position: relative;
+}
+
+.contents-tab::before,
+.page-nav::before,
+.share-btn::before,
+.add-photo-btn::before,
+.note-send::before,
+.clipboard-button::before,
+.footer-prev::before,
+.footer-next::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* 1px past 44 (and past the control) each way, so the hit area's
+       outermost pixels are the control's too */
+    width: max(calc(100% + 2px), 46px);
+    height: max(calc(100% + 2px), 46px);
+    transform: translate(-50%, -50%);
+}
+
 /* ==================== PHONE FOOTER ==================== */
 /* Emitted on every viewport by renderRecipe; only the phone shows it. */
 .phone-footer {
@@ -1276,6 +1328,9 @@ body[data-feature-meals] .contents-tab-meals {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    /* keeps the links' hit areas clear of the 60px .mobile-edge-nav strips */
+    padding-left: 16px;
+    padding-right: 16px;
     margin-top: var(--space-lg);
     padding-top: var(--space-sm);
     border-top: 1px solid var(--color-border-light);
@@ -1976,6 +2031,11 @@ body[data-feature-meals] .contents-tab-meals {
         display: block;
     }
 
+    /* ...at the size the method is read at, from the counter */
+    body[data-spread-mode="cook"] #page-left-content .ingredients-list {
+        font-size: 18px;
+    }
+
     body[data-spread-mode="cook"] #page-left-content .ingredient-sep {
         display: none;
     }
@@ -2155,6 +2215,13 @@ body[data-feature-meals] .contents-tab-meals {
         justify-content: space-between;
     }
 
+    /* The chip is 70px of chrome while cooking, and its Logout sat just
+       above the timer's close control: on the phone it shows on the contents
+       page only. */
+    body:not([data-view-mode="index"]) .user-info {
+        display: none;
+    }
+
     .user-email {
         font-size: 12px;
     }
@@ -2242,8 +2309,8 @@ body[data-feature-meals] .contents-tab-meals {
     }
 
     .ingredients-list,
-    .prep-step .step-text {
-        font-size: 16px;
+    .prep-list {
+        font-size: 17px;
     }
 
     .phone-footer {
@@ -2412,9 +2479,15 @@ body[data-feature-meals] .contents-tab-meals {
         display: none;
     }
 
-    /* Keep add-photo icon clear of the mobile edge nav overlay */
+    /* Keep the polaroid, and the share and add-photo buttons at the end of
+       the meta line, clear of the mobile edge nav overlay (60px from the
+       book's edge), so a tap on them is not taken for "next recipe" */
     .recipe-title-row {
         padding-right: 40px;
+    }
+
+    .recipe-meta-line {
+        padding-right: 44px;
     }
 }
 

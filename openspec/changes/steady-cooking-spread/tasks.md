@@ -259,19 +259,19 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
 
 ## 7. Readable and tappable from the counter (D9)
 
-- [ ] 7.1 `static/styles.css`:
+- [x] 7.1 `static/styles.css`:
   - Above 600px: `.ingredient-item` 18px in cook mode, and `.prep-step .step-text` 18px in every spread mode (design.md open question 2).
   - At ≤600px: 17px for both.
   - `.step-duration` 15px everywhere.
   - Line-height at least 1.6. The contents and Notes keep their sizes.
   - family-recipe-ui › Recipe text is sized for reading from the counter (all)
   - family-recipe-ui › Recipe book displays as open two-page spread with leather cover › Phone shows one page
-- [ ] 7.2 `static/styles.css`: give each tapped control a transparent `::before` hit area with negative inset.
+- [x] 7.2 `static/styles.css`: give each tapped control a transparent `::before` hit area with negative inset.
   - The controls: `.contents-tab` (filters and spread tabs; extend outward over the leather, not over the text), `.page-nav`, `.share-btn`, `.add-photo-btn`, `.note-send`, `.clipboard-button`, `.footer-prev` and `.footer-next`.
   - Make send and attach 44px at every breakpoint (≈319-323, ≈358-362).
   - Each parent needs `position: relative`; no ancestor's `overflow: hidden` may clip the `::before`.
   - family-recipe-ui › Every control the cook taps has a 44px hit area (all)
-- [ ] 7.3 `static/recipe-display.js` `renderRecipe` title row (≈629-669):
+- [x] 7.3 `static/recipe-display.js` `renderRecipe` title row (≈629-669):
   - Move `.share-btn` and `.add-photo-btn` to the end of `.recipe-meta-line`, as 44px icon buttons.
   - Float the polaroid right inside the title block so that the title wraps by words around it.
   - Re-check the phone's `padding-right: 40px` on the title row (≈2414-2421).
@@ -279,20 +279,20 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - Confirm the delegated share and photo handlers in `app.js` still bind.
   - family-recipe-ui › Recipe book displays as open two-page spread with leather cover › The title takes the width of the page
   - family-recipe-ui › Recipe metadata displays with icons › Share and photo end the meta line, Time values display with clock icons
-- [ ] 7.4 `static/styles.css`, phone block (≈2138-2147): hide `.user-info` unless `body[data-view-mode="index"]`.
+- [x] 7.4 `static/styles.css`, phone block (≈2138-2147): hide `.user-info` unless `body[data-view-mode="index"]`.
   - web-chat › Logout UI › Logout button displayed, Logout stays off the phone's cooking screens
-- [ ] 7.5 Rewrite the e2e assertions of the old contract:
+- [x] 7.5 Rewrite the e2e assertions of the old contract:
   - `contents-page.spec.ts` "serif body, red step numbers and a single meta line": add sizes and the new meta order.
   - `contents-filters.spec.ts` "…chips follow the difficulty dots": still holds; share and photo come after the chips.
   - `ui-improvements.spec.ts` "should not show photo upload/delete controls": the polaroid is still in `.recipe-polaroid` on the right page.
   - `image-upload.spec.ts` and `contents-page.spec.ts` "entry shows a polaroid thumbnail after a photo upload": `.add-photo-btn` has moved.
   - `responsive.spec.ts`: the phone user chip is visible on the contents and hidden on a recipe.
-- [ ] 7.6 New cases, in a new `counter-readability.spec.ts`:
+- [x] 7.6 New cases, in a new `counter-readability.spec.ts`:
   - `expectHitArea` for every control in 7.2 that is displayed at each project.
   - Computed font sizes at each project.
   - "Granny's Beef Lasagne" with a photo (upload `RED_DOT_JPEG` as `ui-improvements.spec.ts` does) renders in at most two lines at each project.
   - Share and photo are the last two meta items, with 44px boxes.
-- [ ] 7.7 `make lint`, then `make test-e2e` green, with `layout-stability.spec.ts` still green after the size changes.
+- [x] 7.7 `make lint`, then `make test-e2e` green, with `layout-stability.spec.ts` still green after the size changes.
 
 ## 8. Keeping your place (D10)
 

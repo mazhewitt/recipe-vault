@@ -70,6 +70,21 @@ test.describe('Responsive Layout (book only)', () => {
     expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
   });
 
+  test('the user chip shows on the contents page, and on the phone only there', async ({ page }) => {
+    // web-chat › Logout UI: on the phone, Logout stays off the cooking screens
+    await expect(page.locator('.user-info')).toBeVisible();
+    await expect(page.locator('.logout-link')).toBeVisible();
+    await seedAndOpen(page);
+    if (isPhone(page)) {
+      await expect(page.locator('.user-info')).toBeHidden();
+      await page.click('#recipe-book-header');
+      await expect(page.locator('.index-title')).toBeVisible();
+      await expect(page.locator('.user-info')).toBeVisible();
+    } else {
+      await expect(page.locator('.user-info')).toBeVisible();
+    }
+  });
+
   test('phone hides both tab strips on the contents page', async ({ page }) => {
     test.skip(!isPhone(page), 'phone layout only');
     await seedAndOpen(page);

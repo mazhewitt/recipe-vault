@@ -200,6 +200,16 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     await expect(meta).toContainText('serves 4');
     await expect(meta.locator('.meta-breakdown')).toHaveText('(prep 10 · cook 20)');
     await expect(page.locator('.recipe-meta')).toHaveCount(0);
+
+    // ...ending with share and add-photo, after the breakdown
+    const order = await meta.evaluate(el => Array.from(el.children).slice(-3).map(c => c.className));
+    expect(order).toEqual(['meta-breakdown', 'share-btn', 'add-photo-btn']);
+
+    // Read from the counter: 18px method text above 600px, 17px on the phone;
+    // durations 15px (none here, so the step text is what is measured)
+    const stepSize = await steps.nth(1).locator('.step-text')
+      .evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+    expect(stepSize).toBe(isPhone(page) ? 17 : 18);
   });
 
   test('meta line formats hours and omits missing values', async ({ page }) => {

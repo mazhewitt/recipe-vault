@@ -442,6 +442,8 @@ function setupShareButton() {
             const toast = document.createElement('div');
             toast.className = 'share-toast';
             toast.textContent = copied ? 'Link copied!' : 'Link created!';
+            // Just above the button, wherever the meta line has wrapped it to
+            toast.style.top = `${btn.offsetTop - 30}px`;
             btn.parentElement.appendChild(toast);
             requestAnimationFrame(() => toast.classList.add('show'));
             setTimeout(() => {

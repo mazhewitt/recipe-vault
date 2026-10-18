@@ -655,8 +655,6 @@ export function renderRecipe(recipe, options = {}) {
     const breakdown = [];
     if (prepMinutes) breakdown.push(`prep ${prepMinutes}`);
     if (cookMinutes) breakdown.push(`cook ${cookMinutes}`);
-    // Always rendered: it carries the difficulty slot
-    const metaLine = `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}${breakdown.length ? `<span class="meta-breakdown">(${breakdown.join(' · ')})</span>` : ''}</div>`;
 
     // Photo display
     const hasPhoto = recipe.photo_filename && recipe.photo_filename !== '';
@@ -689,6 +687,11 @@ export function renderRecipe(recipe, options = {}) {
            </span>`
         : '';
 
+    // Always rendered: it carries the difficulty slot and, at its end, the
+    // share and add-photo buttons - out of the title row, so the title takes
+    // the width of the page
+    const metaLine = `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}${breakdown.length ? `<span class="meta-breakdown">(${breakdown.join(' · ')})</span>` : ''}${shareIcon}${addPhotoIcon}</div>`;
+
     // The phone footer is emitted on every viewport and hidden by CSS above
     // 600px, so a resize across the breakpoint needs no re-render.
     const footerPage = pageNumber == null ? '' : `p. ${pageNumber}`;
@@ -696,10 +699,8 @@ export function renderRecipe(recipe, options = {}) {
     // SANITIZED: every recipe-derived string above went through escapeHtml
     rightContent.innerHTML = `
         <div class="recipe-title-row">
-            <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
-            ${shareIcon}
-            ${addPhotoIcon}
             ${photoHtml}
+            <div class="recipe-title">${escapeHtml(recipe.title || 'Untitled Recipe')}</div>
         </div>
         ${metaLine}
 

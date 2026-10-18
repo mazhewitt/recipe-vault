@@ -393,5 +393,15 @@ test.describe('Recipe tag chips', () => {
       return dots && tags ? dots.compareDocumentPosition(tags) : 0;
     });
     expect(after & 4).toBe(4); // Node.DOCUMENT_POSITION_FOLLOWING
+
+    // ...and share and add-photo end the line, after the chips
+    const tail = await page.locator('.recipe-meta-line').evaluate(el => {
+      const kids = Array.from(el.children);
+      return {
+        last: kids.slice(-2).map(c => c.className),
+        tagsFirst: kids.indexOf(el.querySelector('.recipe-tags')!) < kids.indexOf(el.querySelector('.share-btn')!),
+      };
+    });
+    expect(tail).toEqual({ last: ['share-btn', 'add-photo-btn'], tagsFirst: true });
   });
 });

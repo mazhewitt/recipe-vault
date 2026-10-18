@@ -57,8 +57,9 @@ test.describe('UI Improvements', () => {
 
     await navigateToRecipe(page, recipeId);
 
-    // Photo should be visible, in its polaroid frame on the right page
-    const photo = page.locator('#page-right-content .recipe-polaroid .recipe-photo');
+    // Photo should be visible, in its polaroid frame on the right page,
+    // floated in the title row beside the title
+    const photo = page.locator('#page-right-content .recipe-title-row > .recipe-polaroid .recipe-photo');
     await expect(photo).toBeVisible({ timeout: 10000 });
 
     // Photo upload input should be absent
