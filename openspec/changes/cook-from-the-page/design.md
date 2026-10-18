@@ -70,7 +70,7 @@ The usability runs are in the audit worktree `/Users/mazhewitt/projects/recipe-v
   - total time goes in the popover.
 - **Targets:**
   - the top of step 1 is at most 180px below the right page's top at 810×1080, 1080×810 and 1280×800 for Lemon Drizzle Cake and the lasagne;
-  - on the phone the first ingredient row is at most 200px from the top of the viewport.
+  - on the phone the first ingredient row is at most 260px from the top of the viewport. (First written as 200px. The book's chrome alone puts the first content row at 162px, so the owner chose at the merge, 2026-10-18, to drop the panels' repeated heading on the phone and relax the target: the paper tab names the panel, and "clear ticks" moves to the end of the meta line.)
   - Record the before and after with `tests/usability/runs/audit-post-steady/counter/remeasure.cjs header-block-before-method`.
 - This replaces steady-cooking-spread D9's "Share and photo end the meta line" and the meta-line layout. Every e2e test that finds share, add-photo, difficulty or tags on the meta line now opens "⋯" first. Don't delete them; rewrite them.
 

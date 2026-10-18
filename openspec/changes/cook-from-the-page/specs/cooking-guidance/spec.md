@@ -86,7 +86,7 @@ The system SHALL let the cook tick off ingredients and mark the method step they
 
 #### Scenario: Clearing the ticks
 - **WHEN** at least one ingredient is ticked on the displayed recipe
-- **THEN** a "Clear ticks" control (`.clear-ticks`) is shown in the ingredients header; it passes family-recipe-ui's 44×44 hit-area test, and its appearance does not change the header's height
+- **THEN** a "Clear ticks" control (`.clear-ticks`) is shown in the ingredients header (on the phone, where the panels carry no header, at the end of the meta line); it passes family-recipe-ui's 44×44 hit-area test, and its appearance does not change the height of the row that holds it
 - **AND** activating it removes every tick of that recipe and leaves the step mark (`aria-current="step"`), the servings shown and their stored values in `rv-place:<id>` untouched
 
 #### Scenario: Clear ticks is hidden while nothing is ticked

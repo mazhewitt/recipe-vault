@@ -3,6 +3,7 @@ import {
   ANCHORS,
   AnchorResult,
   authenticate,
+  CLEAR_TICKS_ROW,
   createCookingRecipe,
   expectAnchorsStill,
   isPhone,
@@ -455,7 +456,7 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
         return M.isAnimating();
       })).toBe(false);
     }
-    const headerSel = '.tab-panel[data-tab="ingredients"] .section-header:visible';
+    const headerSel = CLEAR_TICKS_ROW;
     const clear = page.locator(`${headerSel} .clear-ticks`);
     await clear.scrollIntoViewIfNeeded();
     const clearAnchors = [

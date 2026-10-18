@@ -33,6 +33,7 @@ The recipe book SHALL render as an open book with a red leather cover frame cont
 - **WHEN** a recipe is displayed on a viewport 600px wide or narrower
 - **THEN** only the right page is visible, showing above the tabs one line holding the title (one line, ellipsised: computed `white-space: nowrap` and `text-overflow: ellipsis`), the thumbnail and `button.recipe-more`, then the active tab's content one item per line, with ingredient and step text at 17px
 - **AND** the meta line with the servings stepper is the first row of the Ingredients tab, not above the tabs
+- **AND** the Ingredients and Method panels carry no section header (the paper tab names them), and "Clear ticks" ends the meta line, 46px in from its end, clear of the stepper and of `button.recipe-more`; above 600px it is back in the Ingredients header
 - **AND** the footer reads "‹ previous recipe", the page number and "next recipe ›"
 
 ### Requirement: Recipe metadata displays with icons
@@ -345,7 +346,7 @@ The compact header SHALL put step 1 high enough on the page that most of a metho
 #### Scenario: Phone
 
 - **WHEN** either recipe is displayed at 390×844 with the Ingredients tab active and scrolled to the top
-- **THEN** the top of the first `.ingredient-item` is at most 200px from the top of the viewport
+- **THEN** the top of the first `.ingredient-item` is at most 260px from the top of the viewport (the book's chrome alone puts the first content row at 162px)
 
 #### Scenario: Recorded before and after
 

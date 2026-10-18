@@ -85,7 +85,7 @@ Load via Google Fonts: `Kalam:wght@300;400;700` and `Libre+Baskerville:ital,wght
 | Recipe Title | Kalam | 27px | 400 | 1.3 | ink-dark |
 | Contents Title | Kalam | 30px | 700 | 1.3 | ink-dark |
 | Contents Letter Header | Kalam | 22px | 700 | 1.4 | leather |
-| Section Header | Kalam | 19px, "Ingredients" / "Method", one rule (`border-bottom`), no underline | 400 | 1.4 | accent-brown |
+| Section Header | Kalam | 19px, "Ingredients" / "Method", one rule (`border-bottom`), no underline; not shown on the phone, where the paper tabs name the panels | 400 | 1.4 | accent-brown |
 | Meal Plan Title | Kalam | 28px | 400 | 1.4 | ink-dark |
 | Step Number | Kalam | 18px | 700 | 1.4 | leather |
 | Contents Entry | Libre Baskerville | 15px | 400 | 1.35 | ink-dark |
@@ -272,7 +272,7 @@ The same in contents, cook and notes mode.
 
 - **Wide, line 1:** the title (wraps by words), a 44 × 44px tilted polaroid thumbnail (`.recipe-polaroid`, opens the full-window preview) and a "⋯" button (`button.recipe-more`, `aria-expanded`, `aria-haspopup="dialog"`).
 - **Wide, line 2:** `serves − N +` (`.meta-serves`) · total time. Then `method:`.
-- **Phone:** one line above the tabs (title ellipsised, thumbnail, "⋯"); the stepper line is the first row of the Ingredients tab; total time goes in the popover.
+- **Phone:** one line above the tabs (title ellipsised, thumbnail, "⋯"); the stepper line is the first row of the Ingredients tab; total time goes in the popover. The panels carry no section header (the paper tab names them), so "clear ticks" ends the stepper line, in its flow, 46px in from the end: off the page's right edge, its hit area clear of "⋯" just above. `placeMetaLine` moves it there and back into the Ingredients header above 600px. The first ingredient sits at 254px at 390 × 844.
 - **"⋯" popover** (`.recipe-more-panel`, `role="dialog"`, `--color-paper-cream`, Kalam 15px; its times, the breakdown and the phone's total, in the serif with tabular figures like the meta line): overlaid under the button, so opening it moves nothing. It holds the difficulty dots (their reserved slot, so a late difficulty never moves the page), the tag chips, the prep/cook split, share and add-photo. It closes on an outside tap, Escape, a page turn or mode change, and once share or add-photo starts.
 
 ### The Servings Stepper
@@ -840,7 +840,7 @@ Known gaps, owned elsewhere: the A-Z letters (`scratch:contents-page-rough-edges
 |------|-----|------|
 | Ingredient tick | Tap an `.ingredient-item[data-index]`; tap again to untick. Rows are `--ingredient-row` tall (38px; 36px on the phone) from vertical padding, not margin, so the row is the tap target edge to edge | `data-ticked="true"`: struck through in `--color-pencil`, `opacity: 0.65` (never below 0.6), and a pencil ✓ (`::before`, Kalam 15px) in the gutter left of the line (on the left page, in the margin left of the rule), no change to the row's box |
 | "You are here" | Tap a `.prep-step[data-step]`; one step at a time, tap again to clear. A tap on the step's duration button does not mark it (buttons inside a line keep their own job) | `aria-current="step"`: a 4px `--color-leather` bar (`::after`, `left: -10px`) down the step's left margin and a faint warm tint (`rgba(139, 45, 26, 0.07)`, `--radius-sm`) behind the step, no box change. With a timer on the same step the bar stands further out (`left: -21px`; phone `-16px`), so both show |
-| Clear | "clear ticks" link (`.clear-ticks`, Kalam 14px, `--color-biro`, a fixed 72px width, right-aligned), absolutely placed in the ingredients header, with a 46px `::before` hit area; shown only while something is ticked | Clears the **ticks only**; the step mark stays (clear it by tapping the step). For 6 seconds the link reads "Undo" (same box) and a tap restores the cleared ticks; a new tick ends the chance |
+| Clear | "clear ticks" link (`.clear-ticks`, Kalam 14px, `--color-biro`, a fixed 72px width, right-aligned), absolutely placed in the ingredients header (on the phone, at the end of the stepper line), with a 46px `::before` hit area; shown only while something is ticked | Clears the **ticks only**; the step mark stays (clear it by tapping the step). For 6 seconds the link reads "Undo" (same box) and a tap restores the cleared ticks; a new tick ends the chance |
 
 - Held per recipe id in `sessionStorage['rv-place:<id>']`, so they survive a reload and paging away and back.
 - `click`, never `touchstart`, so a scroll that starts on a line does not tick it. Buttons and links inside a line keep their own job.

@@ -24,6 +24,7 @@
 - [x] 3.1 `design-system.md`: tokens, background, desk sizes, ingredient rows, pages that scroll like paper, tape, headers, meta line, duration clock, ribbons removed
 - [x] 3.2 `openspec validate lighter-book --strict`
 - [x] 3.3 At the merge of `cook-from-the-page`: re-base the meta line and header requirements, plus the hit-area ribbon scenario, times and tape (design "Done at the merge")
+- [x] 3.4 `.scratch/ingredient-groups` filed for after the release
 
 ## 4. Merge with `cook-from-the-page`
 
@@ -32,4 +33,4 @@
 - [x] 4.3 The tick in the margin: `lighter-book.spec` "margin rule" case. Red-check: tick back at −16px → its right edge at 57px, red; restored byte-identical
 - [x] 4.4 Popover times (`.meta-breakdown`, `.more-total`) in the serif
 - [x] 4.5 Full e2e green on the merge: 858 passed, 183 skipped, 0 failed; `cargo test` and `make lint` clean
-- [x] 3.4 `.scratch/ingredient-groups` filed for after the release
+- [x] 4.6 Owner's choice for the phone: the panels carry no heading (the paper tab names them), "clear ticks" ends the meta line; the phone target restated to 260px (cook-from-the-page verification.md)

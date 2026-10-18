@@ -466,14 +466,14 @@ test.describe('The compact header', () => {
     }
   });
 
-  // family-recipe-ui › The header leaves room for the method › Phone. Not
-  // reachable by the header alone: the book's chrome above the page (76px),
-  // the page padding (16), the paper tabs (50 + 10) and the content padding
-  // (10) put the first content row at 162px before any header, and the title
-  // line (44), the stepper line (24 + 4), "ingredients:" (35 + 12) and the
-  // servings note (20) follow. Measured 301px here (368px before this change).
-  // Escalated to the lead; fixme rather than delete, so it lists in 4.2's grep.
-  test.fixme('the first ingredient within 200px of the top on the phone', async ({ page }) => {
+  // family-recipe-ui › The header leaves room for the method › Phone. The
+  // book's chrome above the page (76px), the page padding (16), the paper tabs
+  // (50 + 10) and the content padding (10) put the first content row at 162px;
+  // the title line (44), the stepper line (24 + 4) and the reserved servings
+  // note (20) follow. The panels carry no heading on the phone (the owner's
+  // choice at the merge, 2026-10-18): 254px measured, 301px with the heading,
+  // 368px before this change.
+  test('the first ingredient within 260px of the top on the phone', async ({ page }) => {
     test.skip(!isPhone(page), 'phone only');
     await page.setViewportSize({ width: 390, height: 844 });
     for (const id of [await createLasagne(page), await createLemonDrizzle(page)]) {
@@ -484,8 +484,45 @@ test.describe('The compact header', () => {
         document.getElementById('page-right')!.scrollTop = 0;
         return document.querySelector('#page-right-content .ingredient-item')!.getBoundingClientRect().top;
       });
-      expect(top, 'first ingredient top').toBeLessThanOrEqual(200);
+      expect(top, 'first ingredient top').toBeLessThanOrEqual(260);
     }
+  });
+
+  test('on the phone the panels carry no heading, and clear ticks ends the meta line', async ({ page }) => {
+    test.skip(!isPhone(page), 'phone only');
+    const id = await createLasagne(page);
+    await openRecipe(page, id);
+    await settled(page);
+    const panel = page.locator('#page-right-content .tab-panel[data-tab="ingredients"]');
+    await expect(panel.locator(':scope > .section-header')).toBeHidden();
+    const meta = panel.locator(':scope > .recipe-meta-line');
+    const clear = meta.locator('.clear-ticks');
+    await expect(clear).toHaveCount(1);
+    await expect(clear).toBeHidden();
+    const before = (await meta.boundingBox())!;
+
+    await panel.locator('.ingredient-item').first().click();
+    await expect(clear).toBeVisible();
+    // On the meta line's row, toward its end but off the page's right edge
+    // (46px in); showing it grows nothing and moves no ingredient
+    const m = (await meta.boundingBox())!;
+    const c = (await clear.boundingBox())!;
+    expect(Math.abs(m.height - before.height), 'meta line height').toBeLessThanOrEqual(1);
+    expect(c.y).toBeGreaterThanOrEqual(m.y - 1);
+    expect(c.y + c.height).toBeLessThanOrEqual(m.y + m.height + 1);
+    expect(Math.abs(m.x + m.width - (c.x + c.width) - 46), '46px in from the end').toBeLessThanOrEqual(1);
+    const plus = (await meta.locator('.servings-step').last().boundingBox())!;
+    expect(c.x, 'right of the stepper').toBeGreaterThan(plus.x + plus.width + 22);
+    await expectHitArea(page, '#page-right-content .recipe-meta-line .clear-ticks');
+    await expectHitArea(page, '#page-right-content button.recipe-more');
+
+    await openTab(page, 'method');
+    await expect(page.locator('#page-right-content .tab-panel[data-tab="method"] > .section-header')).toBeHidden();
+
+    // Wider than 600px it goes back into the Ingredients heading
+    await page.setViewportSize({ width: 810, height: 1080 });
+    await expect(page.locator('.tab-panel[data-tab="ingredients"] > .section-header .clear-ticks')).toHaveCount(1);
+    await expect(page.locator('.recipe-meta-line .clear-ticks')).toHaveCount(0);
   });
 });
 

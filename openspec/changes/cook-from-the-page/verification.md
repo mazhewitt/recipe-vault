@@ -31,7 +31,7 @@ Fixes from review, each red-checked the same way:
 
 ## 4.2 Gates (final run, HEAD 865995e)
 
-- `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts`: one hit, added by this change (ce240a8): `recipe-display.spec.ts:476` "the first ingredient within 200px of the top on the phone". It stays `fixme` pending the owner's decision on the phone target (see 4.3). Nothing else.
+- `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts`: one hit, added by this change (ce240a8): `recipe-display.spec.ts:476` "the first ingredient within 200px of the top on the phone". It stayed `fixme` pending the owner's decision on the phone target (see 4.3), and is a real test again since the merge. Nothing else.
 - `cargo test`: 258 passed, 0 failed. `make lint`: clean. `openspec validate cook-from-the-page --strict`: valid (two INFO notes: the MODIFIED requirements come from steady-cooking-spread, so this change archives after it).
 - Full e2e suite, port 3002 (killed before and after): 837 passed, 180 skipped, 0 failed (15.6m), chromium, mobile-chrome and ipad.
 
@@ -46,13 +46,19 @@ The counter script runs every check whatever its filter argument, and it hung af
 | tablet 810×1080: step 1 below the right page's top | 294px (meta line 101px, ~3 rows) | **178px** (meta 24px, 1 row) | **178px** | ≤180 met |
 | tablet-landscape 1080×810 | 267px (74px, ~3 rows) | **165px** (24px, 1 row) | **165px** | ≤180 met |
 | phone 390×844: step 1 below the page top | 328px | 177px | 177px | (none) |
-| phone: first ingredient from the viewport top, Ingredients tab | 368px | **301px** | **301px** | ≤200 **NOT MET** |
+| phone: first ingredient from the viewport top, Ingredients tab | 368px | **301px** | **301px** | ≤200 **NOT MET**; at the merge, with no heading on the phone: **254px**, against the restated ≤260, met |
 | share / add-photo | meta line, same row | in the "⋯" popover; same row once it is open | same | |
 | steps fully visible | tablet 5/10, landscape 4/10, phone 4/10 | 6/6 | tablet 7/10, landscape 5/10, phone 5/10 | |
 
 The 1280×800 target is covered by e2e (recipe-display › step 1 sits within 180px of the page top (wide), chromium).
 
 **The phone target cannot be met as designed.** The book chrome above the header is 162px. Add the one-line header (44px) and the meta line already sits at 206px, before the Ingredients tab's stepper line, the `ingredients:` heading and the reserved `.servings-note` slot. The e2e case stays `test.fixme` (recipe-display.spec.ts, "the first ingredient within 200px of the top on the phone") until the owner decides: relax the target in design.md P3 and the spec, or compress the chrome or the Ingredients tab's lead-in.
+
+**Resolved at the merge into `cooking-ux-loop` (2026-10-18).** The owner chose to drop the repeated heading on the phone. The paper tab already names the panel, so the Ingredients and Method panels carry no section header there, and `placeMetaLine` moves "clear ticks" to the end of the meta line, back into the heading above 600px. The first ingredient is now at 254px. The target is restated to ≤260px, and the `test.fixme` is a real test again ("the first ingredient within 260px of the top on the phone"), with a second test for the heading and the "clear ticks" position. Red-checks:
+- headings shown again: both tests red;
+- "clear ticks" left in the hidden heading: the new test and three place-keeping tests red.
+
+Both files were restored byte-identical. The other measured options were: also dropping the reserved servings-note line (234px), and also the hidden user chip's slot (198px). Those are left for later.
 
 ### ingredient-rows-tight-for-ticking (`cook/remeasure.cjs 3034 ingredient-rows-tight-for-ticking`)
 

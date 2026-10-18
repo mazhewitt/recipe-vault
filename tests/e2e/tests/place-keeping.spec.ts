@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createCookingRecipe, expectHitArea, isPhone, openRecipe, openTab } from './helpers';
+import { authenticate, CLEAR_TICKS_ROW, createCookingRecipe, expectHitArea, isPhone, openRecipe, openTab } from './helpers';
 
 /**
  * cooking-guidance › The cook can keep their place in a recipe, and
@@ -303,7 +303,7 @@ test.describe('Keeping your place', () => {
     await createCookingRecipe(page);
     await authenticate(page);
     await openCooking(page, r.id);
-    const header = page.locator('.tab-panel[data-tab="ingredients"] .section-header:visible');
+    const header = page.locator(CLEAR_TICKS_ROW);
     const clear = header.locator('.clear-ticks');
     await expect(clear).toBeHidden();
     const headerHeight = (await header.boundingBox())!.height;
@@ -319,7 +319,7 @@ test.describe('Keeping your place', () => {
     await tap(page, step(page, 2));
     await toIngredients(page);
     await clear.scrollIntoViewIfNeeded();
-    await expectHitArea(page, '.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks');
+    await expectHitArea(page, `${CLEAR_TICKS_ROW} .clear-ticks`);
     await clear.click();
 
     await expect(page.locator('.ingredient-item[data-ticked="true"]')).toHaveCount(0);
@@ -337,7 +337,7 @@ test.describe('Keeping your place', () => {
   test('clear ticks is hidden while nothing is ticked, even with a step marked', async ({ page }) => {
     const r = await createCookingRecipe(page);
     await openCooking(page, r.id);
-    const clear = page.locator('.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks');
+    const clear = page.locator(`${CLEAR_TICKS_ROW} .clear-ticks`);
     await toMethod(page);
     await tap(page, step(page, 2));
     await expect(step(page, 2)).toHaveAttribute('aria-current', 'step');
@@ -351,7 +351,7 @@ test.describe('Keeping your place', () => {
     await createCookingRecipe(page);
     await authenticate(page);
     await openCooking(page, r.id);
-    const clear = page.locator('.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks');
+    const clear = page.locator(`${CLEAR_TICKS_ROW} .clear-ticks`);
 
     await tap(page, ingredient(page, 1));
     await tap(page, ingredient(page, 3));
@@ -384,7 +384,7 @@ test.describe('Keeping your place', () => {
     await authenticate(page);
     await openCooking(page, r.id);
     await tap(page, ingredient(page, 0));
-    const sel = '.tab-panel[data-tab="ingredients"] .section-header:visible .clear-ticks';
+    const sel = `${CLEAR_TICKS_ROW} .clear-ticks`;
     await expect(page.locator(sel)).toBeVisible();
     await page.locator(sel).scrollIntoViewIfNeeded();
     await expectHitArea(page, sel);

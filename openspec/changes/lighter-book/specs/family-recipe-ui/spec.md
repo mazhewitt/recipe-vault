@@ -78,6 +78,7 @@ Text in the recipe book and note input SHALL use two font families with appropri
 
 - **WHEN** a recipe is displayed
 - **THEN** the section headers read "Ingredients" and "Method", each with a bottom border and a computed `text-decoration-line` of `none`
+- **AND** on the phone, where the paper tabs name the panels, they are not displayed
 
 #### Scenario: Body text stays readable on paper
 
@@ -138,6 +139,7 @@ The recipe book SHALL render as an open book with a red leather cover frame cont
 - **WHEN** a recipe is displayed on a viewport 600px wide or narrower
 - **THEN** only the right page is visible, showing above the tabs one line holding the title (one line, ellipsised: computed `white-space: nowrap` and `text-overflow: ellipsis`), the thumbnail and `button.recipe-more`, then the active tab's content one item per line, with ingredient and step text at 17px
 - **AND** the meta line with the servings stepper is the first row of the Ingredients tab, not above the tabs
+- **AND** the Ingredients and Method panels carry no section header (the paper tab names them), and "Clear ticks" ends the meta line, 46px in from its end, clear of the stepper and of `button.recipe-more`; above 600px it is back in the Ingredients header
 - **AND** the footer reads "‹ previous recipe", the page number and "next recipe ›"
 
 ### Requirement: Recipe metadata displays with icons

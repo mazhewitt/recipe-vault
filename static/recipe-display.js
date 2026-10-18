@@ -556,17 +556,25 @@ export function closeMorePanel() {
 /**
  * Puts the meta line where this width reads it: under the title line above
  * 600px, the first row of the Ingredients tab on the phone. One node, moved.
+ * "clear ticks" goes with it: the phone's panels carry no heading (the paper
+ * tab names them), so there it sits at the end of the meta line, and above
+ * 600px it goes back into the Ingredients heading.
  */
 export function placeMetaLine(root = document.getElementById('page-right-content')) {
     const meta = root?.querySelector('.recipe-meta-line') || document.querySelector('.recipe-meta-line');
     if (!meta) return;
+    const panel = root?.querySelector('.tab-panel[data-tab="ingredients"]')
+        || document.querySelector('.tab-panel[data-tab="ingredients"]');
+    const heading = panel?.querySelector('.section-header');
     if (isMobile()) {
-        const panel = root?.querySelector('.tab-panel[data-tab="ingredients"]')
-            || document.querySelector('.tab-panel[data-tab="ingredients"]');
         if (panel && panel.firstElementChild !== meta) panel.prepend(meta);
+        const clear = heading?.querySelector('.clear-ticks');
+        if (clear) meta.append(clear);
     } else {
         const header = document.querySelector('#page-right-content .recipe-header');
         if (header && header.nextElementSibling !== meta) header.after(meta);
+        const clear = meta.querySelector('.clear-ticks');
+        if (clear && heading) heading.append(clear);
     }
 }
 

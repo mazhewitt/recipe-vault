@@ -190,7 +190,10 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     // Method header and numbered steps. The phone shows one panel at a time, so
     // the method section is behind its tab there.
     if (isPhone(page)) await openTab(page, 'method');
-    await expect(page.locator('.section-header').filter({ hasText: 'method' })).toBeVisible();
+    // On the phone the paper tab names the panel, so it carries no heading
+    const methodHeader = page.locator('.section-header').filter({ hasText: 'method' });
+    if (isPhone(page)) await expect(methodHeader).toBeHidden();
+    else await expect(methodHeader).toBeVisible();
     const steps = page.locator('.prep-step');
     await expect(steps).toHaveCount(2);
     await expect(steps.nth(0)).toHaveAttribute('data-step', '1');

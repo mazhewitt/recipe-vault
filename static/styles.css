@@ -1124,6 +1124,18 @@ body::before {
     position: relative;
 }
 
+/* On the phone it ends the meta line instead (placeMetaLine), in the line's
+   flow: shorter than the line, so showing it grows nothing. 46px in from the
+   end keeps it off the page's right edge and its hit area clear of "⋯",
+   which ends the title line just above. */
+.recipe-meta-line .clear-ticks {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    margin-left: auto;
+    margin-right: 46px;
+}
+
 .clear-ticks {
     position: absolute;
     right: 0;
@@ -2710,6 +2722,13 @@ body[data-feature-meals] .contents-tab-meals {
     /* The total time is in the popover; the meta line is the stepper */
     .recipe-meta-line .meta-sep,
     .recipe-meta-line .meta-total {
+        display: none;
+    }
+
+    /* The paper tab names the panel, so the panels carry no heading of their
+       own; "clear ticks" moves to the end of the meta line (placeMetaLine) */
+    #page-right-content .tab-panel[data-tab="ingredients"] > .section-header,
+    #page-right-content .tab-panel[data-tab="method"] > .section-header {
         display: none;
     }
 

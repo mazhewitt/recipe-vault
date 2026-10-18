@@ -184,6 +184,13 @@ export function isTablet(page: Page): boolean {
 }
 
 /**
+ * The row that holds "clear ticks": the Ingredients heading above 600px, the
+ * meta line on the phone, where the panels carry no heading (the paper tab
+ * names them).
+ */
+export const CLEAR_TICKS_ROW = '.tab-panel[data-tab="ingredients"] :is(.section-header, .recipe-meta-line):has(.clear-ticks):visible';
+
+/**
  * A desk: above the phone breakpoint with a mouse or trackpad (the `chromium`
  * project), where the book's type is about 90% of its counter size
  * (lighter-book L1). The `ipad` project is a touch screen at counter size.
