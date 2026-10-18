@@ -1,6 +1,7 @@
 # Deploy book-spread-modes: merge, tag, purge the Cloudflare cache
 
 Status: ready-for-human
+Resolved: 2026-10-18 (v2.10.0, e898366)
 Reported: 2026-09-09
 Reporter: Claude (task 10.3 of the archived change, which is a deployer step)
 
@@ -37,3 +38,11 @@ there is nothing to test against a copy of the production database this time.
 The branch `book-spread-modes` (no prefix) is a stale ancestor of `main` with no
 commits of its own — it was the branch the proposal was written on, before it
 merged. It is now confusable with `implement-book-spread-modes`. Delete it.
+
+## Comments
+
+**2026-10-18.** Shipped in v2.10.0, the combined Journal 2.0 release (`main`
+fast-forwarded and pushed, tagged, Docker image built, NAS container
+recreated); the owner purged the Cloudflare cache. The stale
+`book-spread-modes` and `implement-book-spread-modes` branches no longer
+exist. `02-open-decisions.md` is still open, so the directory stays.

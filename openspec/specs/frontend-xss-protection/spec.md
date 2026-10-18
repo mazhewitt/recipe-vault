@@ -1,7 +1,7 @@
 # frontend-xss-protection Specification
 
 ## Purpose
-TBD - created by archiving change ui-code-refactor. Update Purpose after archive.
+Ensures recipe data, chat messages and notes are escaped before they reach the page, so text a family member or the model writes can never run as script.
 ## Requirements
 ### Requirement: HTML Escaping Utility
 

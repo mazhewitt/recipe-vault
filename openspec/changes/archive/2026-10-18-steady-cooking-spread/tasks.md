@@ -368,8 +368,8 @@ The largest group. Checkpoint with a green run of `margin-notes.spec.ts` after 3
   - the timer pill position
   - Also add a section on the reply sticky, the in-flight line, ribbons, hit areas and place keeping.
 - [x] 9.6 `planned-ideas/ui-v2-journal/README.md`: note that the interaction model's "keep the last two or three notes visible" (≈120) became one sticky above the input, and that timers now chime and persist.
-- [ ] 9.7 Hand-off to `safe-page-navigation`:
+- [x] 9.7 Hand-off to `safe-page-navigation` (done: it was written against this change's versions, and this change archives first, 2026-10-18):
   - Its spec deltas must be written against this change's versions of family-recipe-ui "Phone page tabs" and "Recipe book displays as open two-page spread with leather cover", and web-chat "Recipe Artifact Event Handling".
   - Archive this change first.
   - Its N1 removes `.mobile-edge-nav`, after which `layout-stability.spec.ts` and `place-keeping.spec.ts` can tap anywhere on a phone line.
-- [ ] 9.8 Deployment is not an implementation step. This change touches static assets only: tag a release and purge the Cloudflare cache (CLAUDE.md).
+- [x] 9.8 Deployment is not an implementation step. This change touches static assets only: tag a release and purge the Cloudflare cache (CLAUDE.md). Released in v2.10.0 (e898366, 2026-10-18); the owner purged the Cloudflare cache.

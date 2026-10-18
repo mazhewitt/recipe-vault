@@ -1,7 +1,7 @@
 # meal-planning Specification
 
 ## Purpose
-TBD - created by archiving change meal-planning-phase-1. Update Purpose after archive.
+Lets the cook assemble several recipes into a meal plan through the chat and see it as a panel in the book.
 
 ## Requirements
 

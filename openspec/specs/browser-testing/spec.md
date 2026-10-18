@@ -67,9 +67,13 @@ The system SHALL provide Playwright tests that verify the note input, margin ren
 - **AND** sending four notes leaves at most three notes visible in the margin
 
 #### Scenario: AI edit refreshes the page
-- **WHEN** the mock LLM answers "halve this recipe" by calling `update_recipe`
+- **WHEN** the mock LLM answers "update this recipe" by calling `update_recipe`
 - **THEN** the displayed recipe re-renders with the updated servings
 - **AND** a one-line margin note describes the change
+
+#### Scenario: AI scaling sets the page's servings
+- **WHEN** an 8-serving recipe is displayed and the mock LLM answers "halve this recipe" by calling `set_servings` with 4
+- **THEN** `.servings-count` reads "4" and the quantities are scaled, with no re-render of the recipe and no request to `/api/recipes`
 
 #### Scenario: Phone tabs can be tested
 - **WHEN** a recipe is displayed in the mobile-chrome project and the Method tab is tapped

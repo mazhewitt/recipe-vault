@@ -1,7 +1,7 @@
 # frontend-modules Specification
 
 ## Purpose
-TBD - created by archiving change ui-code-refactor. Update Purpose after archive.
+Keeps the static frontend as ES modules with clear boundaries and no shared globals, so each part of the book (display, navigation, spread modes, timers, chat) can change without breaking the others.
 
 ## Requirements
 
@@ -22,6 +22,8 @@ The system SHALL organize frontend JavaScript code into ES modules with clear se
   - `navigation.js` (recipe navigation state and footer links)
   - `page-transitions.js` (page-turn animation, tab crossfade, swipe gestures, prefetch cache)
   - `meal-plan-display.js` (meal plan panel rendering)
+  - `place-keeping.js` (ingredient ticks, the current-step mark, the stepper's servings and their per-recipe `sessionStorage` memory; the screen wake lock while a recipe or meal plan is displayed)
+  - `servings.js` (the servings stepper: scaled ingredient quantities, rounded for reading, for the session only; the `servings_set` event's target)
   - `utils.js` (shared helpers: `escapeHtml`, `renderMarkdown`)
 
 #### Scenario: Entry point loads modules

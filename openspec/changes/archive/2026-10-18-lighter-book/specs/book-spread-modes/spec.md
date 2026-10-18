@@ -46,6 +46,6 @@ While a recipe is open on a viewport wider than 600px, a spread mode change SHAL
 - **AND** in `contents` and `notes` modes no `.ingredients-list` is displayed on either page
 - **AND** returning to `cook` puts the same panel back on the left page, so `applyStepHighlight` and any ticked ingredients keep their single target
 
-#### Scenario: No strip on the right edge in any mode
+#### Scenario: The ribbons stay inert in every mode
 - **WHEN** a recipe is open in `notes` or `contents` mode on a viewport wider than 600px
-- **THEN** there is no `.edge-tab` in the document, and a click 6px inside the right page's outer edge changes neither page's content nor `#page-right`'s `scrollTop`
+- **THEN** there are no ribbons to stay inert: the right page's edge holds no strip, there is no `.edge-tab` in the document, and a click 6px inside the right page's outer edge changes neither page's content nor `#page-right`'s `scrollTop`

@@ -29,9 +29,9 @@ The interface SHALL display the recipe book alone, filling the available width, 
 
 While a recipe is displayed, ingredient lines and method step text SHALL render at 18px on viewports wider than 600px and at 17px on viewports 600px wide or narrower, and step durations at 15px. The exception is the desk: on a viewport wider than 600px whose primary pointer is fine and can hover (`(hover: hover) and (pointer: fine)`, a mouse or trackpad), the book is read from a chair. There, method step text SHALL render at 16px, ingredient lines a size under it at 15px and step durations at 14px, the rest of the book's type at about 90% of its counter size, and every box and hit area at its counter size, except the ingredient rows ("Ingredient rows are tall enough to tick"). Ingredient lines SHALL be one per row at an even pitch. The contents page and the Notes thread keep their own sizes.
 
-#### Scenario: Tablet
+#### Scenario: Tablet and desktop
 
-- **WHEN** a recipe is displayed on a viewport wider than 600px with a coarse primary pointer
+- **WHEN** a recipe is displayed on a viewport wider than 600px with a coarse primary pointer (a tablet, or a touch-screen desktop; a mouse or trackpad is "At the desk")
 - **THEN** `.ingredient-item` on the left page in `cook` mode, and `.prep-step .step-text` in every spread mode, have a computed font-size of 18px
 - **AND** `.step-duration` has a computed font-size of 15px
 - **AND** the computed line-height of the method list is at least 1.6 times its font-size
@@ -214,6 +214,11 @@ The recipe header SHALL be compact and the same in every spread mode: a title li
 - **WHEN** a recipe whose difficulty is not yet known is displayed
 - **THEN** `.meta-difficulty` is present in its place (the Ingredients heading above 600px, the popover on the phone), shows no dots, and is as wide as it is when it holds the label and five dots
 - **AND** when the difficulty arrives later, with the popover open or closed, only the slot's contents change: the title line, the meta line, the Ingredients heading, the slot and every `.prep-step` keep their bounding boxes (tolerance 1px)
+
+#### Scenario: Share and photo end the meta line
+- **WHEN** a recipe is displayed
+- **THEN** `.share-btn` and `.add-photo-btn` are no longer on `.recipe-meta-line`: they end the "⋯" popover, in `.more-actions` (see "The popover's contents")
+- **AND** each still has a bounding box of at least 44×44px
 
 #### Scenario: The same header in every mode
 

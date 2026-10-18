@@ -138,75 +138,6 @@ The system SHALL maintain conversation context within a browser session, includi
 - **AND** the user sends a follow-up message
 - **THEN** both tool calls and their results are present in the conversation history
 
-### Requirement: Web User Interface
-
-The system SHALL provide a web-based chat interface in which the user writes notes into the recipe book and AI replies render as margin notes on the open page; the full thread **for the open recipe** is available from the Notes view.
-
-#### Scenario: Send message via UI
-- **WHEN** a user types a note and presses Enter or taps send
-- **THEN** the note is sent to the API
-- **AND** it is stored in the thread as a user entry and appears in the Notes view without a speaker prefix
-
-#### Scenario: Display streaming response
-- **WHEN** chunks arrive via SSE for an AI response
-- **THEN** a single streaming margin note in `#page-margin` grows in place as text arrives
-- **AND** on the `done` event the note loses its streaming state and stays in the margin
-
-#### Scenario: Display tool use
-- **WHEN** a `tool_use` event is received
-- **THEN** a muted status line naming the tool appears in `#page-margin`
-
-#### Scenario: Handle errors gracefully
-- **WHEN** an `error` event is received or the request fails
-- **THEN** the error text appears as a margin note styled in the leather red
-- **AND** the note input is re-enabled so the user can try again
-
-#### Scenario: Display recipe artifact
-- **WHEN** a `recipe_artifact` event is received
-- **THEN** the right page shows the loading skeleton
-- **AND** the frontend fetches recipe data from /api/recipes/:id
-- **AND** renders the recipe on the right page when the fetch completes, leaving `#page-margin` and its notes in place
-
-#### Scenario: Responsive layout with artifact
-- **WHEN** the viewport is wider than 1024px and a recipe is displayed in `cook` mode
-- **THEN** the left page shows the ingredients and the right page shows the method, with no margin column
-- **AND** a reply is pinned to the top corner of the method page as a single slip, so a note written while cooking still gets a visible answer
-- **WHEN** the viewport is wider than 1024px and a recipe is displayed in `contents` or `notes` mode
-- **THEN** the right page is a two-column grid with the recipe content beside a 150px margin column
-- **WHEN** the viewport is 1024px or narrower and wider than 600px
-- **THEN** the margin column collapses and notes render beneath the right page content
-- **WHEN** the viewport is 600px or narrower
-- **THEN** a single page with Ingredients / Method / Notes tabs is shown and the last three notes for the open recipe render beneath the active tab's content
-
-#### Scenario: Reply renders as a margin note
-- **WHEN** a recipe is displayed and an AI reply completes
-- **THEN** the reply is rendered as markdown inside a `.margin-note[data-kind="reply"]` element in `#page-margin`
-- **AND** the note uses the handwritten font in the biro colour
-
-#### Scenario: Margin shows the last three notes
-- **WHEN** more than three reply or status notes exist for the open recipe
-- **THEN** only the three most recent of that recipe's notes are rendered in `#page-margin`
-- **AND** all entries remain available from the thread store and the Notes view
-
-#### Scenario: Reply on the contents page renders as a sticky note
-- **WHEN** the contents page is displayed and an AI reply completes
-- **THEN** the latest reply is rendered as a single `.sticky-note` pinned to the top of the right page (or beneath the contents on phones)
-- **AND** earlier notes are not shown until a recipe is opened
-
-#### Scenario: Timer confirmation renders as a status line
-- **WHEN** a `timer_start` event is received
-- **THEN** the timer starts as today
-- **AND** a status line such as "Timer set: Marinate chicken, 30 min" appears in `#page-margin`
-
-#### Scenario: Notes tab shows the full thread
-- **WHEN** the user opens the Notes view (the left-edge Notes tab on desktop, the paper tab on phone)
-- **THEN** it lists every user note, reply and status line written while that recipe was open, in order
-- **AND** notes belonging to other recipes are not shown
-
-#### Scenario: Notes view with no recipe open
-- **WHEN** the user opens the Notes view while no recipe is displayed
-- **THEN** it lists the book-level thread: every entry written while the contents or a meal plan was displayed
-
 ### Requirement: Recipe Artifact Event Handling
 
 The system SHALL handle recipe_artifact SSE events from the chat API so that the right page always shows the current version of the recipe.
@@ -214,7 +145,8 @@ The system SHALL handle recipe_artifact SSE events from the chat API so that the
 #### Scenario: Parse recipe artifact event
 - **WHEN** a recipe_artifact SSE event is received
 - **THEN** the recipe_id is extracted from the event data
-- **AND** the right page shows the loading state immediately
+- **AND** if that recipe is not the one displayed, the right page shows the loading state immediately
+- **AND** if it is the recipe already displayed, the page keeps showing it until the refreshed data replaces it in place, with both pages' scroll positions restored
 
 #### Scenario: Fetch recipe data
 - **WHEN** a recipe_artifact event triggers a fetch
@@ -284,7 +216,7 @@ The system SHALL provide a `display_meal_plan` tool that the AI can call to sign
 
 ### Requirement: Unified System Prompt
 
-The system SHALL use a single authoritative system prompt for all chat interactions, including guidance on the recipe tag vocabulary.
+The system SHALL use a single authoritative system prompt for all chat interactions, including guidance on the recipe tag vocabulary and on when a change is shown on the page rather than saved.
 
 #### Scenario: Single prompt source
 - **WHEN** the chat agent is initialized
@@ -298,6 +230,13 @@ The system SHALL use a single authoritative system prompt for all chat interacti
   - Viewing/cooking/reading a specific recipe → `display_recipe`
   - After successful recipe creation → `display_recipe` with the new recipe_id
   - Changing a recipe's course, cuisine or diet tags → `update_recipe` with the full `tags` array
+  - Scaling for tonight ("make it for 6", "halve it", "just two of us") → `set_servings`
+  - Changing or saving the recipe on explicit request ("change the recipe to…", "save it with cream", "update the servings in the book") → `update_recipe`
+
+#### Scenario: Prompt keeps one-off changes off the saved recipe
+- **WHEN** the system prompt is sent to the LLM
+- **THEN** it tells the model to present a substitution or other one-off change for tonight in the reply, flag notable effects, and end with "Want me to save this as a change to the recipe?", calling `update_recipe` only after a yes or an explicit request
+- **AND** it tells the model that after `set_servings` the reply says the page now shows N servings and the saved recipe is unchanged
 
 #### Scenario: Prompt examples match tool schemas
 - **WHEN** the system prompt includes tool call examples
@@ -320,15 +259,29 @@ The system SHALL inject a reminder into messages when conversations reach 5 or m
   - Use `list_recipes` when the user asks to see their recipes
   - Use `display_recipe` to show recipe details in the side panel
   - After creating a recipe, call `display_recipe` with the new recipe_id
+  - Use `set_servings` to scale for tonight, and `update_recipe` only when the user asks to change or save the recipe
+  - When guiding cooking, give the first step first
   - Do not output full ingredient lists or steps in chat
+- **AND** the reminder does not tell the model to ask for servings first
 
 ### Requirement: Logout UI
 
-The system SHALL provide a logout button in the chat interface.
+The system SHALL provide a logout button in the chat interface. On the phone it SHALL appear only on the contents page, so that while a recipe is being cooked it takes no room and sits next to no cooking control. Showing or hiding it SHALL move nothing else on the page.
 
 #### Scenario: Logout button displayed
-- **WHEN** a user is viewing the chat interface
-- **THEN** a logout button is visible in the header
+- **WHEN** a user is viewing the chat interface on a viewport wider than 600px
+- **THEN** the `.user-info` chip with its logout link is visible above the book in every view
+
+#### Scenario: Logout stays off the phone's cooking screens
+- **WHEN** the viewport is 600px or narrower and a recipe or meal plan is displayed
+- **THEN** `.user-info` is not displayed
+- **AND** when the contents page is displayed it is visible again
+
+#### Scenario: Hiding the chip on the phone moves nothing
+- **WHEN** the viewport is 600px or narrower and the cook opens a recipe from the contents, and then returns to the contents with the Recipe Book header
+- **THEN** `.book-container`'s `getBoundingClientRect()` x, y, width and height each stay within 1px of their value on the contents page, on every animation frame of both page turns
+- **AND** no `layout-shift` entry whose sources include `.app-container` or `.book-container` is recorded during either turn
+- **AND** `.user-info` takes no space in the flow at 600px and narrower: its computed `position` is `absolute` or `fixed`, or it keeps its slot with `visibility: hidden` when not displayed
 
 #### Scenario: Logout button clicked
 - **WHEN** a user clicks the logout button
@@ -337,16 +290,17 @@ The system SHALL provide a logout button in the chat interface.
 
 ### Requirement: Notes are scoped to the recipe they were written under
 
-Every thread entry SHALL record the recipe that was open when its turn began, and the margin and Notes view SHALL show only the entries belonging to the recipe currently displayed.
+Every thread entry SHALL record the recipe that was open when its turn began, and the reply sticky and Notes view SHALL show only the entries belonging to the recipe currently displayed.
 
 #### Scenario: Note is stamped at turn start
 - **WHEN** the user sends a note
-- **THEN** the user entry and every reply, status line and error produced by that turn are stamped with the recipe id that was displayed at the moment the note was sent
+- **THEN** the user entry and every reply and error produced by that turn are stamped with the recipe id that was displayed at the moment the note was sent
+- **AND** no status line is stored, so none is stamped
 
 #### Scenario: Reply arriving after navigation stays with its recipe
 - **WHEN** the user sends a note about recipe A, navigates to recipe B, and A's reply then completes
 - **THEN** the reply is filed under recipe A
-- **AND** it does not appear in recipe B's margin or Notes view
+- **AND** it does not appear on recipe B's reply sticky or in its Notes view
 
 #### Scenario: Notes written while browsing form the book thread
 - **WHEN** the user sends a note while the contents page or a meal plan is displayed
@@ -364,6 +318,303 @@ Every thread entry SHALL record the recipe that was open when its turn began, an
 #### Scenario: Empty thread for a recipe
 - **WHEN** the Notes view is opened for a recipe with no notes
 - **THEN** it shows the empty-thread message rather than another recipe's notes
+
+### Requirement: Notes and replies in the book
+
+The system SHALL provide a web-based chat interface in which the user writes notes into the recipe book and the latest AI reply for the open page renders as a single sticky note directly above the note input; the full thread **for the open recipe** is available from the Notes view.
+
+#### Scenario: Send message via UI
+- **WHEN** a user types a note and presses Enter or taps send
+- **THEN** the note is sent to the API
+- **AND** it is stored in the thread as a user entry and appears in the Notes view without a speaker prefix
+
+#### Scenario: Display streaming response
+- **WHEN** chunks arrive via SSE for an AI response
+- **THEN** a single streaming note, `#page-margin .margin-note[data-kind="reply"].streaming`, replaces the in-flight line on the reply sticky and grows in place as text arrives
+- **AND** on the `done` event the note loses its streaming state and stays on the sticky
+
+#### Scenario: Display tool use
+- **WHEN** a `tool_use` event is received
+- **THEN** the in-flight line on the reply sticky changes to the cook-language label for that tool ("Status lines speak the cook's language")
+- **AND** the tool's name is shown nowhere on the page
+- **AND** nothing is added to the thread
+
+#### Scenario: Handle errors gracefully
+- **WHEN** an `error` event is received or the request fails
+- **THEN** the error text appears on the reply sticky as `.margin-note[data-kind="error"]` styled in the leather red, and is stored in the thread
+- **AND** the turn ends: the note input, which was never disabled, accepts the next note and `#send-button` is no longer `aria-disabled`
+
+#### Scenario: Display recipe artifact
+- **WHEN** a `recipe_artifact` event is received
+- **THEN** the frontend fetches recipe data from /api/recipes/:id
+- **AND** if a different recipe was displayed, the right page shows the loading skeleton until the fetch completes and the recipe is rendered
+- **AND** if the same recipe was displayed, it is refreshed in place with no skeleton (family-recipe-ui "Refreshing the open recipe keeps the reader's place")
+- **AND** in both cases the reply sticky and its note stay in place
+
+#### Scenario: Responsive layout with artifact
+- **WHEN** the viewport is wider than 600px and a recipe is displayed in any spread mode
+- **THEN** the right page shows the recipe's title, meta line and method with no margin column, and `#page-margin` is not a descendant of `#page-right`
+- **AND** a reply is shown on the reply sticky directly above the note input at the foot of the left page, except in `notes` mode where the thread on the left page shows it
+- **WHEN** the viewport is 600px or narrower
+- **THEN** a single page with Ingredients / Method / Notes tabs is shown, no notes render beneath the active tab's content, and the reply sticky sits directly above the input bar
+
+#### Scenario: Reply renders on the sticky
+- **WHEN** a recipe is displayed and an AI reply completes
+- **THEN** the reply is rendered as markdown inside a `.margin-note[data-kind="reply"]` element in `#page-margin`
+- **AND** the note uses the handwritten font in the biro colour on the sticky-note yellow (`--color-sticky`)
+
+#### Scenario: The sticky shows only the latest reply
+- **WHEN** more than one reply or error exists for the open recipe
+- **THEN** `#page-margin` holds at most one `.margin-note`: the most recent reply or error of that recipe's thread, or the in-flight line while a turn runs
+- **AND** all entries remain available from the thread store and the Notes view
+
+#### Scenario: Reply on the contents page renders as a sticky note
+- **WHEN** the contents page is displayed and an AI reply completes
+- **THEN** the latest book-level reply is rendered on the same reply sticky directly above the note input, at the foot of the left page (directly above the input bar on phones)
+- **AND** it does not intersect `#page-right`, so it covers no entry of the contents' second half, and it can be dismissed like any other reply
+
+#### Scenario: Timer start is confirmed by the pill
+- **WHEN** a `timer_start` event is received
+- **THEN** the timer starts as today and the timer pill shows it
+- **AND** no "Timer set" line is added to the thread or shown on the reply sticky
+
+#### Scenario: Notes tab shows the full thread
+- **WHEN** the user opens the Notes view (the left-edge Notes tab on desktop, the paper tab on phone)
+- **THEN** it lists every user note, reply and error written while that recipe was open, in order
+- **AND** notes belonging to other recipes are not shown
+
+#### Scenario: Notes view with no recipe open
+- **WHEN** the user opens the Notes view while no recipe is displayed
+- **THEN** it lists the book-level thread: every entry written while the contents or a meal plan was displayed
+
+### Requirement: The latest reply is a sticky note above the input
+
+The latest assistant reply of the thread on display — the displayed recipe's thread, or the book-level thread on the contents page and with a meal plan open — SHALL appear as one sticky note directly above the note input. `#page-margin` is that sticky. It SHALL be note-paper styled, dismissible and height-capped, and it SHALL overlay the foot of the input's own page without moving or resizing any other element.
+
+#### Scenario: Above the input on the wide book
+- **WHEN** a reply is shown on a viewport wider than 600px, in any state other than `notes` mode
+- **THEN** `#page-margin` is not a descendant of `#page-right` and its computed `position` is `absolute` or `fixed`
+- **AND** its bottom edge is between 0 and 8px above the top edge of `#note-input`
+- **AND** its left and right edges are inside the bounding box of `#page-left`, so it does not intersect `#page-right`
+
+#### Scenario: Above the input bar on the phone
+- **WHEN** a reply is shown on a viewport 600px wide or narrower
+- **THEN** `#page-margin`'s bottom edge is between 0 and 8px above the top edge of `#note-input`
+- **AND** it lies wholly inside the viewport and overlays the page (computed `position` `absolute` or `fixed`), so the page above it keeps its height
+
+#### Scenario: It looks like a sticky note
+- **WHEN** the sticky is shown
+- **THEN** it has the `--color-sticky` background, and its reply text is Kalam in the `--color-biro` ink
+
+#### Scenario: Its height is capped
+- **WHEN** a reply is taller than 40% of the page the sticky sits on
+- **THEN** the sticky's height is at most 40% of `#page-left`'s client height (on the phone, of `#page-right`'s)
+- **AND** the rest of the reply scrolls inside the sticky
+
+#### Scenario: It can be dismissed
+- **WHEN** the cook taps `#page-margin .note-dismiss` (labelled "Dismiss note"), which passes family-recipe-ui's 44×44 hit-area test
+- **THEN** the sticky is no longer displayed
+- **AND** the reply is still in the thread and in the Notes view
+
+#### Scenario: A dismissed reply stays dismissed
+- **WHEN** the cook dismisses the sticky on recipe A, then opens recipe B and returns to A, or switches spread mode
+- **THEN** no sticky is shown on A
+- **AND** when a new reply for A arrives, the sticky shows it
+
+#### Scenario: The next turn replaces it
+- **WHEN** a sticky is shown and the cook sends another note
+- **THEN** the sticky's note is replaced by the new turn's in-flight line
+
+#### Scenario: Not shown beside the full thread
+- **WHEN** the spread mode is `notes`, or the phone's Notes tab is active
+- **THEN** `#page-margin` is not displayed, because the thread on the same page already shows the reply
+- **AND** leaving `notes` mode or the Notes tab shows the latest reply again, unless it was dismissed
+
+#### Scenario: Showing it moves nothing
+- **WHEN** the sticky appears, grows while a reply streams, reaches its height cap or is dismissed
+- **THEN** no other element's bounding box changes (tolerance 1px), as family-recipe-ui "Nothing on the page moves unless the cook acted on it" requires
+
+### Requirement: A turn keeps the slip still and the input live
+
+While a chat turn runs, the note input SHALL keep its size and position, its textarea SHALL stay enabled and keep focus, and a second send SHALL be refused until the turn ends. The send button SHALL look unavailable while a send would be refused. Progress SHALL be shown as one line in the reply sticky's slot and SHALL NOT be stored in the thread.
+
+#### Scenario: One in-flight line
+- **WHEN** the cook sends a note
+- **THEN** `#page-margin` shows one `.margin-note[data-kind="status"]` reading "Thinking…"
+- **AND** each `tool_use` event replaces its text with that tool's label
+- **AND** the first `chunk` replaces it with the streaming reply
+- **AND** the in-flight line is never added to the thread, so the Notes view never lists it
+
+#### Scenario: In-flight line while the thread is open
+- **WHEN** a turn runs while the spread mode is `notes` or the phone's Notes tab is active
+- **THEN** the in-flight line is shown as the last entry of the visible `.notes-thread`, and is not stored
+
+#### Scenario: The slip does not change height
+- **WHEN** the cook sends a one-line note and the turn runs to `done`
+- **THEN** `#note-input`'s bounding box is unchanged on every animation frame (tolerance 1px)
+
+#### Scenario: The textarea stays live
+- **WHEN** a turn is running
+- **THEN** `#message-input` never has the `disabled` attribute
+- **AND** if it had focus when the note was sent, `document.activeElement` is `#message-input` throughout the turn and after `done`
+- **AND** the cook can type the next note while the reply streams
+
+#### Scenario: A second send waits for the turn
+- **WHEN** the cook presses Enter or taps send while a turn is running
+- **THEN** no second `POST /api/chat` is made and the typed text stays in the textarea
+- **AND** `#send-button` has `aria-disabled="true"` until the turn ends, after which Enter and send work as normal
+
+#### Scenario: The send button looks unavailable during a turn
+- **WHEN** a turn is running, at any viewport
+- **THEN** `#send-button[aria-disabled="true"]` has a computed `opacity` of at most 0.5 and a computed `cursor` of `not-allowed`
+- **AND** its bounding box is the same as when idle (tolerance 1px), so dimming it moves nothing
+- **AND** when the turn ends (`done` or `error`) its computed `opacity` is 1 again and its cursor is `pointer`
+
+#### Scenario: A follow-up typed during a turn is kept, not sent
+- **WHEN** the cook types a follow-up and presses Enter while a turn is running, and the turn then ends
+- **THEN** the follow-up is still in `#message-input`, unchanged
+- **AND** no `POST /api/chat` is made for it until the cook presses Enter or taps send again
+
+### Requirement: Status lines speak the cook's language
+
+Progress shown to the cook SHALL say what is happening in the cook's words. Tool names, raw tool arguments and decimal minutes SHALL NOT be shown.
+
+#### Scenario: A label for each tool
+- **WHEN** a `tool_use` event arrives during a turn
+- **THEN** the in-flight line reads, for the event's tool:
+
+  | tool | line |
+  |---|---|
+  | `start_timer` | Setting a timer… |
+  | `display_recipe` | Opening the recipe… |
+  | `update_recipe` | Updating the recipe… |
+  | `create_recipe` | Writing it into the book… |
+  | `list_recipes`, `get_recipe` | Looking through the book… |
+  | `display_meal_plan` | Laying out the meal… |
+  | `fetch`, or any other tool whose name contains `fetch` or `search` | Looking it up… |
+  | anything else | Working on it… |
+
+#### Scenario: No plumbing reaches the page
+- **WHEN** any turn runs, including one that starts a timer, updates a recipe or lists recipes
+- **THEN** the text of `#page-margin`, every `.notes-thread` and `.note-input` never contains "Using tool", "Timer set", or a tool identifier such as `start_timer`, `update_recipe` or `list_recipes`
+
+### Requirement: The reply sticky never hides the end of the page
+
+While a reply sticky is shown, the scroll container whose foot it lies over SHALL gain bottom padding equal to the sticky's height plus its gap above the slip, so the last line of that page can always be scrolled clear of the sticky. The padding SHALL be added at the foot only, so nothing above it moves.
+
+The container is `#page-left` on viewports wider than 600px (the contents, the ingredients or a meal plan's left page) and `#page-right` at 600px and narrower. The clearance is published as the custom property `--sticky-clearance` on `.book-container` (`0px` while no sticky has been shown in the current view).
+
+#### Scenario: The last ingredient clears the sticky
+- **WHEN** a recipe with at least 15 ingredients is open in `cook` mode on a viewport wider than 600px, a reply of at least three lines is on the sticky, and `#page-left` is scrolled to its end
+- **THEN** the bottom edge of the last `.ingredient-item` is at or above the top edge of `#page-margin`
+
+#### Scenario: The last contents row clears the sticky
+- **WHEN** the contents page is displayed with a reply on the sticky and the page under the sticky is scrolled to its end
+- **THEN** the bottom edge of the last `.index-recipe-item` on that page is at or above the top edge of `#page-margin`
+
+#### Scenario: The phone footer links clear the sticky
+- **WHEN** a recipe is displayed on a viewport 600px wide or narrower with a reply on the sticky and `#page-right` scrolled to its end
+- **THEN** the bottom edges of the last `.ingredient-item` (Ingredients tab), of `.footer-prev` and of `.footer-next` are at or above the top edge of `#page-margin`
+- **AND** `.footer-prev` and `.footer-next` pass family-recipe-ui's 44×44 hit-area test with the sticky shown
+
+#### Scenario: The clearance moves nothing
+- **WHEN** the sticky appears, grows while a reply streams, reaches its height cap, is replaced by the next turn or is dismissed, with the page under it scrolled anywhere, including to its end
+- **THEN** every anchor of family-recipe-ui "Nothing on the page moves unless the cook acted on it" keeps its bounding box (tolerance 1px)
+- **AND** the scroll container's `scrollTop` is unchanged (tolerance 1px), so the clearance never shrinks below what the current scroll position needs while the view lasts; it returns to `0px` only when a different recipe or the contents is drawn, or the spread mode changes
+
+#### Scenario: No clearance without a sticky
+- **WHEN** no reply has been shown on the sticky in the current view, or the spread mode is `notes`, or the phone's Notes tab is active
+- **THEN** `--sticky-clearance` is `0px`, and the page's bottom padding is what it was before this requirement (the slip clearance only)
+
+### Requirement: The Notes thread follows the conversation
+
+When the thread is on screen — `notes` mode above 600px, or the phone's Notes tab — its scroll container SHALL keep the newest entry in view as the conversation grows, unless the cook has scrolled up to read earlier entries.
+
+The thread's scroll container is `#page-left` in `notes` mode and `#page-right` on the phone's Notes tab. "Pinned" means the container's `scrollHeight - scrollTop - clientHeight` was at most 48px just before an update.
+
+#### Scenario: The cook's own note scrolls into view
+- **WHEN** the thread is on screen, longer than its container and scrolled anywhere, and the cook sends a note
+- **THEN** after the note and the in-flight line are rendered, the bottom edge of the last `.notes-thread` entry is within the container's visible box and at or above the top edge of `#note-input`
+
+#### Scenario: A reply arriving is followed while pinned
+- **WHEN** the thread is on screen and pinned, and the in-flight line appears, a `chunk` arrives or the turn ends
+- **THEN** after each update the container is pinned again: the bottom edge of the last entry is within 48px of the container's visible bottom
+- **AND** the four-send sequence that left the latest reply hidden in the 2026-10-18 re-check (`notes-thread-no-autoscroll`) shows the latest reply wholly visible after every send
+
+#### Scenario: Reading earlier notes is not interrupted
+- **WHEN** the thread is on screen and the cook has scrolled it so it is not pinned, and a reply chunk arrives or the turn ends
+- **THEN** the container's `scrollTop` is unchanged (tolerance 1px)
+
+#### Scenario: Opening the thread shows the newest entry
+- **WHEN** the cook switches to `notes` mode above 600px
+- **THEN** the container is scrolled so the last entry is wholly visible above the slip
+- **AND** on the phone, opening the Notes tab shows the newest entry when an entry was added since the Notes tab was last left or it is opened for the first time on this recipe; otherwise the Notes tab's own saved position is restored, as family-recipe-ui "Phone tabs keep their own scroll position" requires
+
+#### Scenario: Following the thread moves nothing else
+- **WHEN** the thread scrolls to follow the conversation
+- **THEN** only the thread's container scrolls: `#note-input`, `#message-input` and every right-page anchor keep their bounding boxes (tolerance 1px)
+
+### Requirement: Lost-history notice only for lost conversations
+
+The chat handler SHALL tell the AI that history was lost only when the browser resumes a conversation the server no longer holds. A brand-new conversation SHALL carry no such notice.
+
+#### Scenario: First message of a new chat
+- **WHEN** a chat request arrives without a `conversation_id`
+- **THEN** the conversation sent to the LLM SHALL NOT contain a notice that the conversation was reset
+- **AND** the AI's reply does not open by apologising for a reset that never happened
+
+#### Scenario: Server lost the conversation
+- **WHEN** a chat request carries a `conversation_id` the server does not hold (expired, pruned, or the server restarted)
+- **THEN** the conversation sent to the LLM SHALL begin with a notice that the prior history is unavailable
+- **AND** the AI can briefly say it is continuing from here
+
+#### Scenario: Known conversation
+- **WHEN** a chat request carries a `conversation_id` the server holds
+- **THEN** no notice SHALL be added
+
+### Requirement: The servings_set event sets the page's stepper
+
+When the model calls `set_servings` successfully, the chat handler SHALL emit a `servings_set` SSE event carrying the servings and the id of the recipe the request was sent from, and the frontend SHALL set that recipe's servings stepper, without re-rendering the recipe and without any database write.
+
+#### Scenario: Event emitted with the current recipe's id
+- **WHEN** a chat request with `current_recipe.recipe_id` R leads to a successful `set_servings` call with servings 4
+- **THEN** the stream contains `event: servings_set` with data `{"servings":4,"recipe_id":"R"}`, before the reply's `chunk`
+- **AND** no `recipe_artifact` event is emitted for it
+
+#### Scenario: No recipe, no event
+- **WHEN** a chat request without `current_recipe` leads to a `set_servings` call
+- **THEN** no `servings_set` event is emitted
+
+#### Scenario: The open recipe's stepper is set
+- **WHEN** the frontend receives `servings_set` with recipe_id R and servings N while R is displayed
+- **THEN** `.servings-count` reads N, clamped to the stepper's range, and the quantities are scaled as if the cook had used the stepper, including the `rv-place:<R>` record
+- **AND** no request is made to `/api/recipes`
+
+#### Scenario: Another recipe is open
+- **WHEN** the frontend receives `servings_set` with recipe_id R while recipe S, the contents or a meal plan is displayed
+- **THEN** nothing on the page changes and no `rv-place` record changes
+
+#### Scenario: A recipe without servings
+- **WHEN** the frontend receives `servings_set` for the displayed recipe and that recipe has no servings
+- **THEN** nothing on the page changes
+
+#### Scenario: Status line
+- **WHEN** the model calls `set_servings`
+- **THEN** the in-flight status on the reply sticky reads "Adjusting the servings…", never the tool name
+
+### Requirement: The page's servings reach the model
+
+The current-recipe context a chat request carries SHALL include the servings the page shows, so the model can name them and scale from them.
+
+#### Scenario: Servings in the request
+- **WHEN** the cook sends a note while recipe R is displayed with its stepper at N
+- **THEN** the request body's `current_recipe` carries `"servings": N` alongside `recipe_id` and `title`
+- **AND** a recipe without servings sends no `servings` field
+
+#### Scenario: Servings in the model's context
+- **WHEN** the chat handler builds the `[Current recipe context]` block from a `current_recipe` with servings N
+- **THEN** the block contains the line `page_servings: N`, stating it is what the page shows and may differ from the saved recipe's servings
+- **AND** a `current_recipe` without servings produces no such line, and a request without the field still deserialises
 
 ## Data Types
 

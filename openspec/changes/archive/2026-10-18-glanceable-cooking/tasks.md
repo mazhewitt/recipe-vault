@@ -104,7 +104,7 @@ Stop the server you started (`kill $(cat tests/usability/runs/3036/server.pid)`)
   - `static/styles.css` `.edge-tab` (≈1203-1230): one colour for both, with no `active` look. `static/page-tabs.js`: stop toggling `active` and `aria-selected` on `.edge-tab`.
   - Test first, in `page-tabs.spec.ts` "desktop: the edge ribbons are inert": add family-recipe-ui › Right page edge ribbons › Ribbons render on a recipe (empty `innerText`, equal computed styles, no `active`, same rects as on `e35a58c`, measured first).
   - Red-check: on `e35a58c` the ingredients ribbon is `edge-tab active` with a different background (counter `ribbons-look-like-tabs`).
-- [ ] 3.6 `make lint`, then the full suite on port 3002, green.
+- [x] 3.6 `make lint`, then the full suite on port 3002, green. (Met on the merged branch: lint clean, 862 passed locally and on CI run 39159927535.)
 
 ## 4. Verification
 
@@ -133,4 +133,4 @@ Stop the server you started (`kill $(cat tests/usability/runs/3036/server.pid)`)
 - [x] 4.3 `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts` lists nothing this change added. `make lint`, then the full suite on port 3002, green on chromium, mobile-chrome and ipad. If a case fails in a timing-looking way, re-run that spec alone and report both runs.
 - [x] 4.4 `design-system.md`: update the timer pill (size, the label and time split, fixed width, the Done fill and pulse, the chime repeats), the duration buttons, the step mark and clear ticks with undo, the reply sticky's foot clearance, the dimmed send state, the plain ribbons, the tablet slip without a page number and the phone user chip.
 - [x] 4.5 Hand-off to the lead: list the regions of `styles.css`, `chat.html`, `app.js` and `helpers.ts` this change edited, for the merge with `safe-page-navigation` into `cooking-ux-loop`. Archive order: steady-cooking-spread, safe-page-navigation, then this change.
-- [ ] 4.6 Deployment is not an implementation step. Static assets only: tag a release and purge the Cloudflare cache (CLAUDE.md).
+- [x] 4.6 Deployment is not an implementation step. Static assets only: tag a release and purge the Cloudflare cache (CLAUDE.md). Released in v2.10.0 (e898366, 2026-10-18); the owner purged the Cloudflare cache.

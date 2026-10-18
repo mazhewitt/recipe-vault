@@ -102,7 +102,7 @@ The system SHALL send images to Claude's vision API for recipe extraction.
 
 ### Requirement: Extraction Response Format
 
-The system SHALL format extracted recipes in a conversational, reviewable format.
+The system SHALL format extracted recipes in a conversational, reviewable format, in the user's language.
 
 #### Scenario: Display extracted recipe in chat
 - **WHEN** Claude successfully extracts a recipe from an image
@@ -113,7 +113,8 @@ The system SHALL format extracted recipes in a conversational, reviewable format
   - Numbered preparation steps
   - Timing information (prep time, cook time if detected)
   - Temperature information (if detected)
-- **AND** the response ends with "Would you like me to edit it or add it to the book?"
+- **AND** the response ends by asking, in the user's language, whether to edit the recipe or add it to the book ("Would you like me to edit it or add it to the book?" in English)
+- **AND** a user writing in German gets the whole reply, that question included, in German (model eval `hard-german-card`: `replied_german`)
 
 #### Scenario: User requests edits to extracted recipe
 - **WHEN** a user responds with requested changes (e.g., "change servings to 24")

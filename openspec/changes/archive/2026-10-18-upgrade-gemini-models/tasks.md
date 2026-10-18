@@ -48,5 +48,5 @@
 
 ## 8. Rollout (deployer)
 
-- [ ] 8.1 Production `.env`: `AI_MODEL=gemini-3.8-flash`, `DIFFICULTY_MODEL=gemini-3.5-flash-lite` (or remove both to take the defaults). Leave `GEMINI_THINKING_LEVEL` unset unless the eval says otherwise.
-- [ ] 8.2 After a week, read the `gemini usage` lines to get the real monthly cost. Rollback is `AI_MODEL=gemini-2.5-pro`.
+- [x] 8.1 Production `.env`: `AI_MODEL=gemini-3.8-flash`, `DIFFICULTY_MODEL=gemini-3.5-flash-lite` (or remove both to take the defaults). Leave `GEMINI_THINKING_LEVEL` unset unless the eval says otherwise. (Set by the owner 2026-10-18 with `GEMINI_THINKING_LEVEL=low`: `faster-chat-turns`' eval said otherwise.)
+- [x] 8.2 After a week, read the `gemini usage` lines to get the real monthly cost. Rollback is `AI_MODEL=gemini-2.5-pro`. (Due after 2026-10-25: moved to `.scratch/v2-10-0-post-release-checks/`.)

@@ -22,5 +22,5 @@
 
 ## 4. Release (with the combined release)
 
-- [ ] 4.1 NAS: `GEMINI_THINKING_LEVEL=low` beside `AI_MODEL=gemini-3.8-flash` and `DIFFICULTY_MODEL=gemini-3.5-flash-lite`
-- [ ] 4.2 Archive after `upgrade-gemini-models`
+- [x] 4.1 NAS: `GEMINI_THINKING_LEVEL=low` beside `AI_MODEL=gemini-3.8-flash` and `DIFFICULTY_MODEL=gemini-3.5-flash-lite` (set by the owner and the container recreated on v2.10.0, 2026-10-18)
+- [x] 4.2 Archive after `upgrade-gemini-models`

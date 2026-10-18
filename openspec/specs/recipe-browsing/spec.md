@@ -1,21 +1,9 @@
 # recipe-browsing Specification
 
 ## Purpose
-TBD - created by archiving change add-recipe-browsing-without-page-effect. Update Purpose after archive.
+Lets the cook page through the book recipe by recipe, keeping track of the open recipe, including when it is deleted.
+
 ## Requirements
-### Requirement: Recipe list is fetched fresh on navigation
-
-The frontend SHALL fetch the current list of recipes from the API each time navigation is triggered, ensuring the list reflects any recipes created or deleted via chat.
-
-#### Scenario: Fresh list fetched on arrow click
-
-- **WHEN** the user clicks a navigation arrow
-- **THEN** the frontend fetches `/api/recipes` to get the current alphabetically-sorted list before determining which recipe to display
-
-#### Scenario: Empty recipe list handled
-
-- **WHEN** the recipe list fetch returns zero recipes
-- **THEN** both navigation arrows are disabled and the recipe book shows placeholder content
 
 ### Requirement: User can navigate to next recipe
 
@@ -69,7 +57,7 @@ The frontend SHALL track the ID of the currently displayed recipe to determine p
 #### Scenario: Position determined from current recipe ID
 
 - **WHEN** the user clicks a navigation arrow
-- **THEN** the frontend finds the current recipe's position in the freshly-fetched list by matching the stored recipe ID
+- **THEN** the frontend finds the current recipe's position in the recipe list it already holds by matching the stored recipe ID
 
 #### Scenario: Current recipe ID updates after display
 
@@ -92,3 +80,37 @@ When navigating and the current recipe is not found, the system SHALL return to 
 - **WHEN** the user navigates and the current recipe ID is not found in the fresh list
 - **THEN** the index view is displayed instead of the first recipe
 
+### Requirement: Navigation uses the recipe list already held
+
+The frontend SHALL determine the previous and next recipe from the recipe list it already holds, and SHALL NOT request the list during a page turn. The list SHALL be refreshed with `GET /api/recipes` only:
+- when the contents are shown: on page load, on a return to the contents, or by the Contents spread tab;
+- when a recipe is displayed whose id is not in the held list;
+- when a chat turn whose stream included a `tool_use` event for `create_recipe`, `update_recipe` or `delete_recipe` ends.
+
+#### Scenario: A page turn requests no list
+
+- **WHEN** a recipe is displayed and the list is held
+- **AND** the user turns to the next or previous recipe by the arrow, the footer link, the gutter chevron or a swipe
+- **THEN** no request to `GET /api/recipes` is made between the tap and 500ms after the turn has finished (`isAnimating()` false)
+
+#### Scenario: The list is refreshed when the contents are shown
+
+- **WHEN** the contents are shown, by a page load, by a return to the contents, or by the Contents spread tab
+- **THEN** exactly one request to `GET /api/recipes` is made for that showing
+
+#### Scenario: A recipe new to the list refreshes it
+
+- **WHEN** a recipe is displayed whose id is not in the held list (for example one just created through chat and shown by `display_recipe`)
+- **THEN** the list is refreshed once
+- **AND** the note input's page number (`#note-page-number`) and the enabled state of the previous and next controls reflect the recipe's position in the refreshed list
+
+#### Scenario: A chat turn that created or deleted a recipe refreshes it
+
+- **WHEN** a chat turn's stream included a `tool_use` event whose tool is `create_recipe`, `update_recipe` or `delete_recipe`
+- **AND** the turn's `done` event arrives
+- **THEN** the list is refreshed once and the navigation state is updated from it
+
+#### Scenario: Empty recipe list handled
+
+- **WHEN** the held recipe list contains zero recipes
+- **THEN** both navigation arrows are disabled and the recipe book shows placeholder content

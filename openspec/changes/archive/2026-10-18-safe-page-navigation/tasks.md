@@ -303,4 +303,4 @@ Satisfies: `recipe-url-state` (all requirements and scenarios); `recipe-book-ind
 - [x] 10.6 File the tablet-swipe non-goal from proposal.md as a `.scratch/` issue (`Status: needs-triage`), unless the lead already has.
   - Already filed: `.scratch/tablet-swipe/README.md` (needs-triage).
 - [x] 10.7 Update `design-system.md` for the gutter chevrons and the header's hit area.
-- [ ] 10.8 Deployment, not an implementation step. Tag the release and purge the Cloudflare cache. Then confirm `/chat?recipe=<id>` is not cached at the edge (`cf-cache-status` is `DYNAMIC` or `BYPASS`) and that a reload of it opens the recipe (design Risks).
+- [x] 10.8 Deployment, not an implementation step. Released in v2.10.0 (e898366, 2026-10-18); the owner purged the Cloudflare cache. The edge check below needs a signed-in browser (the whole site is behind Cloudflare Access), so it moved to `.scratch/v2-10-0-post-release-checks/`. Tag the release and purge the Cloudflare cache. Then confirm `/chat?recipe=<id>` is not cached at the edge (`cf-cache-status` is `DYNAMIC` or `BYPASS`) and that a reload of it opens the recipe (design Risks).

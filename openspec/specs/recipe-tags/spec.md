@@ -202,10 +202,19 @@ The system SHALL treat `main` and `dessert` as the fixed tag names behind the co
 - **THEN** it lists the course vocabulary and states that `main` and `dessert` drive the Mains and Sweets tabs
 
 #### Scenario: Tag chips on the recipe page
-- **WHEN** a recipe with tags is displayed
-- **THEN** up to three tags render as muted chips at the end of the meta line
+- **WHEN** a recipe with tags is displayed and the cook opens the header's "⋯" popover
+- **THEN** up to three tags render as muted chips in `.recipe-more-panel .recipe-tags` (family-recipe-ui "Recipe metadata displays with icons")
+- **AND** no tag chip is rendered in `.recipe-meta-line`
 - **AND** a recipe without tags shows no chips
 
 #### Scenario: Chat request to change a course
 - **WHEN** the user says a displayed recipe is a pudding
 - **THEN** the model calls `update_recipe` with the recipe's current tags with the course tag replaced by `dessert`
+
+### Requirement: Diet questions are answered from what each recipe is
+
+Diet tags (`vegetarian`, `vegan`, `gluten-free`) are optional and often missing, so the chat SHALL answer a question about which recipes suit a diet by judging each recipe from what it is (its title, and its ingredients when known), not from its tags alone.
+
+#### Scenario: Untagged bakes are vegetarian
+- **WHEN** the cook asks "Which of my recipes are vegetarian?" and the book holds sweet bakes with no meat or fish that carry no `vegetarian` tag
+- **THEN** the reply names those bakes as well as the recipes tagged `vegetarian`, and no meat dish (model eval `grounded-search`: `names_every_vegetarian`)

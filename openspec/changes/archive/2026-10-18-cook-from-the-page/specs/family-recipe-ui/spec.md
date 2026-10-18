@@ -106,6 +106,11 @@ The recipe header SHALL be compact and the same in every spread mode: a title li
 - **THEN** `.recipe-more-panel .meta-difficulty` is present, shows no dots, and is as wide as it is when it holds the label and five dots
 - **AND** when the difficulty arrives later, with the popover open or closed, only the slot's contents change: the title line, the meta line and every `.prep-step` keep their bounding boxes (tolerance 1px)
 
+#### Scenario: Share and photo end the meta line
+- **WHEN** a recipe is displayed
+- **THEN** `.share-btn` and `.add-photo-btn` are no longer on `.recipe-meta-line`: they end the "⋯" popover, in `.more-actions` (see "The popover's contents")
+- **AND** each still has a bounding box of at least 44×44px
+
 #### Scenario: The same header in every mode
 
 - **WHEN** a recipe is open on a viewport wider than 600px and the cook switches Cook → Notes → Contents → Cook

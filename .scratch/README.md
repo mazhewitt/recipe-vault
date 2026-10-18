@@ -96,11 +96,9 @@ Archive these with that change.
 
 ## Waiting on a human decision (`ready-for-human` / `needs-info`)
 
-- `book-spread-modes-follow-ups/01-deploy-and-purge-cache.md` — the spread-modes
-  work is implemented, tested and archived but unshipped: merge, tag a release,
-  and purge the Cloudflare cache (static assets only, so the compiled
-  `ASSET_VERSION` does not change on its own). Also deletes the stale
-  `book-spread-modes` branch.
+- `v2-10-0-post-release-checks/` — after the v2.10.0 release (2026-10-18): the
+  `/chat?recipe=<id>` edge-cache check needs a signed-in browser, and the real
+  monthly Gemini cost needs a week of `gemini usage` lines (after 2026-10-25).
 
 - `contents-thumbnails-full-size-photos/` — contents page polaroids load the
   full-size photo. Decision brief appended 2026-09-08 with measured bytes and

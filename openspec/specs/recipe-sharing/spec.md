@@ -1,7 +1,7 @@
 # recipe-sharing Specification
 
 ## Purpose
-TBD - created by archiving change recipe-sharing. Update Purpose after archive.
+Lets a family member share one recipe outside the family through a read-only link, with its photo and a copy-to-clipboard page.
 ## Requirements
 ### Requirement: Share link creation
 
