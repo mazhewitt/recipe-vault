@@ -23,6 +23,12 @@ let recipeListCache = null;
 let viewMode = 'index'; // 'index' | 'recipe' | 'meal'
 let attachedImage = null; // Stores pasted image data
 let lastRecipeId = null; // Last recipe displayed this session (for contents highlight)
+// The last recipe shown on the spread (above 600px). Opening a recipe sets
+// cook mode, which spread-modes.js refuses on a phone; so a recipe first opened
+// on a phone has never had the reader's mode applied, and gets cook when the
+// viewport widens (setupOrientationChangeHandler). One shown on the spread
+// keeps whatever mode the reader left it in.
+let wideRecipeId = null;
 let photoEpoch = 0; // Bumped after photo uploads to bust thumbnail cache
 
 // Image size limit (5MB)
@@ -71,7 +77,11 @@ const sharedState = {
     // which recipe is on the page re-projects them — otherwise a reply that
     // lands after the reader has paged on keeps the previous recipe's notes
     // in the margin until the next note arrives.
-    set currentRecipeId(val) { currentRecipeId = val; MarginNotes.render(); },
+    set currentRecipeId(val) {
+        currentRecipeId = val;
+        if (!RecipeDisplay.isMobile()) wideRecipeId = val;
+        MarginNotes.render();
+    },
     get currentRecipeTitle() { return currentRecipeTitle; },
     set currentRecipeTitle(val) { currentRecipeTitle = val; },
     get viewMode() { return viewMode; },
@@ -662,18 +672,60 @@ function setupContentsTabs() {
 }
 
 function setupOrientationChangeHandler() {
-    // Re-render index when viewport size changes (orientation change)
-    window.addEventListener('resize', () => {
+    // Only crossing 600px changes the layout, so only a change of the phone
+    // query re-draws anything. A resize inside one band - a window drag, the
+    // phone keyboard opening - leaves the pages exactly as they are, which is
+    // what stops the contents refetching and losing their scroll on every
+    // resize event.
+    const phoneQuery = window.matchMedia('(max-width: 600px)');
+    let phoneBand = phoneQuery.matches;
+
+    // The last scroll positions seen in each band. By the time the change
+    // event fires the new layout has applied and the browser may already have
+    // clamped the pages, so they are recorded as the reader scrolls, and only
+    // while the query still agrees with the band being recorded (a clamp in the
+    // new layout must not overwrite the old band's place).
+    const bandScroll = { true: { left: 0, right: 0, view: null }, false: { left: 0, right: 0, view: null } };
+    const pageLeft = document.getElementById('page-left');
+    const pageRight = document.getElementById('page-right');
+    const record = (key, el) => () => {
+        if (phoneQuery.matches !== phoneBand) return;
+        const band = bandScroll[phoneBand];
+        // Positions belong to what was on the page when they were taken
+        const view = `${viewMode}:${currentRecipeId}`;
+        if (band.view !== view) Object.assign(band, { left: 0, right: 0, view });
+        band[key] = el.scrollTop;
+    };
+    if (pageLeft) pageLeft.addEventListener('scroll', record('left', pageLeft), { passive: true });
+    if (pageRight) pageRight.addEventListener('scroll', record('right', pageRight), { passive: true });
+
+    phoneQuery.addEventListener('change', () => {
+        phoneBand = phoneQuery.matches;
+
         // Cook and notes modes own the left page, so the contents must not be
         // rendered over them - which is why this goes through renderSpread
-        // rather than renderIndex directly. Crossing 600px is the case worth
-        // spelling out: below it there is no spread at all, so
-        // effectiveSpreadMode reads contents whatever the body says, a
-        // relocated ingredients panel goes back to the one page the reader can
-        // see, and the contents are drawn across the pages again. The attribute
-        // survives the trip (spread-modes.js refuses to write it on a phone),
-        // so the reader's mode is re-applied on the way back up.
-        renderSpread(effectiveSpreadMode());
+        // rather than renderIndex directly. Below 600px effectiveSpreadMode
+        // reads contents whatever the body says, so a relocated ingredients
+        // panel goes back to the one page the reader can see. Above it the
+        // body still holds the reader's mode (spread-modes.js refuses to write
+        // it on a phone), except for a recipe never yet shown on the spread,
+        // which gets the cook mode its opening would have set. A meal plan is
+        // kept as it is: spread-modes.js refuses cook over a meal.
+        if (!phoneBand && viewMode === 'recipe' && currentRecipeId !== wideRecipeId) {
+            wideRecipeId = currentRecipeId;
+            SpreadModes.setSpreadMode('cook', { force: true });
+        } else {
+            renderSpread(effectiveSpreadMode());
+        }
+
+        // Pages showing a recipe come back to where the reader left them in
+        // this band. The contents are drawn afresh for the new layout, so they
+        // start at the top.
+        const to = bandScroll[phoneBand];
+        if (viewMode !== 'index' && to.view === `${viewMode}:${currentRecipeId}`) {
+            if (pageRight) pageRight.scrollTop = to.right;
+            if (pageLeft) pageLeft.scrollTop = to.left;
+        }
     });
 }
 

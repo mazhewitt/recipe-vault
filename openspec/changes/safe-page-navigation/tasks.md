@@ -176,22 +176,22 @@ Satisfies: `recipe-book-index` "Recipe Book header navigates to index" (all scen
 Files: `static/app.js` (`setupOrientationChangeHandler`), `static/page-tabs.js` (the per-tab positions from group 4).
 Satisfies: `family-recipe-ui` "Crossing the phone breakpoint keeps the view" (all scenarios).
 
-- [ ] 8.1 Replace the `window` `resize` listener with `matchMedia('(max-width: 600px)').addEventListener('change', …)`. A resize that stays in one band does nothing at all.
-- [ ] 8.2 Keep the last `#page-right`/`#page-left` `scrollTop` per band, updated on `scroll`. The `change` event fires after the new layout applies, by which time the browser may already have clamped the positions, so reading them in the handler is too late.
-- [ ] 8.3 With a recipe open:
-  - Crossing above 600px: `setSpreadMode('cook', { force: true })`, which moves the ingredients to the left page, then restore the wide-band `#page-right.scrollTop`.
+- [x] 8.1 Replace the `window` `resize` listener with `matchMedia('(max-width: 600px)').addEventListener('change', …)`. A resize that stays in one band does nothing at all.
+- [x] 8.2 Keep the last `#page-right`/`#page-left` `scrollTop` per band, updated on `scroll`. The `change` event fires after the new layout applies, by which time the browser may already have clamped the positions, so reading them in the handler is too late.
+- [x] 8.3 With a recipe open:
+  - Crossing above 600px: `setSpreadMode('cook', { force: true })`, which moves the ingredients to the left page, then restore the wide-band `#page-right.scrollTop`. (Per lead answer Q11: cook only for a recipe not yet shown on the spread; otherwise the reader's mode on the body is re-applied.)
   - Crossing to 600px or narrower: the ingredients panel goes back to the right page (`renderSpread` with `effectiveSpreadMode()` already does this). Show the tab in `#page-right[data-tab]` at its stored per-tab position.
-- [ ] 8.4 With the contents shown: re-render once for the new layout (`renderContents`; its list refresh is allowed, since this is the contents being shown).
-- [ ] 8.5 With a meal plan shown: keep it. `spread-modes.js` already refuses `cook` over a meal.
-- [ ] 8.6 The `.note-input` being visible after a crossing relies on steady-cooking-spread D1. Assert it; do not re-implement it.
-- [ ] 8.7 Tests in a new `tests/e2e/tests/breakpoint.spec.ts`. These test the resize handler itself, so `setViewportSize` is allowed here.
+- [x] 8.4 With the contents shown: re-render once for the new layout (`renderContents`; its list refresh is allowed, since this is the contents being shown).
+- [x] 8.5 With a meal plan shown: keep it. `spread-modes.js` already refuses `cook` over a meal.
+- [x] 8.6 The `.note-input` being visible after a crossing relies on steady-cooking-spread D1. Assert it; do not re-implement it.
+- [x] 8.7 Tests in a new `tests/e2e/tests/breakpoint.spec.ts`. These test the resize handler itself, so `setViewportSize` is allowed here.
   - `mobile-chrome`: Method tab at 390x844 → 844x390 keeps the recipe, with `cook`, the ingredients on the left and `.note-input` visible. The Method tab scrolled to S comes back to S after a round trip.
   - `chromium`: 1280x800 with `#page-right.scrollTop` 200 → 500x800 → 1280x800 gives 200 ±1 and `cook`. 1280 → 500 keeps the recipe, with one ingredients panel, inside `#page-right-content`.
   - `chromium`: 20 resizes between 900 and 1090px on the contents give 0 list requests and the same `.index-recipe-item` nodes (tag one with a JS property before resizing).
   - `mobile-chrome`: contents with `#page-left.scrollTop` 300, height 844 → 500, keeps 300 ±1 with 0 list requests.
   - `index.spec.ts` "index refreshes on orientation change" and `spread-modes.spec.ts` "narrowing past 600px…" stay green unchanged.
-- [ ] 8.8 Red-check: restore the `resize` listener and confirm the in-band and keyboard tests go red.
-- [ ] 8.9 Gate: `make lint`, `npx playwright test tests/breakpoint.spec.ts tests/index.spec.ts tests/spread-modes.spec.ts`, `make test-e2e`.
+- [x] 8.8 Red-check: restore the `resize` listener and confirm the in-band and keyboard tests go red.
+- [x] 8.9 Gate: `make lint`, `npx playwright test tests/breakpoint.spec.ts tests/index.spec.ts tests/spread-modes.spec.ts`, `make test-e2e`.
 
 ## 9. The open recipe lives in the URL (design N5)
 
