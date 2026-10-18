@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone, openRecipe, recordRequests, sendNote } from './helpers';
+import { authenticate, createRecipe, isPhone, line, openRecipe, recordRequests, sendNote, touchGesture } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -94,6 +94,25 @@ test.describe('Page turns use the held list and the prefetch', () => {
 
     expect(rec.list, 'GET /api/recipes during the turn').toEqual([]);
   });
+
+  for (const via of ['footer', 'swipe'] as const) {
+    test(`a turn by the ${via} makes no list request`, async ({ page }) => {
+      test.skip(!isPhone(page), 'phone only: the footer link and swipes are the phone\'s controls');
+      const { titles } = await openMiddle(page);
+      const rec = recordRequests(page);
+
+      if (via === 'footer') {
+        await page.locator('#page-right-content .footer-next').click();
+      } else {
+        await touchGesture(page, 320, 420, line(10, -0.45 * page.viewportSize()!.width, 0));
+      }
+      await expect(title(page)).toHaveText(titles[2]);
+      await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
+      await page.waitForTimeout(500);
+
+      expect(rec.list, 'GET /api/recipes during the turn').toEqual([]);
+    });
+  }
 
   test('a cached turn requests no recipe and shows no skeleton', async ({ page }) => {
     const { ids, titles } = await openMiddle(page);

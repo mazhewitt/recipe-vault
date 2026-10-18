@@ -205,6 +205,10 @@ function entryRecipeId() {
  */
 export function writeHistory(recipeId, mode) {
     if (mode === 'none') return;
+    // A popstate landed while this page was on its way (a turn waiting on the
+    // network): the URL is that entry's now, and the page will be replayed to
+    // match it, so the late write must not take the popped entry's place.
+    if (pendingEntry) return;
     const id = recipeId == null ? null : String(recipeId);
     if (mode === 'push') {
         const shown = entryRecipeId();

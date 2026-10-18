@@ -29,7 +29,7 @@ async function refreshListAfterTurn() {
     if (state.viewMode === 'index') {
         await state.renderContents();
     } else {
-        await state.fetchRecipeList(true);
+        await state.refreshListBesideRecipe();
     }
     state.updateNavigationState();
 }

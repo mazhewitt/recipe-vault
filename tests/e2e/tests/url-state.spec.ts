@@ -294,6 +294,80 @@ test.describe('The open recipe in the URL', () => {
     await expect(title(page)).toHaveText(titles[0]);
   });
 
+  test('Back pressed while a real page turn waits on the network ends on the URL\'s page', async ({ page }) => {
+    await openFromContents(page, ids[0], titles[0]);
+    await clearCache(page);
+    await page.route(`**/api/recipes/${ids[1]}`, async (route) => {
+      await new Promise(r => setTimeout(r, 800));
+      await route.continue();
+    });
+    await clickNext(page);
+    await page.waitForTimeout(150);
+    await page.goBack();
+    await waitForTurn(page);
+    await page.waitForTimeout(1200);
+    await waitForTurn(page);
+    // The book shows the page the URL names, whatever that is
+    const s = await search(page);
+    const mode = await page.locator('body').getAttribute('data-view-mode');
+    if (s === '') {
+      expect(mode).toBe('index');
+    } else {
+      expect(mode).toBe('recipe');
+      const shown = titles[ids.indexOf(new URLSearchParams(s).get('recipe')!)];
+      await expect(title(page)).toHaveText(shown);
+    }
+    // Back was not swallowed: the turned-to recipe never took the popped entry
+    expect(s).not.toBe(`?recipe=${ids[1]}`);
+  });
+
+  test('a photo upload after a cached turn shows the new photo', async ({ page }) => {
+    await openFromContents(page, ids[0], titles[0]);
+    await expect.poll(() => page.evaluate(async (rid) => {
+      // @ts-ignore - browser-side module import
+      const M = await import('/static/page-transitions.js');
+      return M.getCachedRecipe(rid) !== null;
+    }, ids[1]), { timeout: 10000 }).toBe(true);
+    await clickNext(page);
+    await expect(title(page)).toHaveText(titles[1]);
+    await waitForTurn(page);
+    const RED_DOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
+    const chooser = page.waitForEvent('filechooser');
+    await page.locator('#page-right-content .add-photo-btn').click();
+    await (await chooser).setFiles({ name: 'dot.png', mimeType: 'image/png', buffer: RED_DOT });
+    await expect(page.locator('#page-right-content .recipe-photo')).toHaveCount(1, { timeout: 10000 });
+  });
+
+  test('a chat rename beside the contents updates the page number and the contents', async ({ page }) => {
+    test.skip(isPhone(page), 'the Contents spread mode is above 600px');
+    await openFromContents(page, ids[0], titles[0]);
+    await page.locator('.spread-tab[data-mode="contents"]').click();
+    await waitForTurn(page);
+    await expect(page.locator('#note-page-number')).toHaveText('p. 3');
+    const renamed = `Zebra ${titles[0]}`;
+    const res = await page.request.put(`/api/recipes/${ids[0]}`, { headers: API_HEADERS, data: { title: renamed } });
+    expect(res.ok(), `PUT -> ${res.status()}`).toBeTruthy();
+    await page.route('**/api/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+        body: `event: tool_use\ndata: {"tool":"update_recipe"}\n\nevent: recipe_artifact\ndata: {"recipe_id":"${ids[0]}"}\n\nevent: done\ndata: {"conversation_id":"c1"}\n\n`,
+      });
+    });
+    // The done-time list refresh lands after the recipe has re-rendered from the held list
+    await page.route(/\/api\/recipes$/, async (route) => {
+      await new Promise(r => setTimeout(r, 700));
+      await route.continue();
+    });
+    await sendNote(page, 'rename it');
+    await expect(title(page)).toHaveText(renamed, { timeout: 10000 });
+    await expect(page.locator('#page-left-content')).toContainText(renamed, { timeout: 5000 });
+    // Renamed to the end of the book: the last of three pages
+    await expect(page.locator('#note-page-number')).toHaveText('p. 7', { timeout: 5000 });
+    await expect(page.locator(`#page-left-content .index-recipe-item[data-recipe-id="${ids[0]}"]`).first()).toContainText('7');
+    await expect(page.locator('#page-next')).toBeDisabled();
+  });
+
   test('an unknown recipe on load shows the contents with the notice', async ({ page }) => {
     await page.addInitScript(() => { (window as any).__len0 = window.history.length; });
     const goneId = await createRecipe(page, { title: `Gone ${Date.now()}`, ingredients: [], steps: [], difficulty: 2, tags: ['main'] });

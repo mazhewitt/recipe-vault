@@ -814,7 +814,9 @@ export async function fetchAndDisplayRecipe(recipeId, options = {}) {
     state.currentRecipeId = recipeId;
     try {
         // Check prefetch cache first
-        const cached = getCachedRecipe(recipeId);
+        // A refresh is asked for because the recipe changed, so the copy
+        // cached by a page turn is stale.
+        const cached = isRefresh ? null : getCachedRecipe(recipeId);
         let recipe;
         if (cached && cached.difficulty != null) {
             recipe = cached;

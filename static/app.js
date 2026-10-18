@@ -140,6 +140,7 @@ const sharedState = {
     renderContents: () => renderContents(),
     drawHeldContents: () => drawHeldContents(),
     refreshContents: (generation) => refreshContents(generation),
+    refreshListBesideRecipe: () => refreshListBesideRecipe(),
     fetchAndDisplayRecipe: RecipeDisplay.fetchAndDisplayRecipe,
     updateNavigationState: Navigation.updateNavigationState,
     showIndex: Navigation.showIndex,
@@ -589,6 +590,22 @@ async function renderContents(mode = effectiveSpreadMode()) {
     if (generation !== spreadGeneration) return;
 
     drawContents(list, mode);
+}
+
+/**
+ * Refreshes the held list with a recipe on the page (a chat turn renamed,
+ * added or removed one): the page number follows the recipe's new place, and
+ * the contents beside it redraw, unless something decided the pages meanwhile.
+ */
+async function refreshListBesideRecipe() {
+    const generation = spreadGeneration;
+    const list = await fetchRecipeList(true);
+    if (viewMode !== 'recipe' || currentRecipeId == null) return;
+    const idx = list.findIndex(r => String(r.id) === String(currentRecipeId));
+    RecipeDisplay.setNotePageNumber(idx >= 0 ? RecipeDisplay.pageNumberFor(idx) : null);
+    if (generation === spreadGeneration && SpreadModes.getSpreadMode() === 'contents') {
+        drawContents(list, 'contents');
+    }
 }
 
 /**
