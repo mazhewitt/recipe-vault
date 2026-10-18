@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use sqlx::SqlitePool;
 use tokio::sync::RwLock;
 
 use crate::ai::{AiAgent, AiAgentConfig, McpServerConfig, LlmProvider, LlmProviderType};
@@ -14,17 +15,24 @@ pub struct ChatState {
     config: Arc<Config>,
     api_key: Arc<String>,
     http_client: reqwest::Client,
+    /// Reads the open recipe for the chat context (handlers::chat)
+    pool: SqlitePool,
 }
 
 impl ChatState {
-    pub fn new(config: Config, api_key: String, http_client: reqwest::Client) -> Self {
+    pub fn new(config: Config, api_key: String, http_client: reqwest::Client, pool: SqlitePool) -> Self {
         Self {
             agent: Arc::new(RwLock::new(None)),
             sessions: SessionStore::new(),
             config: Arc::new(config),
             api_key: Arc::new(api_key),
             http_client,
+            pool,
         }
+    }
+
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
     }
 
     pub fn sessions(&self) -> &SessionStore {

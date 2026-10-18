@@ -300,7 +300,7 @@ fn note_with_recipe(note: &str, recipe_json: serde_json::Value) -> Message {
     Message::User {
         content: vec![
             ContentBlock::Text { text: note.to_string() },
-            ContentBlock::Text { text: current_recipe_context_text(&ctx) },
+            ContentBlock::Text { text: current_recipe_context_text(&ctx, None) },
         ],
     }
 }
@@ -351,16 +351,120 @@ fn test_servings_set_events_need_a_current_recipe() {
 fn test_page_servings_reach_the_context_block() {
     let ctx: CurrentRecipeContext =
         serde_json::from_value(json!({"recipe_id": "R", "title": "Lasagne", "servings": 8})).unwrap();
-    let text = current_recipe_context_text(&ctx);
+    let text = current_recipe_context_text(&ctx, None);
     assert!(text.lines().any(|l| l == "page_servings: 8"), "missing page_servings line: {text}");
     assert!(text.contains("may differ from the saved recipe"), "missing explanation: {text}");
 
     // An old request body without the field still deserialises, and adds no line
     let old: CurrentRecipeContext =
         serde_json::from_value(json!({"recipe_id": "R", "title": "Lasagne"})).unwrap();
-    let text = current_recipe_context_text(&old);
+    let text = current_recipe_context_text(&old, None);
     assert!(!text.contains("page_servings"), "no servings, no line: {text}");
     assert!(text.starts_with("[Current recipe context]\nrecipe_id: R"));
+}
+
+// ==== faster-chat-turns: the open recipe's saved text travels with the message ====
+
+use recipe_vault::db::queries;
+use recipe_vault::handlers::chat::open_recipe_for_context;
+use recipe_vault::models::CreateRecipeInput;
+
+/// A small lasagne owned by `owner`, with every field the block carries.
+async fn saved_lasagne(pool: &sqlx::SqlitePool, owner: &str) -> String {
+    let input: CreateRecipeInput = serde_json::from_value(json!({
+        "title": "Granny's Lasagne",
+        "description": "The Sunday classic.",
+        "prep_time_minutes": 40,
+        "cook_time_minutes": 150,
+        "servings": 6,
+        "difficulty": 3,
+        "tags": ["main", "pasta"],
+        "ingredients": [
+            {"name": "olive oil", "quantity": 2.0, "unit": "tbsp"},
+            {"name": "onion", "quantity": 1.0, "notes": "finely chopped"},
+            {"name": "milk", "quantity": 0.75, "unit": "l"},
+            {"name": "nutmeg", "notes": "a good grating"}
+        ],
+        "steps": [
+            {"instruction": "Soften the onion in the oil.", "duration_minutes": 10},
+            {"instruction": "Heat the oven.", "temperature_value": 180, "temperature_unit": "Celsius"},
+            {"instruction": "Rest before cutting."}
+        ]
+    }))
+    .unwrap();
+    queries::create_recipe(pool, input, Some(owner.to_string())).await.unwrap().recipe.id
+}
+
+fn ctx_for(id: &str) -> CurrentRecipeContext {
+    serde_json::from_value(json!({"recipe_id": id, "title": "Lasagne", "servings": 3})).unwrap()
+}
+
+#[tokio::test]
+async fn test_the_open_recipes_saved_text_reaches_the_context_block() {
+    let pool = common::create_test_db().await;
+    let id = saved_lasagne(&pool, "alice@example.com").await;
+    let family = vec!["alice@example.com".to_string(), "bob@example.com".to_string()];
+    let ctx = ctx_for(&id);
+
+    let recipe = open_recipe_for_context(&pool, &ctx, Some(family.as_slice())).await;
+    assert!(recipe.is_some(), "a family member reads the family's recipe");
+    let text = current_recipe_context_text(&ctx, recipe.as_ref());
+    let lines: Vec<&str> = text.lines().collect();
+
+    assert!(text.starts_with(&format!("[Current recipe context]\nrecipe_id: {id}")), "{text}");
+    for line in [
+        "page_servings: 3",
+        // The saved title, under the field names update_recipe takes
+        "title: Granny's Lasagne",
+        "description: The Sunday classic.",
+        "servings: 6",
+        "prep_time_minutes: 40",
+        "cook_time_minutes: 150",
+        "difficulty: 3",
+        "tags: main, pasta",
+        "- 2 tbsp olive oil",
+        "- 1 onion (finely chopped)",
+        "- 0.75 l milk",
+        "- nutmeg (a good grating)",
+        "1. Soften the onion in the oil. [duration_minutes: 10]",
+        "2. Heat the oven. [temperature: 180 Celsius]",
+        "3. Rest before cutting.",
+    ] {
+        assert!(lines.contains(&line), "missing {line:?} in:\n{text}");
+    }
+    assert!(!lines.contains(&"title: Lasagne"), "the page's title gives way to the saved one: {text}");
+    let at = |s: &str| text.find(s).unwrap();
+    assert!(at("- 2 tbsp olive oil") < at("- nutmeg"), "ingredients in order: {text}");
+    assert!(at("1. Soften") < at("2. Heat") && at("2. Heat") < at("3. Rest"), "steps in order: {text}");
+    assert!(text.contains("without calling get_recipe"), "the instruction follows the text: {text}");
+    assert!(!text.contains("Call get_recipe if you need full details"), "{text}");
+}
+
+#[tokio::test]
+async fn test_another_familys_recipe_stays_out_of_the_context_block() {
+    let pool = common::create_test_db().await;
+    let id = saved_lasagne(&pool, "alice@example.com").await;
+    let other_family = vec!["carol@elsewhere.com".to_string()];
+    let ctx = ctx_for(&id);
+
+    let recipe = open_recipe_for_context(&pool, &ctx, Some(other_family.as_slice())).await;
+    assert!(recipe.is_none(), "another family reads nothing");
+    let text = current_recipe_context_text(&ctx, recipe.as_ref());
+    for leaked in ["Granny", "olive oil", "Soften", "Sunday", "prep_time_minutes"] {
+        assert!(!text.contains(leaked), "{leaked:?} leaked into:\n{text}");
+    }
+    // Today's block: the request's own id, title and servings, and get_recipe for the rest
+    assert!(text.lines().any(|l| l == "title: Lasagne"), "{text}");
+    assert!(text.lines().any(|l| l == "page_servings: 3"), "{text}");
+    assert!(text.ends_with("Call get_recipe if you need full details."), "{text}");
+
+    // No such recipe at all
+    let missing = ctx_for("no-such-recipe");
+    assert!(open_recipe_for_context(&pool, &missing, None).await.is_none());
+
+    // A database error falls back too, and the turn goes ahead
+    pool.close().await;
+    assert!(open_recipe_for_context(&pool, &ctx, None).await.is_none());
 }
 
 // ==== Integration Tests (require external dependencies) ====

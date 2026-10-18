@@ -124,10 +124,16 @@ const SCENARIOS = [
   { id: 'grounded-search', run: async () => {
       const r = await chat('Which of my recipes are vegetarian? Just the names please.');
       const t = r.text.toLowerCase();
+      // Every meat-free recipe in the book at this point, the sweet bakes too
+      // (October's judge: thinking low left out 5 of 8)
+      const book = (await list()).map(x => x.title.toLowerCase());
+      const veg = ['shakshuka', 'risotto', 'banana bread', 'brownie', 'drizzle', 'pancake', 'flapjack', 'scone']
+        .filter(k => book.some(title => title.includes(k)));
       return { turns: [r], checks: {
         names_shakshuka: t.includes('shakshuka'), names_risotto: t.includes('risotto'),
         no_meat_dishes: !/lasagne|curry|roast|bolognese/.test(t),
-      } };
+        names_every_vegetarian: veg.every(k => t.includes(k)),
+      }, missing_vegetarian: veg.filter(k => !t.includes(k)) };
   } },
   { id: 'guided-cooking-2-turns', run: async () => {
       const a = await chat("I'm about to make this. What do I need to do first?", { current_recipe: cur('drizzle', 'Lemon Drizzle Cake', 8) });

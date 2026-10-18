@@ -16,7 +16,7 @@ emits; it never judges prose. See
 | image-to-recipe | handwritten card → one new recipe, 6-7 ingredients, 225 g flour, 220/200 °C, 12-15 min bake |
 | text-to-recipe | flapjacks saved with 4 ingredients, 20 min, 180 °C, makes 12 |
 | meal-plan | `meal_artifact` with valid ids, a main and a dessert, 6 guests |
-| grounded-search | vegetarian recipes named without inventing meat dishes |
+| grounded-search | every meat-free recipe in the book named (the sweet bakes too), no meat dishes |
 | guided-cooking-2-turns | first step mentions the oven, before any question; next mentions eggs; both concise; no writes |
 | troubleshoot-french | replies in French and writes nothing |
 

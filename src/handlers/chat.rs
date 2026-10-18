@@ -7,11 +7,15 @@ use axum::{
 };
 use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use std::convert::Infallible;
 use uuid::Uuid;
 
 use crate::ai::{ContentBlock, ImageSource, Message, MealPlanEntry, ServingsData};
 use crate::chat::{ChatError, ChatState, SessionStore};
+use crate::db::queries;
+use crate::error::ApiError;
+use crate::models::RecipeWithDetails;
 
 #[derive(Debug, Deserialize)]
 pub struct ImageAttachment {
@@ -91,21 +95,117 @@ impl SseEvent {
     }
 }
 
-/// The `[Current recipe context]` block appended to the user message.
-pub fn current_recipe_context_text(current_recipe: &CurrentRecipeContext) -> String {
+/// The `[Current recipe context]` block appended to the user message. With the
+/// open recipe's saved text the model answers from it, instead of spending a
+/// whole model call on `get_recipe` first. Without it (no recipe the user's
+/// family can read) the block names the recipe and points at `get_recipe`.
+pub fn current_recipe_context_text(
+    current_recipe: &CurrentRecipeContext,
+    recipe: Option<&RecipeWithDetails>,
+) -> String {
     let mut context_text = format!(
         "[Current recipe context]\nrecipe_id: {}",
         current_recipe.recipe_id
     );
-    if let Some(title) = &current_recipe.title {
+    // The saved text carries the saved title
+    if let (None, Some(title)) = (recipe, &current_recipe.title) {
         context_text.push_str(&format!("\ntitle: {}", title));
     }
     if let Some(servings) = current_recipe.servings {
         context_text.push_str(&format!("\npage_servings: {}", servings));
         context_text.push_str("\n(page_servings is what the page shows now and may differ from the saved recipe's servings.)");
     }
-    context_text.push_str("\nInstruction: Treat this as the active recipe. Call get_recipe if you need full details.");
+    match recipe {
+        Some(recipe) => {
+            context_text.push_str("\n\nThe recipe as saved (its quantities are for its saved servings):\n");
+            context_text.push_str(&saved_recipe_text(recipe));
+            context_text.push_str("\n\nInstruction: Treat this as the active recipe. Its saved text is above: answer questions about it, scale it and substitute in it from that text, without calling get_recipe. Call get_recipe only for another recipe.");
+        }
+        None => context_text.push_str("\nInstruction: Treat this as the active recipe. Call get_recipe if you need full details."),
+    }
     context_text
+}
+
+/// The saved recipe as compact lines, under the field names `update_recipe`
+/// takes: about 600 prompt tokens for a lasagne, where `get_recipe`'s JSON
+/// is about 4,000.
+fn saved_recipe_text(details: &RecipeWithDetails) -> String {
+    let recipe = &details.recipe;
+    let non_empty = |s: &Option<String>| s.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+    let mut lines = vec![format!("title: {}", recipe.title)];
+    if let Some(description) = non_empty(&recipe.description) {
+        lines.push(format!("description: {}", description));
+    }
+    if let Some(servings) = recipe.servings {
+        lines.push(format!("servings: {}", servings));
+    }
+    if let Some(minutes) = recipe.prep_time_minutes {
+        lines.push(format!("prep_time_minutes: {}", minutes));
+    }
+    if let Some(minutes) = recipe.cook_time_minutes {
+        lines.push(format!("cook_time_minutes: {}", minutes));
+    }
+    if let Some(difficulty) = recipe.difficulty {
+        lines.push(format!("difficulty: {}", difficulty));
+    }
+    if !recipe.tags.is_empty() {
+        lines.push(format!("tags: {}", recipe.tags.join(", ")));
+    }
+
+    lines.push("ingredients:".to_string());
+    for ingredient in &details.ingredients {
+        let mut line = "-".to_string();
+        // As stored: 2.0 prints "2", 0.75 "0.75"
+        if let Some(quantity) = ingredient.quantity {
+            line.push_str(&format!(" {}", quantity));
+        }
+        if let Some(unit) = non_empty(&ingredient.unit) {
+            line.push_str(&format!(" {}", unit));
+        }
+        line.push_str(&format!(" {}", ingredient.name));
+        if let Some(notes) = non_empty(&ingredient.notes) {
+            line.push_str(&format!(" ({})", notes));
+        }
+        lines.push(line);
+    }
+
+    lines.push("steps:".to_string());
+    for (n, step) in details.steps.iter().enumerate() {
+        let mut line = format!("{}. {}", n + 1, step.instruction);
+        if let Some(minutes) = step.duration_minutes {
+            line.push_str(&format!(" [duration_minutes: {}]", minutes));
+        }
+        match (step.temperature_value, non_empty(&step.temperature_unit)) {
+            (Some(value), Some(unit)) => line.push_str(&format!(" [temperature: {} {}]", value, unit)),
+            (Some(value), None) => line.push_str(&format!(" [temperature: {}]", value)),
+            _ => {}
+        }
+        lines.push(line);
+    }
+    lines.join("\n")
+}
+
+/// Reads the recipe the page names, scoped to the requesting user's family as
+/// `GET /api/recipes/:id` is. Not found, or not the family's: `None`. A
+/// database error is logged and is `None` too: the turn goes ahead on the
+/// short block.
+pub async fn open_recipe_for_context(
+    pool: &SqlitePool,
+    current_recipe: &CurrentRecipeContext,
+    family_members: Option<&[String]>,
+) -> Option<RecipeWithDetails> {
+    match queries::get_recipe(pool, &current_recipe.recipe_id, family_members).await {
+        Ok(recipe) => Some(recipe),
+        Err(ApiError::NotFound(_)) => None,
+        Err(e) => {
+            tracing::warn!(
+                "Could not read the open recipe {} for the chat context: {}",
+                current_recipe.recipe_id,
+                e
+            );
+            None
+        }
+    }
 }
 
 /// `servings_set` events for a turn's set_servings calls. They go to the recipe the
@@ -204,8 +304,12 @@ pub async fn chat(
     }
 
     if let Some(current_recipe) = &request.current_recipe {
+        // The open recipe's saved text, read as the user's family can read it,
+        // so a question about it needs no get_recipe round trip
+        let family_members = identity.and_then(|i| i.family_members.as_deref());
+        let recipe = open_recipe_for_context(state.pool(), current_recipe, family_members).await;
         content_blocks.push(ContentBlock::Text {
-            text: current_recipe_context_text(current_recipe),
+            text: current_recipe_context_text(current_recipe, recipe.as_ref()),
         });
     }
 

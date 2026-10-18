@@ -290,6 +290,11 @@ impl LlmProvider {
         self
     }
 
+    /// The Gemini request options this provider sends.
+    pub fn gemini_options(&self) -> &GeminiOptions {
+        &self.gemini_options
+    }
+
     pub fn anthropic(api_key: String, model: String) -> Self {
         Self::new(LlmProviderType::Anthropic, api_key, model, None)
     }

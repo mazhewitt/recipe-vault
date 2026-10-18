@@ -276,3 +276,28 @@ async fn test_user_specified_difficulty_preserved() {
     // Note: In the actual handler, auto-assignment only happens if difficulty is None
     // This test verifies the data layer preserves user-specified values
 }
+
+/// faster-chat-turns F5: `GEMINI_THINKING_LEVEL` is for chat. The background
+/// assessments run on Flash-Lite, whose own default (minimal) is lower than `low`.
+#[test]
+fn test_assessment_provider_sends_no_thinking_level() {
+    use recipe_vault::ai::{GeminiOptions, GeminiThinkingLevel};
+    use recipe_vault::config::LlmProviderKind;
+    use recipe_vault::handlers::recipes::build_assessment_provider;
+
+    let mut config = common::create_test_config(common::create_test_families_config());
+    config.mock_llm = false;
+    config.ai_provider = LlmProviderKind::Gemini;
+    config.difficulty_provider = LlmProviderKind::Gemini;
+    config.gemini_api_key = Some("test-key".to_string());
+    config.difficulty_model = "gemini-3.5-flash-lite".to_string();
+    config.gemini_options = GeminiOptions {
+        thinking_level: Some(GeminiThinkingLevel::Low),
+        ..GeminiOptions::default()
+    };
+
+    let provider = build_assessment_provider(&config, reqwest::Client::new()).unwrap();
+    assert_eq!(provider.gemini_options().thinking_level, None);
+    // The output budget is still the configured one
+    assert_eq!(provider.gemini_options().max_output_tokens, config.gemini_options.max_output_tokens);
+}

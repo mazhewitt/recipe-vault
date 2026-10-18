@@ -54,9 +54,14 @@ Example Gemini settings:
 AI_PROVIDER=gemini
 DIFFICULTY_PROVIDER=gemini
 GEMINI_API_KEY=your-gemini-api-key
-AI_MODEL=gemini-2.5-pro
-DIFFICULTY_MODEL=gemini-2.5-flash
+AI_MODEL=gemini-3.8-flash
+DIFFICULTY_MODEL=gemini-3.5-flash-lite
+# Chat only: think less, answer sooner (unset to go back to the model's default)
+GEMINI_THINKING_LEVEL=low
 ```
+
+To roll the chat model back, set `AI_MODEL=gemini-2.5-pro` (the thinking level
+is not sent to 2.5).
 
 ### 4. Start the Application
 

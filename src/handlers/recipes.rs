@@ -8,7 +8,7 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 
 use crate::{
-    ai::{assess_recipe_difficulty, assess_recipe_tags, LlmProvider, LlmProviderType},
+    ai::{assess_recipe_difficulty, assess_recipe_tags, GeminiOptions, LlmProvider, LlmProviderType},
     auth::UserIdentity,
     config::{Config, LlmProviderKind},
     db::queries,
@@ -375,6 +375,8 @@ fn validate_file_extension(extension: &str) -> ApiResult<()> {
 /// Uses the cheap model configured for difficulty assessment
 /// (`difficulty_provider` / `difficulty_model`) and the shared HTTP client;
 /// tag assessment reuses it, so no extra configuration keys are needed.
+/// `GEMINI_THINKING_LEVEL` is for chat: the assessment model keeps its own
+/// default (Flash-Lite's minimal is lower than `low`).
 pub fn build_assessment_provider(
     config: &Config,
     http_client: reqwest::Client,
@@ -406,7 +408,10 @@ pub fn build_assessment_provider(
         config.difficulty_model.clone(),
         Some(http_client),
     )
-    .with_gemini_options(config.gemini_options.clone()))
+    .with_gemini_options(GeminiOptions {
+        thinking_level: None,
+        ..config.gemini_options.clone()
+    }))
 }
 
 /// Auto-assign tags to a recipe using AI assessment

@@ -107,8 +107,11 @@ To use Gemini instead of Anthropic, set `AI_PROVIDER=gemini`,
 `AI_MODEL=gemini-3.8-flash` and `DIFFICULTY_MODEL=gemini-3.5-flash-lite`; set
 `AI_MODEL=gemini-2.5-pro` to roll back. Two optional Gemini settings:
 `GEMINI_MAX_OUTPUT_TOKENS` (default 16384, shared by thinking and visible output)
-and `GEMINI_THINKING_LEVEL` (`low`, `medium` or `high`, sent only to
-`gemini-3*` / `gemini-4*` models; unset uses each model's default). Each Gemini
+and `GEMINI_THINKING_LEVEL` (`low`, `medium` or `high`, sent only on chat
+requests and only to `gemini-3*` / `gemini-4*` models; unset uses each model's
+default). Production sets `GEMINI_THINKING_LEVEL=low`: it cuts a 3.8 Flash
+turn by about a third, and the background difficulty and tag jobs keep
+Flash-Lite's own (lower) default. Each Gemini
 call logs a `gemini usage ...` line at `info` with token counts, never content.
 Provider API keys are conditional: Anthropic mode needs `ANTHROPIC_API_KEY`,
 Gemini mode needs `GEMINI_API_KEY`, and `MOCK_LLM=true` needs neither.

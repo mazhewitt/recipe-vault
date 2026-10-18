@@ -805,7 +805,7 @@ impl AiAgent {
 const LONG_CONVERSATION_REMINDER: &str = "\n\n(Reminder: Use list_recipes when the user asks to see their recipes. \
      Use display_recipe to show recipe details in the side panel. \
      After creating a recipe, call display_recipe with the new recipe_id. \
-     If current_recipe context is provided, treat it as the active recipe and call get_recipe when needed. \
+     If current_recipe context is provided, treat it as the active recipe and answer from its saved text; call get_recipe only for another recipe. \
      Use set_servings to scale for tonight, and update_recipe only when the user asks to change or save the recipe. \
      When guiding cooking, give the first step first, break into phases, and call start_timer for waiting periods. \
      Do not output full ingredient lists or steps in chat.)";
