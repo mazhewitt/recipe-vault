@@ -29,6 +29,12 @@ Fixes from review, each red-checked the same way:
 - `Servings.redrawServings()` after Notes → Cook (`app.js`). With it removed, servings › "remembered across a spread mode switch…" fails: the parked panel comes back reading the old count.
 - The `state.viewMode === 'recipe'` guard on `servings_set` (`chat.js`). With it removed, servings › "the contents is open: nothing changes…" fails on all three projects.
 
+## 4.2 Gates (final run, HEAD 865995e)
+
+- `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts`: one hit, added by this change (ce240a8): `recipe-display.spec.ts:476` "the first ingredient within 200px of the top on the phone". It stays `fixme` pending the owner's decision on the phone target (see 4.3). Nothing else.
+- `cargo test`: 258 passed, 0 failed. `make lint`: clean. `openspec validate cook-from-the-page --strict`: valid (two INFO notes: the MODIFIED requirements come from steady-cooking-spread, so this change archives after it).
+- Full e2e suite, port 3002 (killed before and after): 837 passed, 180 skipped, 0 failed (15.6m), chromium, mobile-chrome and ipad.
+
 ## 4.3 Re-measure (ports 3033 and 3034, a fresh server each, both stopped)
 
 ### header-block-before-method

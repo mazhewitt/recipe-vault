@@ -84,7 +84,8 @@ Before/after measurement: the explorer folders `tests/usability/runs/audit-post-
 ## 4. Verification
 
 - [x] 4.1 Revert-and-fail. Revert each line below, name the test that goes red, then restore it and confirm `git diff` is byte-identical to before: the `set_servings` range check; the `servings_set` extraction; the `page_servings` context line; the mock "halve" branch; the prompt's removed "ask servings first"; the g/ml rounding bands; the halves-round-up rule; the "a little of" fallback; the stored servings; Clear ticks keeping the servings; the `servings_set` recipe-id check; the popover's overlay positioning; share and add-photo out of the meta line; the difficulty slot's reserved width in the panel; the outside-tap guard; the row padding; the ticked opacity.
-- [ ] 4.2 `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts` lists nothing this change added. `cargo test`, `make lint`, then the full suite on port 3002, green on chromium, mobile-chrome and ipad. Kill 3002 before and after.
+- [x] 4.2 `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts` lists nothing this change added. `cargo test`, `make lint`, then the full suite on port 3002, green on chromium, mobile-chrome and ipad. Kill 3002 before and after.
+  - Done: cargo test 258 passed, lint clean, full suite 837 passed, 180 skipped, 0 failed. Exception: the phone `test.fixme` in `recipe-display.spec.ts` (3.3) remains, pending the owner.
 - [x] 4.3 Re-measure on ports 3031-3036, a fresh server per script (see "Before you start"):
   - `tests/usability/fresh.sh 3031 && node tests/usability/runs/audit-post-steady/counter/remeasure.cjs 3031 header-block-before-method`
   - `tests/usability/fresh.sh 3032 && node tests/usability/runs/audit-post-steady/cook/remeasure.cjs 3032 ingredient-rows-tight-for-ticking`
