@@ -172,6 +172,16 @@ A recipe's photo on the page SHALL be held on by a strip of tape across its top 
 - **THEN** `.recipe-polaroid::before` draws a translucent strip about half the photo's width across its top edge, taking no pointer input
 - **AND** the photo's bounding box does not overlap `#page-next`'s bounding box
 
+### Requirement: The left page has a margin rule
+
+Above 600px the left page SHALL carry a notebook's margin rule: a very light 1px vertical line just inside the left-edge tab strip, the page's full height, which stays put while the page scrolls. The page's text SHALL start 12px past it, and the tab strip SHALL stay 10px in from the page's edge with its 44px hit area clear of the rule.
+
+#### Scenario: The rule and the text
+
+- **WHEN** a recipe is open in `cook` mode on a viewport wider than 600px
+- **THEN** `#page-left`'s first background layer draws a 1px line in `rgba(139, 45, 26, 0.16)` 50px from its left edge
+- **AND** the first `.ingredient-item` starts 62px from `#page-left`'s left edge, and each visible `.contents-tab` spans 10px to 36px from it
+
 ## REMOVED Requirements
 
 ### Requirement: Background displays wood table texture

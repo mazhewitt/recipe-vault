@@ -680,8 +680,11 @@ body::before {
     padding-bottom: var(--page-foot);
     /* Room for the leather tabs' 44px hit area: the page clips at its edge (it
        scrolls), so the 26px tab sits 10px in and its hit area reaches 9px
-       either side without touching the text. */
-    padding-left: 48px;
+       either side (to 45px). The margin rule is at 50px, and the text starts
+       12px past it. */
+    --margin-rule: 50px;
+    --page-pad-left: 62px;
+    padding-left: var(--page-pad-left);
 }
 
 /* The content grows with what it holds rather than overflowing a box fixed at
@@ -700,7 +703,15 @@ body::before {
 /* Center binding shadows: a background layer stays on the page's edge while
    its content scrolls, where a 100%-tall pseudo-element scrolled away with it */
 .page-left {
-    background: linear-gradient(90deg, transparent calc(100% - 15px), rgba(0,0,0,0.08)), var(--page-paper);
+    background:
+        /* A notebook's margin rule: a very light 1px line just inside the tabs */
+        linear-gradient(90deg,
+            transparent var(--margin-rule),
+            rgba(139, 45, 26, 0.16) var(--margin-rule),
+            rgba(139, 45, 26, 0.16) calc(var(--margin-rule) + 1px),
+            transparent calc(var(--margin-rule) + 1px)),
+        linear-gradient(90deg, transparent calc(100% - 15px), rgba(0,0,0,0.08)),
+        var(--page-paper);
 }
 
 .page-right {
@@ -1357,7 +1368,7 @@ body::before {
     z-index: 4;
     align-self: flex-start;
     height: 0;
-    margin-left: -38px; /* 10px in from the page's edge; see .page-left */
+    margin-left: calc(10px - var(--page-pad-left)); /* 10px in from the page's edge; see .page-left */
     display: flex;
     flex-direction: column;
     gap: 6px;

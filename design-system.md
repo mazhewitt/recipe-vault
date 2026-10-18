@@ -525,7 +525,7 @@ An open book showing two pages with a leather cover frame.
 | Min width | None — `flex: 1` inside the 1400px container | Same | 100% |
 | Page layout | Two-page flex | Two-page flex | Single page, picked by `body[data-view-mode]` |
 | Cover | Overhangs by 12px at the sides, 8px top/bottom; leather texture + spine shadow | Same | Flush with the frame, no texture, no spine; a 40px leather strip above the paper |
-| Page padding | 20px 28px (+ `--slip-clearance` bottom on the left page) | Same | 16px |
+| Page padding | 20px 28px; the left page 62px on the left (the tab strip 10px in, a 1px margin rule at 50px in `rgba(139,45,26,0.16)` drawn as its first background layer, the text 12px past it) and `--page-foot` at the bottom | Same | 16px |
 | Spine shadow | Visible | Visible | Hidden |
 | Nav arrows | `.page-nav` 29px, 46px hit area | `.page-nav` 36px, 46px hit area | `.page-nav` hidden; 46px `.gutter-chevron` buttons in the `.page-tabs` row |
 | Section tabs | None: both sections are on the spread | Same | `.page-tabs`, page top edge (all three) |

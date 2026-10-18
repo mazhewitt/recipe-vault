@@ -263,4 +263,28 @@ test.describe('A lighter book', () => {
       expect(overlap, 'the photo overlaps the next arrow').toBe(false);
     }
   });
+
+  test('the left page has a margin rule, the text clear of it', async ({ page }) => {
+    test.skip(isPhone(page), 'the spread above 600px');
+    await openListRecipe(page);
+    await selectCook(page);
+    const m = await page.evaluate(() => {
+      const left = document.getElementById('page-left')!;
+      const x = left.getBoundingClientRect().x;
+      const tabs = [...document.querySelectorAll<HTMLElement>('.contents-tabs .contents-tab')]
+        .map(el => el.getBoundingClientRect())
+        .filter(r => r.width > 0)
+        .map(r => [Math.round(r.x - x), Math.round(r.right - x)]);
+      return {
+        image: getComputedStyle(left).backgroundImage,
+        text: Math.round(document.querySelector('#page-left-content .ingredient-item')!.getBoundingClientRect().x - x),
+        tabs,
+      };
+    });
+    // The first layer is the rule: transparent to 50px, then 1px of faint leather
+    expect(m.image.startsWith('linear-gradient(90deg, rgba(0, 0, 0, 0) 50px, rgba(139, 45, 26, 0.16) 50px')).toBe(true);
+    expect(m.text).toBe(62);
+    expect(m.tabs.length).toBeGreaterThan(0);
+    for (const tab of m.tabs) expect(tab).toEqual([10, 36]);
+  });
 });
