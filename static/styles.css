@@ -2009,6 +2009,28 @@ body[data-feature-meals] .contents-tab-meals {
     box-shadow: var(--shadow-soft);
 }
 
+/* "That recipe isn't in the book any more": a one-line sticky over the top of
+   the contents when a recipe asked for has gone (navigation.js
+   showMissingRecipe). Absolutely placed, so it moves nothing on the page, and
+   removed when the next page is shown. */
+.missing-recipe-notice {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-1deg);
+    z-index: 7;
+    max-width: calc(100% - 32px);
+    padding: 6px 14px;
+    background: var(--color-sticky);
+    border-radius: 2px;
+    box-shadow: var(--shadow-soft);
+    font-family: var(--font-handwritten);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
 /* Empty means nothing to show: margin-notes.js leaves it truly empty then */
 .page-margin:empty {
     display: none;

@@ -140,15 +140,20 @@ export async function returnToContents() {
  */
 async function turnToContents() {
     let generation = null;
-    await animatePageTurn('backward', () => { generation = showIndex(); });
+    await animatePageTurn('backward', () => { generation = showIndex({ history: 'push' }); });
     if (generation != null) await state.refreshContents(generation);
 }
 
 /**
  * Shows the contents, drawn synchronously from the list already held.
+ * @param {{history?: 'push'|'replace'|'none'}} [options] - how the bare path is
+ *        written to history: a push for the reader's own return, nothing when
+ *        popstate drives it (the URL is already the entry's)
  * @returns {number} the spread generation of the draw, for state.refreshContents
  */
-export function showIndex() {
+export function showIndex(options = {}) {
+    const historyMode = options.history ?? 'push';
+    removeMissingNotice();
     state.viewMode = 'index';
     // Nothing is being cooked from the contents: let the screen sleep
     releaseWakeLock();
@@ -168,7 +173,142 @@ export function showIndex() {
     // before the refresh lands keeps it (state.refreshContents checks it).
     const generation = state.drawHeldContents();
     updateNavigationState();
+    writeHistory(null, historyMode);
     return generation;
+}
+
+// ---------------------------------------------------------------------------
+// The open recipe in the URL (recipe-url-state). Every entry this page writes
+// carries { recipeId, seq }: seq grows by one with every push, so a popstate
+// can tell Back (a lower seq) from Forward.
+// ---------------------------------------------------------------------------
+
+let currentSeq = 0;
+
+function urlFor(recipeId) {
+    return recipeId ? '?recipe=' + encodeURIComponent(recipeId) : window.location.pathname;
+}
+
+function entryRecipeId() {
+    const entry = window.history.state;
+    if (entry && 'recipeId' in entry) return entry.recipeId;
+    return new window.URLSearchParams(window.location.search).get('recipe');
+}
+
+/**
+ * Writes the page now on show to history. A push that would only repeat the
+ * current entry (the same recipe, or the bare path over the bare path) writes
+ * nothing, so history never holds two identical entries in a row.
+ *
+ * @param {string|null} recipeId - the recipe shown, or null for the contents
+ * @param {'push'|'replace'|'none'} mode
+ */
+export function writeHistory(recipeId, mode) {
+    if (mode === 'none') return;
+    const id = recipeId == null ? null : String(recipeId);
+    if (mode === 'push') {
+        const shown = entryRecipeId();
+        if ((shown == null ? null : String(shown)) === id) return;
+        currentSeq += 1;
+        window.history.pushState({ recipeId: id, seq: currentSeq }, '', urlFor(id));
+    } else {
+        window.history.replaceState({ recipeId: id, seq: currentSeq }, '', urlFor(id));
+    }
+}
+
+/**
+ * Start-up: stamps the page's first entry so a later popstate back to it has
+ * a seq to compare. A reload keeps the seq the entry already had, so the
+ * entries around it still order correctly.
+ *
+ * @returns {string|null} the recipe the URL names, if any
+ */
+export function initHistory() {
+    const recipeId = new window.URLSearchParams(window.location.search).get('recipe') || null;
+    const seq = window.history.state && Number.isFinite(window.history.state.seq) ? window.history.state.seq : 0;
+    currentSeq = seq;
+    window.history.replaceState({ recipeId, seq }, '', urlFor(recipeId));
+    window.addEventListener('popstate', (e) => {
+        pendingEntry = e.state || { recipeId: entryRecipeId(), seq: 0 };
+        applyPendingEntry();
+    });
+    return recipeId;
+}
+
+/**
+ * Called by recipe-display once a recipe has rendered. A different recipe is
+ * written as asked; a refresh of the one on the page leaves the entry alone.
+ */
+export function recipeShown(recipeId, { refresh = false, history: mode = 'push' } = {}) {
+    removeMissingNotice();
+    if (!refresh) writeHistory(recipeId, mode);
+}
+
+/** A meal plan is not persisted (RV-107): it replaces the entry with the bare path. */
+export function mealPlanShown() {
+    removeMissingNotice();
+    writeHistory(null, 'replace');
+}
+
+let pendingEntry = null;
+let applyingEntry = false;
+
+/**
+ * Shows the page the latest popstate's entry names, with a turn in the
+ * direction of travel. A popstate that lands while a turn holds the lock waits
+ * for it to end; only the latest one is kept, because the URL already is that
+ * entry's.
+ */
+async function applyPendingEntry() {
+    if (applyingEntry) return;
+    applyingEntry = true;
+    try {
+        while (pendingEntry) {
+            while (isAnimating()) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            const entry = pendingEntry;
+            pendingEntry = null;
+            const seq = Number.isFinite(entry.seq) ? entry.seq : 0;
+            const direction = seq < currentSeq ? 'backward' : 'forward';
+            currentSeq = seq;
+            const recipeId = entry.recipeId;
+            if (recipeId) {
+                await animatePageTurn(direction, () =>
+                    state.fetchAndDisplayRecipe(recipeId, { history: 'none', source: 'popstate' }));
+            } else {
+                let generation = null;
+                await animatePageTurn(direction, () => { generation = showIndex({ history: 'none' }); });
+                if (generation != null) await state.refreshContents(generation);
+            }
+        }
+    } finally {
+        applyingEntry = false;
+    }
+}
+
+const MISSING_NOTICE_TEXT = "That recipe isn't in the book any more";
+
+function removeMissingNotice() {
+    document.querySelectorAll('.missing-recipe-notice').forEach(el => el.remove());
+}
+
+/**
+ * A recipe the server no longer has (404): the contents, with a one-line
+ * sticky saying so, and the bare path in the URL. No other recipe opens.
+ *
+ * @param {'push'|'replace'} mode - replace for the URL on load and popstate,
+ *        whose entry named the missing recipe; push for the reader's own opens
+ */
+export function showMissingRecipe(mode) {
+    showIndex({ history: mode });
+    const host = document.querySelector('.pages-container');
+    if (!host) return;
+    const notice = document.createElement('div');
+    notice.className = 'missing-recipe-notice';
+    notice.setAttribute('role', 'status');
+    notice.textContent = MISSING_NOTICE_TEXT;
+    host.appendChild(notice);
 }
 
 // Guard so initFooterNav can be called more than once without stacking listeners

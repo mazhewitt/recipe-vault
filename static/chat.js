@@ -44,7 +44,9 @@ function handleRecipeArtifact(recipeId) {
     if (fetchedRecipeIds.has(key)) return;
     fetchedRecipeIds.add(key);
     clearPrefetchCache();
-    state.fetchAndDisplayRecipe(recipeId);
+    // Marked so a 404 keeps web-chat's "Recipe not found" rather than the
+    // contents' missing-recipe note
+    state.fetchAndDisplayRecipe(recipeId, { source: 'artifact' });
 }
 
 // Import global state accessors (will be set by app.js)

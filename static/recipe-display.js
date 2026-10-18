@@ -794,7 +794,14 @@ function renderRecipeInPlace(recipe, options = {}) {
     return scroll;
 }
 
-export async function fetchAndDisplayRecipe(recipeId) {
+/**
+ * @param {string} recipeId
+ * @param {{history?: 'push'|'none', source?: 'url'|'popstate'|'artifact'}} [options]
+ *        history - 'none' when the URL already names this recipe (start-up,
+ *        popstate); otherwise opening a different recipe pushes an entry.
+ *        source - where the open came from, which decides what a 404 shows.
+ */
+export async function fetchAndDisplayRecipe(recipeId, options = {}) {
     // Opening a *different* recipe starts on Ingredients; a refresh of the
     // recipe already on the page (photo upload, an AI update_recipe, the
     // difficulty backfill) must not yank the reader off Method or Notes.
@@ -819,25 +826,21 @@ export async function fetchAndDisplayRecipe(recipeId) {
             try {
                 recipe = await fetchRecipeFromApi(recipeId);
             } catch (error) {
-                if (error.status === 404) {
-                    // Recipe missing - refresh list and fallback to first if available
-                    const list = await state.fetchRecipeList(true);
-                    if (list.length > 0) {
-                        const firstId = list[0].id;
-                        // currentRecipeId is deliberately left pointing at the
-                        // recipe that is missing: the recursive call assigns it
-                        // anyway, and pre-assigning it here made that call look
-                        // like a refresh of a recipe already on the page, which
-                        // skips the reset to Ingredients and to cook mode that
-                        // opening a different recipe is supposed to do.
-                        state.currentRecipeTitle = list[0].title || null;
-                        await fetchAndDisplayRecipe(firstId);
-                    } else {
-                        state.currentRecipeId = null;
-                        state.currentRecipeTitle = null;
-                        showRecipeError('Recipe not found');
-                        state.updateNavigationState();
-                    }
+                if (error.status === 404 && options.source !== 'artifact') {
+                    // The recipe is gone from the book: the contents, with a
+                    // note saying so, and never another recipe in its place.
+                    // The URL on load and a popstate named this recipe in the
+                    // entry itself, so that entry is replaced; the reader's own
+                    // opens push the bare path.
+                    await state.fetchRecipeList(true);
+                    const fromEntry = options.source === 'url' || options.source === 'popstate';
+                    state.showMissingRecipe(fromEntry ? 'replace' : 'push');
+                } else if (error.status === 404) {
+                    // A recipe_artifact keeps web-chat's message on the right page
+                    state.currentRecipeId = null;
+                    state.currentRecipeTitle = null;
+                    showRecipeError('Recipe not found');
+                    state.updateNavigationState();
                 } else {
                     showRecipeError('Failed to load recipe');
                 }
@@ -880,6 +883,8 @@ export async function fetchAndDisplayRecipe(recipeId) {
         state.currentRecipeId = recipe.id || recipe.recipe?.id || state.currentRecipeId;
         state.lastRecipeId = state.currentRecipeId;
         state.currentRecipeTitle = recipe.title || recipe.recipe?.title || state.currentRecipeTitle;
+        // Written once the recipe has rendered, so a failed open leaves the URL alone
+        state.recipeShown(state.currentRecipeId, { refresh: isRefresh, history: options.history ?? 'push' });
         // Keep the contents column on the left page in step with the page, so
         // its current highlight follows it. Only while the left page is
         // actually holding the contents: in cook and notes modes it holds the

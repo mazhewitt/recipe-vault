@@ -20,7 +20,10 @@ let conversationId = null;
 let currentRecipeId = null;
 let currentRecipeTitle = null;
 let recipeListCache = null;
-let viewMode = 'index'; // 'index' | 'recipe' | 'meal'
+// A recipe named in the URL (?recipe=<id>) is opened straight away, so the
+// view starts as a recipe and the contents are never drawn first.
+const urlRecipeId = new window.URLSearchParams(window.location.search).get('recipe') || null;
+let viewMode = urlRecipeId ? 'recipe' : 'index'; // 'index' | 'recipe' | 'meal'
 let attachedImage = null; // Stores pasted image data
 let lastRecipeId = null; // Last recipe displayed this session (for contents highlight)
 // The last recipe shown on the spread (above 600px). Opening a recipe sets
@@ -140,6 +143,11 @@ const sharedState = {
     fetchAndDisplayRecipe: RecipeDisplay.fetchAndDisplayRecipe,
     updateNavigationState: Navigation.updateNavigationState,
     showIndex: Navigation.showIndex,
+    // recipe-display and meal-plan-display report what they showed through
+    // these, because importing navigation.js would close an import cycle
+    recipeShown: Navigation.recipeShown,
+    mealPlanShown: Navigation.mealPlanShown,
+    showMissingRecipe: Navigation.showMissingRecipe,
     startTimer: Timer.startTimer,
     cancelTimer: Timer.cancelTimer,
     removeImage: () => removeImage(),
@@ -750,10 +758,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pagesContainer = document.querySelector('.pages-container');
     if (pagesContainer) PageTransitions.initSwipeGestures(pagesContainer);
 
-    // Load initial state
-    const list = await fetchRecipeList();
-    RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId, filter: contentsFilter });
-    Navigation.updateNavigationState();
+    // Load initial state. A recipe in the URL opens straight to it (skeleton,
+    // then the recipe in the mode for the width) with no history write: the
+    // entry already names it.
+    const restoreId = Navigation.initHistory();
+    if (restoreId) {
+        await RecipeDisplay.fetchAndDisplayRecipe(restoreId, { history: 'none', source: 'url' });
+    } else {
+        const list = await fetchRecipeList();
+        RecipeDisplay.renderIndex(list, { currentRecipeId: lastRecipeId, filter: contentsFilter });
+        Navigation.updateNavigationState();
+    }
 
     // Request notification permission for timers
     if ('Notification' in window && Notification.permission === 'default') {

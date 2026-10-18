@@ -203,30 +203,30 @@ Files:
 
 Satisfies: `recipe-url-state` (all requirements and scenarios); `recipe-book-index` "Index displays on page load" → "Page load with a recipe in the URL"; the URL clause of "Recipe Book header navigates to index".
 
-- [ ] 9.1 History writer in `navigation.js`: `history.pushState({ recipeId, seq }, '', recipeId ? '?recipe=' + encodeURIComponent(recipeId) : location.pathname)`, and the `replaceState` equivalent. `seq` increases with every push, and `popstate` reads it to pick the direction.
-- [ ] 9.2 Call sites:
+- [x] 9.1 History writer in `navigation.js`: `history.pushState({ recipeId, seq }, '', recipeId ? '?recipe=' + encodeURIComponent(recipeId) : location.pathname)`, and the `replaceState` equivalent. `seq` increases with every push, and `popstate` reads it to pick the direction.
+- [x] 9.2 Call sites:
   - A successful open of a different recipe pushes. That covers the contents row, previous/next, a swipe, a chevron and a `recipe_artifact`.
   - A refresh of the same recipe replaces the entry or leaves it alone.
   - `showIndex` from the header or from previous-from-first pushes the bare path.
   - `renderMealPlan` replaces with the bare path.
   - Opens and returns driven by `popstate` write nothing.
   - A failed (non-404) open writes nothing.
-- [ ] 9.3 Start-up: `app.js` currently seeds `body[data-view-mode]="index"` at module evaluation, so read `?recipe=` before that.
+- [x] 9.3 Start-up (implemented with the entry's existing `seq` kept on a reload rather than reset to 0, so entries before it still order correctly): `app.js` currently seeds `body[data-view-mode]="index"` at module evaluation, so read `?recipe=` before that.
   - If present: seed `viewMode` as `recipe`, show the skeleton, never call `renderIndex`, `replaceState({ recipeId, seq: 0 })`, and open the recipe with no push.
   - Otherwise: start as today, plus `replaceState({ recipeId: null, seq: 0 })`.
-- [ ] 9.4 `popstate`:
+- [x] 9.4 `popstate`:
   - The direction is `backward` if the new entry's `seq` is lower than the current one, otherwise `forward`.
   - An entry with a `recipeId` gets `animatePageTurn(direction, open that recipe without writing history)`. An entry without one gets the same with `showIndex`.
   - If `isAnimating()`, keep only the latest `popstate` and apply it when the turn ends.
-- [ ] 9.5 404: remove the fall-through to `list[0]` in `fetchAndDisplayRecipe`.
+- [x] 9.5 404: remove the fall-through to `list[0]` in `fetchAndDisplayRecipe`.
   - For opens from the URL, `popstate`, a contents row or previous/next: refresh the list, show the contents and render `.missing-recipe-notice` (`role="status"`, `--color-sticky` background, the exact text "That recipe isn't in the book any more"). Write the bare path: `replaceState` for start-up and `popstate`, a push for the others.
   - Remove the notice when the next page is shown.
   - For a `recipe_artifact` open, keep `web-chat`'s "Recipe not found" on the right page. `chat.js` marks the call so `fetchAndDisplayRecipe` can tell. See design Open question 8.
-- [ ] 9.6 E2e reload audit. Once opens push `?recipe=`, a `page.reload()` after an open restores the recipe instead of showing the contents.
+- [x] 9.6 E2e reload audit. Once opens push `?recipe=`, a `page.reload()` after an open restores the recipe instead of showing the contents.
   - Change the `openBook` helpers in `contents-page.spec.ts` and `contents-filters.spec.ts` to `page.goto('/chat')`.
   - Review the other `page.reload()` calls (20 today; grep) and keep `reload()` only where restoring the open recipe is the point.
   - Check `responsive.spec.ts` and `ui-improvements.spec.ts` header tests for any history assumption.
-- [ ] 9.7 Tests in a new `tests/e2e/tests/url-state.spec.ts`, every scenario of `recipe-url-state`:
+- [x] 9.7 Tests in a new `tests/e2e/tests/url-state.spec.ts`, every scenario of `recipe-url-state`:
   - Push on a contents click, a turn and a `recipe_artifact` (mock "show a recipe").
   - Replace on a photo upload (`history.length` unchanged).
   - Push bare on return, with nothing written on a non-404 failure (`page.route` → 500).
@@ -239,8 +239,9 @@ Satisfies: `recipe-url-state` (all requirements and scenarios); `recipe-book-ind
   - An unknown id on load, a recipe deleted before Back, and a row whose recipe was deleted (not cached) each show the contents with the notice and an empty `location.search`. The notice goes away on the next open.
   - A meal plan replaces the entry, and a reload after it shows the contents.
   - A `/share/<token>` page loads no `/static/app.js` and keeps its URL.
-- [ ] 9.8 Red-check: drop the `popstate` listener, the start-up restore and the 404 branch one at a time, and confirm the matching tests go red.
-- [ ] 9.9 Gate: `make lint`, `npx playwright test tests/url-state.spec.ts tests/contents-page.spec.ts tests/contents-filters.spec.ts tests/ui-improvements.spec.ts`, `make test-e2e`.
+- [x] 9.8 Red-check: drop the `popstate` listener, the start-up restore and the 404 branch one at a time, and confirm the matching tests go red.
+  - Red-checks done: no popstate listener -> "Back and Forward...", "Back pressed during a page turn...", "a recipe deleted before Back..." red; no start-up restore -> "a reload restores...", "never shows the contents first", "after a reload ... highlight", "unknown recipe on load" red; no 404 branch -> the three missing-recipe tests red. Also: recipeShown writing nothing -> the four push tests red; a refresh that pushes -> the photo test red.
+- [x] 9.9 Gate: `make lint`, `npx playwright test tests/url-state.spec.ts tests/contents-page.spec.ts tests/contents-filters.spec.ts tests/ui-improvements.spec.ts`, `make test-e2e`.
 
 ## 10. Verification and hand-off
 

@@ -30,6 +30,9 @@ export function renderMealPlan(mealPlan) {
     // Switch the view mode first: body[data-view-mode="meal"] is what makes the
     // right page visible on phones and hides the recipe tabs.
     if (state) state.viewMode = 'meal';
+    // Meal plans are not persisted (RV-107), so they stay out of the URL: the
+    // entry is replaced with the bare path and a reload opens the contents
+    if (state && state.mealPlanShown) state.mealPlanShown();
 
     const guestBadge = mealPlan.guest_count
         ? `<span class="meal-plan-guest-badge">For ${escapeHtml(String(mealPlan.guest_count))} people</span>`

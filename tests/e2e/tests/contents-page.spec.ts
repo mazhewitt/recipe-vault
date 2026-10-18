@@ -44,7 +44,8 @@ async function clearRecipes(page: Page) {
 }
 
 async function openBook(page: Page) {
-  await page.reload();
+  // goto, not reload: a reload after an open restores the recipe (?recipe=)
+  await page.goto('/chat');
   await expect(page.locator('.index-title')).toBeVisible();
 }
 

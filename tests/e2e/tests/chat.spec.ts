@@ -83,10 +83,21 @@ test.describe('Notes and replies', () => {
   });
 
   test('a note that triggers display_recipe shows a recipe on the right page', async ({ page }) => {
-    await seedRecipes(page, 1);
+    const [recipeId] = await seedRecipes(page, 1);
     await page.reload();
     await expect(page.locator('#message-input')).toBeVisible();
 
+    // The mock LLM's display_recipe names a fixed id that is not in the book;
+    // this used to pass only through the 404 fall-through to the first recipe,
+    // which recipe-url-state removes (a recipe_artifact 404 now shows "Recipe
+    // not found"). So the stream carries the seeded recipe's id.
+    await page.route('**/api/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+        body: `event: tool_use\ndata: {"tool":"display_recipe"}\n\nevent: recipe_artifact\ndata: {"recipe_id":"${recipeId}"}\n\nevent: done\ndata: {"conversation_id":"c1"}\n\n`,
+      });
+    });
     await sendNote(page, 'show me the recipe');
 
     // The recipe_artifact event opens the recipe on the right page
