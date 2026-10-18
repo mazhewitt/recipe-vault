@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, expectHitArea, openRecipe, sendNote } from './helpers';
+import { authenticate, createRecipe, expectHitArea, isPhone, openNotesView, openRecipe, sendNote, waitForTurn } from './helpers';
 
 /**
  * family-recipe-ui › Scaled quantities are rounded for reading, driven through
@@ -273,6 +273,32 @@ test.describe('A servings stepper scales the page', () => {
     await expect(count(page)).toHaveText('8');
   });
 
+  test('remembered across a spread mode switch, set while the ingredients are parked', async ({ page }) => {
+    test.skip(isPhone(page), 'a phone has no spread modes');
+    const id = await createScalingRecipe(page);
+    await openRecipe(page, id);
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+    await stepTo(page, 3);
+    await openNotesView(page);
+    await expect(count(page)).toHaveText('3');
+
+    // Set in Notes mode, on the header's stepper, with the ingredients panel parked off the page
+    await stepTo(page, 5);
+    // Read in the same task as the switch: the panel must come back already redrawn
+    const back = await page.evaluate(() => {
+      (window as any).setSpreadMode('cook', { force: true });
+      const left = document.getElementById('page-left-content')!;
+      return {
+        note: left.querySelector('.servings-note')?.textContent,
+        qty: left.querySelector('.ingredient-item[data-index="0"] .ingredient-qty')?.textContent,
+      };
+    });
+    expect(back).toEqual({ note: 'Scaled for 5 · amounts in the method are for 8', qty: '280 g' });
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+    await expect(page.locator('#page-left-content .servings-note')).toHaveText('Scaled for 5 · amounts in the method are for 8');
+    await expect(page.locator('#page-left-content .ingredient-item[data-index="0"] .ingredient-qty')).toHaveText('280 g');
+  });
+
   test('nothing is saved; an update_recipe keeps the count, clamped', async ({ page }) => {
     const id = await createScalingRecipe(page);
     await openRecipe(page, id);
@@ -291,6 +317,22 @@ test.describe('A servings stepper scales the page', () => {
     await sendNote(page, 'update this recipe');
     await expect(page.locator('.servings-note')).toHaveText('Scaled for 8 · amounts in the method are for 2', { timeout: 10000 });
     await expect(count(page)).toHaveText('8');
+  });
+
+  test('stepping back to S stores no count, so a saved new servings shows unscaled', async ({ page }) => {
+    const id = await createScalingRecipe(page);
+    await openRecipe(page, id);
+    await plus(page).click();
+    await expect(count(page)).toHaveText('9');
+    await minus(page).click();
+    await expect(count(page)).toHaveText('8');
+    expect((await placeRecord(page, id))?.servings ?? null).toBeNull();
+
+    // The mock's "update" saves servings 2: the page shows the recipe's new servings
+    await sendNote(page, 'update this recipe');
+    await expect(count(page)).toHaveText('2', { timeout: 10000 });
+    await expect(page.locator('.ingredient-qty[data-scaled]')).toHaveCount(0);
+    await expect(page.locator('.servings-note')).toHaveText('');
   });
 });
 
@@ -341,6 +383,22 @@ test.describe('The servings_set event sets the page\'s stepper', () => {
     await expect(qty(page, 0)).toHaveText('450 g');
     expect(await placeRecord(page, id)).toBeNull();
     expect(await placeRecord(page, other)).toBeNull();
+  });
+
+  test('the contents is open: nothing changes, though that recipe was the last one shown', async ({ page }) => {
+    const id = await createScalingRecipe(page);
+    await openRecipe(page, id);
+    await waitForTurn(page);
+    await page.goBack();
+    await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'index');
+    await waitForTurn(page);
+    await routeServingsSet(page, id, 3);
+    await sendNote(page, 'for three please');
+    await expect(page.locator('#page-margin')).toContainText('Done.', { timeout: 10000 });
+    expect(await placeRecord(page, id)).toBeNull();
+    await page.unroute('**/api/chat');
+    await openRecipe(page, id);
+    await expect(count(page)).toHaveText('8');
   });
 
   test('a recipe without servings: nothing changes', async ({ page }) => {

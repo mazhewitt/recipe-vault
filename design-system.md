@@ -245,6 +245,19 @@ A recipe open in `cook` mode, the arrangement every recipe opens in. The left pa
 
 `.book-container` has no `min-width`: with a single column, `flex: 1` inside the 1400px `.app-container` does the centring on its own. The bounded `calc(100vh - 60px)` height is load-bearing — the independent page-scroll model depends on it.
 
+### The Recipe Header (cook-from-the-page)
+
+The same in contents, cook and notes mode.
+
+- **Wide, line 1:** the title (wraps by words), a 44 × 44px tilted polaroid thumbnail (`.recipe-polaroid`, opens the full-window preview) and a "⋯" button (`button.recipe-more`, `aria-expanded`, `aria-haspopup="dialog"`).
+- **Wide, line 2:** `serves − N +` (`.meta-serves`) · total time. Then `method:`.
+- **Phone:** one line above the tabs (title ellipsised, thumbnail, "⋯"); the stepper line is the first row of the Ingredients tab; total time goes in the popover.
+- **"⋯" popover** (`.recipe-more-panel`, `role="dialog"`, `--color-paper-cream`, Kalam 15px): overlaid under the button, so opening it moves nothing. It holds the difficulty dots (their reserved slot, so a late difficulty never moves the page), the tag chips, the prep/cook split, share and add-photo. It closes on an outside tap, Escape, a page turn or mode change, and once share or add-photo starts.
+
+### The Servings Stepper
+
+`static/servings.js`. `serves − N +`, N from 1 to `max(S, min(4S, 24))`; the count is an `<output aria-live="polite">` of fixed width (tabular numerals), so N changing moves nothing. While N ≠ S each scaled `.ingredient-qty` carries `data-scaled` and is drawn in `--color-biro`, and the `.servings-note` (Kalam 14px, `--color-biro`, a slot of `1.4em` reserved whether or not it shows) reads "Scaled for N · amounts in the method are for S". N is kept for the session in `rv-place:<id>`; back at S nothing is stored. Nothing is saved to the server.
+
 ### Right Page in Recipe / Meal View
 
 `body[data-view-mode="recipe"] #page-right` is a flex column with `#page-right-content` sized to its content (`height: auto; flex: 0 0 auto`), in every spread mode. There is no grid and no margin column: `#page-margin` is the reply sticky, a sibling of the slip that lives at the foot of the left page (see **Reply Sticky** below). Whatever `#page-right[data-tab]` says, the method panel is what the right page shows above 600px.
@@ -781,7 +794,9 @@ Every control the cook taps has a hit area of at least **44px x 44px**, at every
 | Nav arrows | `.page-nav` 29px (36px on tablet) | 46px `::before` | 46px `.gutter-chevron` buttons in the tab row |
 | Spread / contents tabs | `.contents-tab` 26 × 76px | 46px `::before` | `.contents-tab` min-height 44px, min-width 66px |
 | Edge tabs | `.edge-tab` 26 × 92px | None: inert ribbons, not controls | `.page-tab` min-height 44px, `flex: 1` |
-| Share / photo | 44px icon buttons at the end of the meta line | 46px `::before` | Same |
+| "⋯" (`.recipe-more`) | 44 × 44px on the title line | Its own box | Same |
+| Share / photo | 44px icon buttons inside the "⋯" popover | 46px `::before` | Same |
+| Servings − / + | `.servings-step` 22 × 22px | 46px `::before` | Same |
 | Send / clipboard | 44 × 44px | 46px `::before` | 44 × 44px |
 | Timer close | 28 × 28px | 46px `::before` | Same |
 | Step duration | `.step-duration` button, the chip's 57 × 29px | 46px `::before` | Same |
@@ -801,7 +816,7 @@ Known gaps, owned elsewhere: the A-Z letters (`scratch:contents-page-rough-edges
 
 | Mark | How | Look |
 |------|-----|------|
-| Ingredient tick | Tap an `.ingredient-item[data-index]`; tap again to untick | `data-ticked="true"`: struck through in `--color-pencil`, `opacity: 0.55`, and a pencil ✓ (`::before`, Kalam 15px) in the margin left of the line |
+| Ingredient tick | Tap an `.ingredient-item[data-index]`; tap again to untick. Rows are `min-height: 38px` (36px on the phone) from vertical padding, not margin, so the row is the tap target edge to edge | `data-ticked="true"`: struck through in `--color-pencil`, `opacity: 0.65` (never below 0.6), and a pencil ✓ (`::before`, Kalam 15px) in the gutter left of the line, no change to the row's box |
 | "You are here" | Tap a `.prep-step[data-step]`; one step at a time, tap again to clear. A tap on the step's duration button does not mark it (buttons inside a line keep their own job) | `aria-current="step"`: a 4px `--color-leather` bar (`::after`, `left: -10px`) down the step's left margin and a faint warm tint (`rgba(139, 45, 26, 0.07)`, `--radius-sm`) behind the step, no box change. With a timer on the same step the bar stands further out (`left: -21px`; phone `-16px`), so both show |
 | Clear | "clear ticks" link (`.clear-ticks`, Kalam 14px, `--color-biro`, a fixed 72px width, right-aligned), absolutely placed in the ingredients header, with a 46px `::before` hit area; shown only while something is ticked | Clears the **ticks only**; the step mark stays (clear it by tapping the step). For 6 seconds the link reads "Undo" (same box) and a tap restores the cleared ticks; a new tick ends the chance |
 
@@ -812,7 +827,7 @@ Known gaps, owned elsewhere: the A-Z letters (`scratch:contents-page-rough-edges
 
 ### Nothing Moves Unless the Cook Acted on It
 
-The layout contract behind all of the above (`tests/e2e/tests/layout-stability.spec.ts`, 1px tolerance, every project): opening a recipe, switching spread mode, sending a note, a reply arriving, refreshing the recipe (`update_recipe`, a photo upload, a late difficulty), a timer starting, ticking and finishing, and ticking an ingredient or marking a step leave the slip, the textarea, the right page's content top, a mid-method step, the next arrow and the timer pill where they were. A refresh of the recipe already displayed shows no skeleton and restores both pages' scroll positions and the phone tab; the difficulty dots have a reserved, fixed-width slot (`.meta-difficulty`) in the meta line.
+The layout contract behind all of the above (`tests/e2e/tests/layout-stability.spec.ts`, 1px tolerance, every project): opening a recipe, switching spread mode, sending a note, a reply arriving, refreshing the recipe (`update_recipe`, a photo upload, a late difficulty), a timer starting, ticking and finishing, and ticking an ingredient or marking a step leave the slip, the textarea, the right page's content top, a mid-method step, the next arrow and the timer pill where they were. A refresh of the recipe already displayed shows no skeleton and restores both pages' scroll positions and the phone tab; the difficulty dots have a reserved, fixed-width slot (`.meta-difficulty`) inside the "⋯" popover, off the page.
 
 ### Gestures (Mobile)
 

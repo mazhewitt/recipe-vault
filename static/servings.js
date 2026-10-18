@@ -191,7 +191,9 @@ export function setServings(recipeId, n) {
     const wanted = Math.round(Number(n));
     if (!Number.isFinite(wanted)) return false;
     current.n = Math.min(Math.max(wanted, 1), servingsRange(current.servings));
-    writeServings(current.id, current.n);
+    // Back at the recipe's own servings the cook has set nothing: store no
+    // count, so a later saved change of servings shows unscaled
+    writeServings(current.id, current.n === current.servings ? null : current.n);
     draw(pageRoots());
     return true;
 }
