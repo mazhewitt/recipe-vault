@@ -285,6 +285,7 @@ function placeSticky() {
     }
     container.style.setProperty('--sticky-bottom', `${bottom}px`);
     container.style.setProperty('--sticky-max-height', `${maxHeight}px`);
+    updateStickyClearance(container, host);
 
     if (!placementObserved && typeof window.ResizeObserver !== 'undefined') {
         placementObserved = true;
@@ -293,6 +294,47 @@ function placeSticky() {
             ...document.querySelectorAll('.contents-tabs .contents-tab')]
             .forEach(el => { if (el) observer.observe(el); });
     }
+    if (!viewObserved && typeof window.MutationObserver !== 'undefined') {
+        viewObserved = true;
+        // A spread mode change or a phone tab switch draws a different view
+        // without re-rendering the sticky, and the clearance belongs to the view
+        const observer = new window.MutationObserver(() => placeSticky());
+        observer.observe(document.body, { attributes: true, attributeFilter: ['data-spread-mode', 'data-view-mode'] });
+        const pageRight = document.getElementById('page-right');
+        if (pageRight) observer.observe(pageRight, { attributes: true, attributeFilter: ['data-tab'] });
+    }
+}
+
+let viewObserved = false;
+// The foot clearance published for the view it was measured in
+let stickyClearance = 0;
+let clearanceView = null;
+
+/**
+ * Publishes --sticky-clearance on the book: the sticky's height plus its gap
+ * above the slip, which the page under the sticky adds to its foot padding so
+ * its last line can be scrolled clear. It never shrinks while the view lasts
+ * (a dismissal at scroll end would otherwise clamp scrollTop and move the
+ * page); a different recipe, the contents, a spread mode change or a phone tab
+ * starts it again from 0. The Notes views have no sticky, so no clearance.
+ */
+function updateStickyClearance(container, host) {
+    const phone = window.matchMedia('(max-width: 600px)').matches;
+    const pageRight = document.getElementById('page-right');
+    const phoneTab = phone && pageRight ? pageRight.dataset.tab : '';
+    const spreadMode = phone ? '' : document.body.dataset.spreadMode;
+    const view = [currentViewMode(), displayedRecipeId(), spreadMode, phoneTab, phone].join('|');
+    if (view !== clearanceView) {
+        clearanceView = view;
+        stickyClearance = 0;
+    }
+    const noSticky = spreadMode === 'notes'
+        || (phone && currentViewMode() === 'recipe' && phoneTab === 'notes');
+    if (!noSticky && window.getComputedStyle(container).display !== 'none') {
+        const height = container.getBoundingClientRect().height;
+        if (height > 0) stickyClearance = Math.max(stickyClearance, Math.ceil(height + STICKY_GAP));
+    }
+    host.style.setProperty('--sticky-clearance', `${noSticky ? 0 : stickyClearance}px`);
 }
 
 /**

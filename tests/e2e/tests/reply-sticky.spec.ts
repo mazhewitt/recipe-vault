@@ -1,12 +1,14 @@
 import { test, expect, Page } from '@playwright/test';
 import {
   authenticate,
+  createCookingRecipe,
   createRecipe,
   expectHitArea,
   isPhone,
   notesThread,
   openNotesView,
   openRecipe,
+  openTab,
   paceChat,
   sendNote,
   threadEntries,
@@ -453,5 +455,113 @@ test.describe('The sticky in the notes spread', () => {
     await expect(sticky(page)).toBeHidden();
     await selectMode(page, 'contents');
     await expect(sticky(page)).toBeVisible();
+  });
+});
+
+/** A hand-built three-paragraph reply, so the sticky is at least three lines tall. */
+async function routeThreeLineReply(page: Page) {
+  let body = '';
+  for (let i = 1; i <= 3; i++) {
+    body += `event: chunk\ndata: {"text":"Line ${i} of the reply about the stew.\\n\\n"}\n\n`;
+  }
+  body += 'event: done\ndata: {"conversation_id":"sticky-clearance"}\n\n';
+  await page.route('**/api/chat', route => route.fulfill({
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+    body,
+  }));
+}
+
+/** Scrolls a page to its end and returns the sticky's top edge. */
+async function scrollToEnd(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).evaluate(async (el) => {
+    el.scrollTop = el.scrollHeight;
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return document.getElementById('page-margin')!.getBoundingClientRect().top;
+  });
+}
+
+async function bottomOf(page: Page, selector: string): Promise<number> {
+  const box = (await page.locator(selector).last().boundingBox())!;
+  return box.y + box.height;
+}
+
+async function stickyClearance(page: Page): Promise<string> {
+  return page.locator('.book-container').evaluate(el => getComputedStyle(el).getPropertyValue('--sticky-clearance').trim());
+}
+
+/** web-chat › The reply sticky never hides the end of the page. */
+test.describe('The reply sticky never hides the end of the page', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  test('the last ingredient clears the sticky', async ({ page }) => {
+    test.skip(isPhone(page), 'the ingredients are on the left page above 600px');
+    const recipe = await createCookingRecipe(page);
+    await openRecipe(page, recipe.id);
+    await selectMode(page, 'cook');
+    await routeThreeLineReply(page);
+    await sendNote(page, 'tell me about it');
+    await expect(stickyNote(page)).toContainText('Line 3 of the reply', { timeout: 10000 });
+    expect(await page.locator('#page-left .ingredient-item').count()).toBeGreaterThanOrEqual(15);
+
+    const stickyTop = await scrollToEnd(page, '#page-left');
+    expect(await bottomOf(page, '#page-left .ingredient-item')).toBeLessThanOrEqual(stickyTop + 0.5);
+  });
+
+  test('the last contents row clears the sticky', async ({ page }) => {
+    for (let i = 0; i < 3; i++) await newRecipe(page, 'Clearance Row');
+    await page.reload();
+    await expect(page.locator('.index-title')).toBeVisible();
+    await routeThreeLineReply(page);
+    await sendNote(page, 'hello contents');
+    await expect(stickyNote(page)).toContainText('Line 3 of the reply', { timeout: 10000 });
+
+    const stickyTop = await scrollToEnd(page, '#page-left');
+    expect(await bottomOf(page, '#page-left .index-recipe-item')).toBeLessThanOrEqual(stickyTop + 0.5);
+  });
+
+  test('the phone footer links clear the sticky', async ({ page }) => {
+    test.skip(!isPhone(page), 'the footer links are the phone\'s');
+    const recipe = await createCookingRecipe(page);
+    // A recipe after it, so both footer links are live
+    await createCookingRecipe(page);
+    await openRecipe(page, recipe.id);
+    await routeThreeLineReply(page);
+    await sendNote(page, 'tell me about it');
+    await expect(stickyNote(page)).toContainText('Line 3 of the reply', { timeout: 10000 });
+
+    let stickyTop = await scrollToEnd(page, '#page-right');
+    expect(await bottomOf(page, '#page-right .tab-panel[data-tab="ingredients"] .ingredient-item'))
+      .toBeLessThanOrEqual(stickyTop + 0.5);
+    for (const tab of ['ingredients', 'method'] as const) {
+      if (tab === 'method') await openTab(page, 'method');
+      stickyTop = await scrollToEnd(page, '#page-right');
+      for (const link of ['.footer-prev', '.footer-next']) {
+        expect(await bottomOf(page, `#page-right ${link}`), `${link} on ${tab}`).toBeLessThanOrEqual(stickyTop + 0.5);
+      }
+    }
+    await expectHitArea(page, '#page-right .footer-prev');
+    await expectHitArea(page, '#page-right .footer-next');
+  });
+
+  test('no clearance without a sticky, in notes mode or on the phone Notes tab', async ({ page }) => {
+    const recipe = await createCookingRecipe(page);
+    await openRecipe(page, recipe.id);
+    const scroller = isPhone(page) ? '#page-right' : '#page-left';
+    const padding = () => page.locator(scroller).evaluate(el => getComputedStyle(el).paddingBottom);
+    const before = await padding();
+    expect(await stickyClearance(page)).toBe('0px');
+
+    await routeThreeLineReply(page);
+    await sendNote(page, 'tell me about it');
+    await expect(stickyNote(page)).toContainText('Line 3 of the reply', { timeout: 10000 });
+    await expect.poll(() => stickyClearance(page)).not.toBe('0px');
+
+    if (isPhone(page)) await openTab(page, 'notes');
+    else await selectMode(page, 'notes');
+    await expect.poll(() => stickyClearance(page)).toBe('0px');
+    expect(await padding()).toBe(before);
   });
 });

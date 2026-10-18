@@ -69,13 +69,21 @@ const sharedState = {
     // which recipe is on the page re-projects them — otherwise a reply that
     // lands after the reader has paged on keeps the previous recipe's notes
     // in the margin until the next note arrives.
-    set currentRecipeId(val) { currentRecipeId = val; MarginNotes.render(); },
+    set currentRecipeId(val) {
+        // A different recipe starts every spread mode's left page at the top
+        if (String(val) !== String(currentRecipeId)) SpreadModes.resetLeftScroll();
+        currentRecipeId = val;
+        MarginNotes.render();
+    },
     get currentRecipeTitle() { return currentRecipeTitle; },
     set currentRecipeTitle(val) { currentRecipeTitle = val; },
     get viewMode() { return viewMode; },
     // Mirrored to the body so CSS can key the margin column off the current view;
     // the margin re-projects because the visible slice and styling depend on the mode
     set viewMode(val) {
+        // Opening a meal plan, or going back to the contents, starts the
+        // spread modes' left-page scroll afresh
+        if (val !== viewMode) SpreadModes.resetLeftScroll();
         viewMode = val;
         document.body.dataset.viewMode = val;
         // A meal plan is the one case where several recipes at once is the
@@ -556,7 +564,7 @@ let spreadGeneration = 0;
  *
  * @param {'contents'|'cook'|'notes'} mode - the mode just applied
  */
-function renderSpread(mode) {
+function renderSpread(mode, options = {}) {
     const leftContent = document.getElementById('page-left-content');
     if (!leftContent) return;
 
@@ -594,7 +602,7 @@ function renderSpread(mode) {
         return;
     }
 
-    renderContents(mode);
+    renderContents(mode, options);
 }
 
 /**
@@ -605,7 +613,7 @@ function renderSpread(mode) {
  *        passes the mode it was called with, so a redraw and the arrangement it
  *        is drawing can never disagree.
  */
-async function renderContents(mode = effectiveSpreadMode()) {
+async function renderContents(mode = effectiveSpreadMode(), options = {}) {
     const generation = ++spreadGeneration;
     const list = await fetchRecipeList(true);
     // Superseded while the list was in flight: the pages belong to whatever
@@ -624,7 +632,10 @@ async function renderContents(mode = effectiveSpreadMode()) {
         }
     } else {
         // A recipe (or a meal plan) holds the right page; the contents stay on the left
-        RecipeDisplay.renderIndex(list, { currentRecipeId, singleColumn: true, filter: contentsFilter });
+        // A mode round trip puts the column back where the reader left it
+        RecipeDisplay.renderIndex(list, {
+            currentRecipeId, singleColumn: true, filter: contentsFilter, scrollTop: options.leftScroll,
+        });
     }
 }
 

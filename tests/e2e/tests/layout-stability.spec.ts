@@ -93,9 +93,27 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
     const result = await trackAnchors(page, [
       { name: 'note-input', selector: '#note-input' },
       { name: 'message-input', selector: '#message-input' },
+      ...(isPhone(page) ? [{ name: 'book-container', selector: '.book-container' }] : []),
     ], async () => {
       await entry.click();
       await expect(page.locator('#page-right-content .recipe-title')).toContainText(recipe.title, { timeout: 10000 });
+    });
+    expectAnchorsStill(result);
+  });
+
+  test('returning to the contents on the phone', async ({ page }) => {
+    test.skip(!isPhone(page), 'the chip only hides at ≤600px');
+    await openCookingRecipe(page);
+    await expect(page.locator('.user-info')).toBeHidden();
+
+    const result = await trackAnchors(page, [
+      { name: 'book-container', selector: '.book-container' },
+      { name: 'note-input', selector: '#note-input' },
+      { name: 'message-input', selector: '#message-input' },
+    ], async () => {
+      await page.locator('#recipe-book-header').click();
+      await expect(page.locator('.index-title')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.user-info')).toBeVisible();
     });
     expectAnchorsStill(result);
   });
@@ -161,6 +179,59 @@ test.describe('Layout stability: nothing moves unless the cook acted on it', () 
       await expect(page.locator('#page-margin')).toContainText('Line 40 of a long reply', { timeout: 10000 });
     });
     expectAnchorsStill(result);
+  });
+
+  test('a reply sticky over a page scrolled to its end', async ({ page }) => {
+    await openCookingRecipe(page);
+    // The page the sticky lies over: the left page above 600px, the phone's one page
+    const scroller = isPhone(page) ? '#page-right' : '#page-left';
+    await page.route('**/api/chat', route => route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+      body: longReplyBody(3),
+    }));
+    const scrollToEnd = async () => {
+      await page.locator(scroller).evaluate(el => { el.scrollTop = el.scrollHeight; });
+      await page.waitForTimeout(300);
+    };
+    /** Tracks the anchors and every frame's scrollTop of the page under the sticky through `action`. */
+    const trackWithScroll = async (action: () => Promise<void>) => {
+      const anchors = await ANCHORS(page);
+      await page.locator(scroller).evaluate((el) => {
+        const w = window as any;
+        w.__scrollTops = [];
+        w.__scrollSampling = true;
+        const sample = () => {
+          if (!w.__scrollSampling) return;
+          w.__scrollTops.push(el.scrollTop);
+          requestAnimationFrame(sample);
+        };
+        sample();
+      });
+      const result = await trackAnchors(page, anchors, action);
+      const tops: number[] = await page.evaluate(() => {
+        const w = window as any;
+        w.__scrollSampling = false;
+        return w.__scrollTops;
+      });
+      expectAnchorsStill(result);
+      const drift = Math.max(...tops) - Math.min(...tops);
+      expect(drift, `${scroller} scrollTop moved ${tops[0]} → ${tops[tops.length - 1]}`).toBeLessThanOrEqual(1);
+    };
+
+    // The reply streams in and completes over a page scrolled to its end...
+    await scrollToEnd();
+    await trackWithScroll(async () => {
+      await sendNote(page, 'tell me about it');
+      await expect(page.locator('#page-margin')).toContainText('Line 3 of a long reply', { timeout: 10000 });
+      await expect(page.locator('#send-button')).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
+    });
+    // ...and is dismissed with the page scrolled to its new end, the sticky's clearance included
+    await scrollToEnd();
+    await trackWithScroll(async () => {
+      await page.locator('#page-margin .note-dismiss').click();
+      await expect(page.locator('#page-margin')).toBeHidden();
+    });
   });
 
   test('refreshing the recipe', async ({ page }) => {

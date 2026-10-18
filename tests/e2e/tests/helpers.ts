@@ -323,7 +323,7 @@ export type AnchorResult = Record<string, AnchorDeviation>;
 /**
  * The anchors of family-recipe-ui › Nothing on the page moves unless the cook
  * acted on it. M is the mid-method step, ceil(steps ÷ 2), counted from the
- * displayed recipe. Anchors that are not displayed when tracking starts (the
+ * displayed recipe; `.book-container` is one at ≤600px. Anchors that are not displayed when tracking starts (the
  * timer pill before a timer, the mid step on the phone's Ingredients tab) are
  * judged from the first frame they are shown.
  */
@@ -343,6 +343,8 @@ export async function ANCHORS(page: Page): Promise<Anchor[]> {
   }
   // The page arrows are not displayed at ≤600px (the phone turns pages by edge tap)
   if (!isPhone(page)) anchors.push({ name: 'page-next', selector: '#page-next' });
+  // The book itself is an anchor where the chrome above it can come and go
+  else anchors.push({ name: 'book-container', selector: '.book-container' });
   anchors.push({ name: 'timer-widget', selector: '#timer-widget' });
   return anchors;
 }

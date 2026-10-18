@@ -85,6 +85,105 @@ test.describe('Responsive Layout (book only)', () => {
     }
   });
 
+  test('hiding the chip on the phone moves nothing', async ({ page }) => {
+    // web-chat › Logout UI › Hiding the chip on the phone moves nothing
+    test.skip(!isPhone(page), 'the chip only hides at ≤600px');
+    await createRecipe(page, { ...RECIPE, title: `${RECIPE.title} ${Date.now()}` });
+    await page.reload();
+    await expect(page.locator('.index-title')).toBeVisible();
+    await expect(page.locator('.user-info')).toBeVisible();
+
+    // Out of the flow, or keeping its slot while it is not displayed
+    const chip = () => page.locator('.user-info').evaluate(el => {
+      const cs = getComputedStyle(el);
+      return { position: cs.position, display: cs.display, visibility: cs.visibility };
+    });
+
+    // Every frame's book box, and every layout shift, through both turns
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__bookBoxes = [];
+      w.__shifts = [];
+      new PerformanceObserver(list => {
+        for (const entry of list.getEntries() as any[]) {
+          const sources = (entry.sources || []).map((s: any) => s.node && s.node instanceof Element
+            ? `${s.node.tagName.toLowerCase()}.${s.node.className}` : '');
+          w.__shifts.push({ value: entry.value, sources });
+        }
+      }).observe({ type: 'layout-shift', buffered: false });
+      const sample = () => {
+        const r = document.querySelector('.book-container')!.getBoundingClientRect();
+        w.__bookBoxes.push([r.x, r.y, r.width, r.height]);
+        requestAnimationFrame(sample);
+      };
+      sample();
+    });
+    const entry = page.locator('.index-recipe-item', { hasText: RECIPE.title }).last();
+    await entry.scrollIntoViewIfNeeded();
+    await entry.click();
+    await expect(page.locator('#page-right-content .recipe-title')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.user-info')).toBeHidden();
+    const hidden = await chip();
+    const outOfFlow = ['absolute', 'fixed'].includes(hidden.position);
+    const keepsSlot = hidden.display !== 'none' && hidden.visibility === 'hidden';
+    expect(outOfFlow || keepsSlot, `.user-info hidden as ${JSON.stringify(hidden)}`).toBe(true);
+    await page.waitForTimeout(600);
+    await page.click('#recipe-book-header');
+    await expect(page.locator('.index-title')).toBeVisible();
+    await expect(page.locator('.user-info')).toBeVisible();
+    await page.waitForTimeout(600);
+
+    const { boxes, shifts } = await page.evaluate(() => ({
+      boxes: (window as any).__bookBoxes as number[][],
+      shifts: (window as any).__shifts as Array<{ value: number; sources: string[] }>,
+    }));
+    const base = boxes[0];
+    const drift = Math.max(...boxes.map(b => Math.max(...b.map((v, i) => Math.abs(v - base[i])))));
+    expect(drift, `.book-container moved ${drift.toFixed(1)}px`).toBeLessThanOrEqual(1);
+    const bookShifts = shifts.filter(s => s.sources.some(src => /app-container|book-container/.test(src)));
+    expect(bookShifts, JSON.stringify(bookShifts)).toEqual([]);
+  });
+
+  test('the tablet slip gives the page number\'s room to the textarea', async ({ page }) => {
+    // family-recipe-ui › Note input lives in the book
+    test.skip(!isTablet(page), 'tablet band only');
+    await seedAndOpen(page);
+    await expect(page.locator('.note-page-number')).toBeHidden();
+    expect(await page.locator('.note-page-number').evaluate(el => getComputedStyle(el).display)).toBe('none');
+
+    // The placeholder is shown in full: it fits the textarea's content box on one line
+    const fit = await page.locator('#message-input').evaluate((el) => {
+      const ta = el as HTMLTextAreaElement;
+      const cs = getComputedStyle(ta);
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const content = ta.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      return { text: ctx.measureText(ta.placeholder).width, content, scrollWidth: ta.scrollWidth, clientWidth: ta.clientWidth };
+    });
+    expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
+    expect(fit.text, JSON.stringify(fit)).toBeLessThanOrEqual(fit.content);
+
+    // The freed slot is the textarea's: at 810px it is 217px wide, where it
+    // was 164px beside the page number. The spec's 40-character note needs
+    // ~284px of Kalam at 16px, more than the slip's column holds with the
+    // pencil and the two 44px buttons, so the case is a placeholder-length
+    // question (escalated with the group 1 report).
+    expect(await page.locator('#message-input').evaluate(el => el.clientWidth)).toBeGreaterThanOrEqual(210);
+    const before = (await page.locator('#note-input').boundingBox())!;
+    await page.locator('#message-input').fill('how long should it rest?');
+    await page.waitForTimeout(200);
+    const after = (await page.locator('#note-input').boundingBox())!;
+    expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
+  });
+
+  test('the page number stays on the slip above 1024px', async ({ page }) => {
+    // family-recipe-ui › Note input lives in the book › Page number follows the open page
+    test.skip(isPhone(page) || isTablet(page), 'wider than 1024px only');
+    await seedAndOpen(page);
+    await expect(page.locator('.note-page-number')).toBeVisible();
+    await expect(page.locator('.note-page-number')).toHaveText(/^p\. \d+$/);
+  });
+
   test('phone hides both tab strips on the contents page', async ({ page }) => {
     test.skip(!isPhone(page), 'phone layout only');
     await seedAndOpen(page);

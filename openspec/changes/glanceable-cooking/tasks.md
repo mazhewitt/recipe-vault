@@ -27,30 +27,30 @@ Stop the server you started (`kill $(cat tests/usability/runs/3036/server.pid)`)
 
 ## 1. Nothing covers, nothing moves (G1, G2, G3, G4)
 
-- [ ] 1.1 The sticky's foot clearance (G1).
+- [x] 1.1 The sticky's foot clearance (G1).
   - Files: `static/margin-notes.js` `placeSticky` (≈255) and the `ResizeObserver` beside it (≈291); `static/styles.css`, the left page's `padding-bottom: var(--slip-clearance)` (≈616) and the phone `#page-right` padding in the ≤600px block.
   - Set `--sticky-clearance` on `.book-container` to the sticky's rendered height plus its gap above the slip, `0px` with no sticky. Add it to the bottom padding of `#page-left` above 600px and `#page-right` at 600px and narrower: `calc(var(--slip-clearance) + var(--sticky-clearance))`.
   - The clearance never shrinks while the view lasts, so a dismissal at scroll end cannot clamp `scrollTop` and move the page. Reset it to `0px` when a different recipe or the contents is drawn, or the spread mode changes. Keep it `0px` in `notes` mode and on the phone Notes tab.
   - Test first, in `tests/e2e/tests/reply-sticky.spec.ts`: one case per scenario of web-chat › The reply sticky never hides the end of the page. Use `createCookingRecipe` (at least 15 ingredients; extend the fixture if needed) and a three-line hand-built SSE reply. Scroll the container to its end, and compare the last `.ingredient-item` / `.index-recipe-item` / `.footer-prev` / `.footer-next` bottom with `#page-margin`'s top. On the phone, call `expectHitArea` on both footer links.
   - In `layout-stability.spec.ts`, add family-recipe-ui › Nothing on the page moves unless the cook acted on it › A reply sticky over a page scrolled to its end, and also assert the container's `scrollTop`.
   - Red-check: on `e35a58c` the last ingredient sits under the sticky on chromium and ipad, and the footer links are blocked on mobile-chrome. Then remove the `--sticky-clearance` term from the padding: the reply-sticky cases go red. Then make the clearance follow the sticky's current height on dismissal: the scroll-at-end case goes red.
-- [ ] 1.2 The phone book stays put (G2).
+- [x] 1.2 The phone book stays put (G2).
   - Files: `static/styles.css`, the phone `.user-info` rules (≈2288 and `body:not([data-view-mode="index"]) .user-info` ≈2302).
   - At ≤600px take `.user-info` out of flow: absolutely positioned in the strip above the book, where it sits now on the contents. If it then overlaps a control on the contents page, keep its slot with `visibility: hidden` instead of `display: none`.
   - Add `.book-container` to `ANCHORS(page)` in `helpers.ts` when `isPhone(page)`.
   - Test first: in `layout-stability.spec.ts`, assert `.book-container` in "Opening a recipe" on mobile-chrome, and add "Returning to the contents on the phone" (`test.skip(!isPhone(page), 'the chip only hides at ≤600px')`). In `responsive.spec.ts`, add web-chat › Logout UI › Hiding the chip on the phone moves nothing, with a `PerformanceObserver` `layout-shift` buffer read after the turns.
   - Red-check: on `e35a58c` `.book-container` moves dy=36 on mobile-chrome (counter `phone-book-jumps-on-open`). Restoring `display: none` turns the case red.
-- [ ] 1.3 Each spread mode keeps its own left-page scroll (G3).
+- [x] 1.3 Each spread mode keeps its own left-page scroll (G3).
   - Files: `static/spread-modes.js` `setSpreadMode` (≈81). Save `#page-left.scrollTop` under the outgoing mode before `spreadRenderer(mode)`, and restore the incoming mode's saved value after it, in the same frame. `static/app.js`: reset the saved positions when a recipe or meal plan is opened (`cook` = 0) and on return to the contents page.
   - `static/recipe-display.js` `renderIndex` (≈226): its scroll-the-current-row-into-view runs only when the contents are drawn fresh. Pass an option from the mode switch so a round trip skips it.
   - Do not touch the phone tabs: `safe-page-navigation` N3 owns them.
   - Test first, in `spread-modes.spec.ts` (`test.skip(isPhone(page), 'no spread modes at ≤600px')`): one case per scenario of book-spread-modes › Each spread mode keeps its own left-page scroll. Add a `requestAnimationFrame` sampler for "no frame shows it at another position".
   - Red-check: on `e35a58c` Contents → Cook brings the ingredients back at L=88 (cook `left-scroll-leaks-across-modes`). Deleting the restore line turns the cases red.
-- [ ] 1.4 The tablet slip has room (G4).
+- [x] 1.4 The tablet slip has room (G4).
   - Files: `static/styles.css`, `.note-page-number` (≈400). Add a `@media (min-width: 601px) and (max-width: 1024px)` rule with `display: none`. Leave the phone rule (≈2451) alone. If the freed width does not reach the textarea, check the `.note-input` flex rules (≈246-261).
   - Test first, in `responsive.spec.ts` (`test.skip(!isTablet(page), 'tablet band only')`): family-recipe-ui › Note input lives in the book › The tablet slip gives the page number's room to the textarea. On chromium, assert the page number is still shown and reads "p. N" (Page number follows the open page).
   - Red-check: on `e35a58c` the textarea is 148-164px and a 35-character note grows the slip 61 → 75px at 810px. Removing the media rule turns the case red.
-- [ ] 1.5 `make lint`, then the full suite on port 3002, green.
+- [x] 1.5 `make lint`, then the full suite on port 3002, green.
 
 ## 2. A timer for across the kitchen (G5, G6, G7)
 

@@ -875,3 +875,189 @@ test.describe('Spread modes', () => {
     expect(await spreadMode(page)).toBe(before);
   });
 });
+
+/** book-spread-modes › Each spread mode keeps its own left-page scroll. */
+test.describe('Each spread mode keeps its own left-page scroll', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  const leftScroll = (page: Page) => page.locator('#page-left').evaluate(el => el.scrollTop);
+  const scrollLeftTo = (page: Page, top: number) =>
+    page.locator('#page-left').evaluate((el, t) => { el.scrollTop = t; return el.scrollTop; }, top);
+
+  /** Enough contents rows that the contents column scrolls beside an open recipe. */
+  async function fillContents(page: Page) {
+    for (let i = 0; i < 12; i++) {
+      await createRecipe(page, {
+        title: `Scroll Filler ${i} ${Date.now()}`,
+        ingredients: [{ name: 'flour', quantity: 1, unit: 'cup' }],
+        steps: [{ step_number: 1, instruction: 'Mix' }],
+        difficulty: 3,
+      });
+    }
+  }
+
+  /** Waits for the contents to be drawn on the left page beside the recipe. */
+  async function contentsDrawn(page: Page) {
+    await expect(page.locator('#page-left-content .index-recipe-item').first()).toBeVisible();
+  }
+
+  /** Puts `count` replies on the open recipe's thread, so the notes page scrolls. */
+  async function seedThread(page: Page, recipeId: string, count: number) {
+    await page.evaluate(async ({ id, n }) => {
+      // @ts-ignore - module path served by the app; the same instance app.js uses
+      const M = await import('/static/margin-notes.js');
+      for (let i = 1; i <= n; i++) M.addNote(`Seeded reply ${i}: a line or two about the stew so the thread grows.`, 'reply', id);
+    }, { id: recipeId, n: count });
+  }
+
+  test('contents to cook brings the ingredients back where they were', async ({ page }) => {
+    skipOnPhone(page);
+    await fillContents(page);
+    const recipeId = await createLongRecipe(page, 'Scroll Back');
+    await openRecipe(page, recipeId);
+    expect(await leftScroll(page)).toBeLessThanOrEqual(1);
+
+    await selectMode(page, 'contents');
+    await contentsDrawn(page);
+    const end = await page.locator('#page-left').evaluate(el => { el.scrollTop = el.scrollHeight; return el.scrollTop; });
+    expect(end, 'the contents must scroll for this case to mean anything').toBeGreaterThan(20);
+
+    await selectMode(page, 'cook');
+    await expect(page.locator('#page-left-content .tab-panel[data-tab="ingredients"]')).toBeVisible();
+    expect(await leftScroll(page)).toBeLessThanOrEqual(1);
+    const first = (await page.locator('#page-left .ingredient-item').first().boundingBox())!;
+    const pageBox = (await page.locator('#page-left').boundingBox())!;
+    expect(first.y).toBeGreaterThanOrEqual(pageBox.y);
+  });
+
+  test('each mode has its own position', async ({ page }) => {
+    skipOnPhone(page);
+    await fillContents(page);
+    const recipeId = await createLongRecipe(page, 'Scroll Each');
+    await openRecipe(page, recipeId);
+    await seedThread(page, recipeId, 30);
+
+    // Record a position in each mode
+    expect(await scrollLeftTo(page, 50)).toBe(50);
+    await selectMode(page, 'contents');
+    await contentsDrawn(page);
+    expect(await scrollLeftTo(page, 200)).toBe(200);
+    await selectMode(page, 'notes');
+    await expect(page.locator('#page-left-content .notes-thread .thread-note').first()).toBeVisible();
+    const p = await scrollLeftTo(page, 120);
+    expect(p, 'the thread must scroll for this case to mean anything').toBeGreaterThan(20);
+
+    await selectMode(page, 'cook');
+    expect(await leftScroll(page)).toBeCloseTo(50, 0);
+    await selectMode(page, 'contents');
+    await contentsDrawn(page);
+    await expect.poll(() => leftScroll(page)).toBeCloseTo(200, 0);
+    await selectMode(page, 'notes');
+    expect(await leftScroll(page)).toBeCloseTo(p, 0);
+    await selectMode(page, 'cook');
+    expect(await leftScroll(page)).toBeCloseTo(50, 0);
+  });
+
+  test('a round trip does not re-centre the contents', async ({ page }) => {
+    skipOnPhone(page);
+    await fillContents(page);
+    // Last in the alphabet, so the current row is centred well down the column
+    const recipeId = await createLongRecipe(page, 'Zz Round Trip');
+    await openRecipe(page, recipeId);
+
+    await selectMode(page, 'contents');
+    await contentsDrawn(page);
+    await expect.poll(() => leftScroll(page), { message: 'drawn fresh, the current row is scrolled into view' })
+      .toBeGreaterThan(20);
+    await scrollLeftTo(page, 0);
+
+    await selectMode(page, 'cook');
+    await selectMode(page, 'contents');
+    await contentsDrawn(page);
+    await page.waitForTimeout(300);
+    expect(await leftScroll(page)).toBeLessThanOrEqual(1);
+  });
+
+  test('a newly opened recipe starts at the top of its ingredients', async ({ page }) => {
+    skipOnPhone(page);
+    const a = await createLongRecipe(page, 'Scroll New A');
+    const b = await createLongRecipe(page, 'Scroll New B');
+    // The page arrows walk the list the page loaded with
+    await page.reload();
+    await expect(page.locator('.index-title')).toBeVisible();
+    await openRecipe(page, a);
+    expect(await scrollLeftTo(page, 200)).toBe(200);
+
+    await openRecipe(page, b);
+    await expect(page.locator('#page-right-content .recipe-title')).toContainText('Scroll New B');
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+    expect(await leftScroll(page)).toBeLessThanOrEqual(1);
+
+    // ...and by the page arrow, from a scrolled cook page
+    expect(await scrollLeftTo(page, 200)).toBe(200);
+    await expect.poll(() => isAnimating(page)).toBe(false);
+    const bTitle = (await page.locator('#page-right-content .recipe-title').textContent())!;
+    await page.locator('#page-prev').click();
+    await expect(page.locator('#page-right-content .recipe-title')).not.toHaveText(bTitle, { timeout: 10000 });
+    await expect.poll(() => isAnimating(page)).toBe(false);
+    await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'cook');
+    expect(await leftScroll(page)).toBeLessThanOrEqual(1);
+  });
+
+  test('restoring moves nothing else, and no frame shows another position', async ({ page }) => {
+    skipOnPhone(page);
+    await fillContents(page);
+    const recipeId = await createLongRecipe(page, 'Scroll Frames');
+    await openRecipe(page, recipeId);
+    await scrollLeftTo(page, 50);
+    await selectMode(page, 'contents');
+    await contentsDrawn(page);
+    await scrollLeftTo(page, 200);
+    const rightBefore = await page.locator('#page-right').evaluate(el => ({ top: el.scrollTop, box: el.getBoundingClientRect().toJSON() }));
+
+    for (const [mode, expected, marker] of [
+      ['cook', 50, '#page-left .ingredient-item'],
+      ['contents', 200, '#page-left .index-recipe-item'],
+    ] as const) {
+      // Every frame on which the incoming mode's content is on the left page
+      await page.evaluate((sel) => {
+        const w = window as any;
+        const frames: number[] = w.__leftFrames = [];
+        w.__leftSampling = true;
+        const sample = () => {
+          // A sampler belongs to its own switch; the previous one stops here
+          if (!w.__leftSampling || w.__leftFrames !== frames) return;
+          if (document.querySelector(sel)) w.__leftFrames.push(document.getElementById('page-left')!.scrollTop);
+          requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      }, marker);
+      await selectMode(page, mode);
+      await expect(page.locator(marker).first()).toBeVisible();
+      await page.waitForTimeout(300);
+      const frames: number[] = await page.evaluate(() => {
+        const w = window as any;
+        w.__leftSampling = false;
+        return w.__leftFrames;
+      });
+      expect(frames.length).toBeGreaterThan(0);
+      const off = frames.filter(t => Math.abs(t - expected) > 1);
+      expect(off, `${mode}: frames at another position`).toEqual([]);
+    }
+    const rightAfter = await page.locator('#page-right').evaluate(el => ({ top: el.scrollTop, box: el.getBoundingClientRect().toJSON() }));
+    expect(rightAfter).toEqual(rightBefore);
+  });
+
+  test('the phone is unaffected', async ({ page }) => {
+    test.skip(!isPhone(page), 'phone only');
+    const recipeId = await createLongRecipe(page, 'Scroll Phone');
+    await openRecipe(page, recipeId);
+    await page.locator('#page-right').evaluate(el => { el.scrollTop = 150; });
+    const before = await page.locator('#page-right').evaluate(el => el.scrollTop);
+    // @ts-ignore - exposed by app.js
+    expect(await page.evaluate(() => window.setSpreadMode('contents'))).toBe(false);
+    expect(await page.locator('#page-right').evaluate(el => el.scrollTop)).toBe(before);
+  });
+});

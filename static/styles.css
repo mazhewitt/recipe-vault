@@ -410,6 +410,14 @@ body::before {
     white-space: nowrap;
 }
 
+/* The tablet slip is a narrow column: its page number's room goes to the
+   textarea (the contents and the footer already say where you are) */
+@media (min-width: 601px) and (max-width: 1024px) {
+    .note-page-number {
+        display: none;
+    }
+}
+
 .clipboard-button {
     flex-shrink: 0;
     width: 44px;
@@ -509,6 +517,9 @@ body::before {
     --slip-bottom: 10px;
     --slip-height: 52px;
     --slip-clearance: calc(var(--slip-height) + var(--slip-bottom) + 10px);
+    /* The reply sticky's height plus its gap above the slip, set by
+       margin-notes.js while a sticky has been shown in this view */
+    --sticky-clearance: 0px;
 }
 
 .recipe-book {
@@ -613,7 +624,8 @@ body::before {
 .page-left {
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);
     box-shadow: var(--shadow-inset-left);
-    padding-bottom: var(--slip-clearance); /* clear the .note-input slip pinned to the foot */
+    /* clear the .note-input slip pinned to the foot, and the reply sticky above it */
+    padding-bottom: calc(var(--slip-clearance) + var(--sticky-clearance));
     /* Room for the leather tabs' 44px hit area: the page clips at its edge (it
        scrolls), so the 26px tab sits 10px in and its hit area reaches 9px
        either side without touching the text. */
@@ -2298,9 +2310,11 @@ body[data-feature-meals] .contents-tab-meals {
 
     /* The chip is 70px of chrome while cooking, and its Logout sat just
        above the timer's close control: on the phone it shows on the contents
-       page only. */
+       page only. It keeps its slot rather than leaving the flow: out of flow it
+       would lie over the Recipe Book header and the timer pill in the leather
+       strip, and taking the slot away moved the whole book 36px. */
     body:not([data-view-mode="index"]) .user-info {
-        display: none;
+        visibility: hidden;
     }
 
     .user-email {
@@ -2318,6 +2332,8 @@ body[data-feature-meals] .contents-tab-meals {
         border-radius: 0;
         box-shadow: none;
         padding: 16px;
+        /* the reply sticky overlays the page's foot, above the input bar */
+        padding-bottom: calc(16px + var(--sticky-clearance));
     }
 
     .page-right::before {
