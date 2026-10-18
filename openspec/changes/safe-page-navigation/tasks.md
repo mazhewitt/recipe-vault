@@ -150,26 +150,26 @@ Files:
 
 Satisfies: `recipe-book-index` "Recipe Book header navigates to index" (all scenarios except the URL clause, which lands in group 9), and "Index displays on page load" → "Index fetches fresh data" (the return to the contents).
 
-- [ ] 7.1 The header click runs `animatePageTurn('backward', () => showIndex())` while a recipe or meal plan is open. On the contents it does nothing: no turn and no request.
-- [ ] 7.2 `showIndex` draws the contents synchronously from the held list, inside the render function and in the same task as the spread-mode change. No frame can then show the left page emptied with the recipe re-flowed on the right.
+- [x] 7.1 The header click runs `animatePageTurn('backward', () => showIndex())` while a recipe or meal plan is open. On the contents it does nothing: no turn and no request.
+- [x] 7.2 `showIndex` draws the contents synchronously from the held list, inside the render function and in the same task as the spread-mode change. No frame can then show the left page emptied with the recipe re-flowed on the right.
   - After the turn resolves, refresh the list once. Re-render in place only if the ids, titles, order, tags or photos differ, under the existing `spreadGeneration` guard.
   - After steady-cooking-spread D2, re-check what `restoreIngredientsPanel` still does on this path.
-- [ ] 7.3 "Previous" from the first recipe (`loadPrevRecipe` → `showIndex` inside a turn) gets the same synchronous draw.
-- [ ] 7.4 Header hit area:
+- [x] 7.3 "Previous" from the first recipe (`loadPrevRecipe` → `showIndex` inside a turn) gets the same synchronous draw.
+- [x] 7.4 Header hit area:
   - Desktop: `#recipe-book-header` is `display: block; width: fit-content; margin-inline: auto`, with horizontal padding of at most 22px per side and `min-height: 44px` (vertically centred text).
   - Phone: the same cap and `min-height: 44px`, kept clear of `.page-tabs` and `#page-right-content`. The leather strip is 40px tall and the tabs start about 60px down.
   - At every width, keep the box clear of `#timer-widget`: steady-cooking-spread centres the pill over the spine at the book's top edge, and requires that it never overlap `#recipe-book-header`.
   - The hover style stays.
-- [ ] 7.5 Update `spread-modes.spec.ts` "going back to the contents does not overwrite a mode chosen while the list loads". The header now holds the animation lock for the turn. Hold the list refresh with `page.route`, click the header, wait for `isAnimating()` to be false, choose Notes, then release, and keep the assertion that the late refresh cannot overwrite notes mode. Re-run the specs that click `#recipe-book-header` and act straight after (`margin-notes`, `notes-scoping`, `page-tabs`, `responsive`, `ui-improvements`, `contents-filters`). Where they act inside the turn, wait for the lock rather than sleeping.
-- [ ] 7.6 New tests, in `ui-improvements.spec.ts` beside the existing header test:
+- [x] 7.5 Update `spread-modes.spec.ts` "going back to the contents does not overwrite a mode chosen while the list loads". The header now holds the animation lock for the turn. Hold the list refresh with `page.route`, click the header, wait for `isAnimating()` to be false, choose Notes, then release, and keep the assertion that the late refresh cannot overwrite notes mode. Re-run the specs that click `#recipe-book-header` and act straight after (`margin-notes`, `notes-scoping`, `page-tabs`, `responsive`, `ui-improvements`, `contents-filters`). Where they act inside the turn, wait for the lock rather than sleeping.
+- [x] 7.6 New tests, in `ui-improvements.spec.ts` beside the existing header test:
   - Above 600px, `.page-turn-overlay.turn-backward` is observed. On the phone, `html[data-nav-direction="backward"]` is observed.
   - A requestAnimationFrame sampler, with `/api/recipes` delayed 400ms, finds the left page never empty and the right page never holding the ingredients panel, and `.index-title` is present by 150ms.
   - Exactly one list request is made after the turn.
   - A header click on the contents gives no overlay and no request.
   - Hit box: at least 44 tall and at most text width + 44 wide (a `Range` over the header's contents), on every project.
   - A click 60px right of the text keeps the recipe open.
-- [ ] 7.7 Red-check: route the header back to the un-animated `showIndex` that awaits the list, and confirm the frame-sampler test goes red. Restore the full-width label and confirm the wood-click test goes red.
-- [ ] 7.8 Gate: `make lint`, `npx playwright test tests/ui-improvements.spec.ts tests/spread-modes.spec.ts tests/responsive.spec.ts`, `make test-e2e`.
+- [x] 7.7 Red-check: route the header back to the un-animated `showIndex` that awaits the list, and confirm the frame-sampler test goes red. Restore the full-width label and confirm the wood-click test goes red.
+- [x] 7.8 Gate: `make lint`, `npx playwright test tests/ui-improvements.spec.ts tests/spread-modes.spec.ts tests/responsive.spec.ts`, `make test-e2e`.
 
 ## 8. Crossing 600px keeps the view (design N6)
 

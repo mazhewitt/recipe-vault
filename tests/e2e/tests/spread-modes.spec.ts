@@ -634,10 +634,12 @@ test.describe('Spread modes', () => {
       await route.continue();
     });
 
-    // The Recipe Book header reaches showIndex directly, outside a page turn,
-    // so nothing holds the animation lock while the list is in flight
+    // The Recipe Book header turns the page back, drawing the contents from
+    // the list already held, and refreshes the list once the turn is over. The
+    // turn holds the animation lock, so wait it out; the refresh is still held.
     await page.locator('#recipe-book-header').click();
     await expect(page.locator('body')).toHaveAttribute('data-spread-mode', 'contents');
+    await expect.poll(() => isAnimating(page), { timeout: 5000 }).toBe(false);
 
     // With no recipe open the strip shows the filters plus Notes, which is the
     // way in — the book-level thread on the left, the contents on the right

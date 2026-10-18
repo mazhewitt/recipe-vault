@@ -1,8 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import {
-  authenticate, createRecipe, openRecipe, sendNote, isPhone,
-  openNotesView, notesThread,
-} from './helpers';
+import { authenticate, createRecipe, openRecipe, sendNote, isPhone, openNotesView, notesThread, waitForTurn } from './helpers';
 
 /**
  * Notes belong to the recipe that was open when their turn began. The reply
@@ -146,7 +143,9 @@ test.describe('Notes scoped to their recipe', () => {
     await expect(notesThread(page)).toHaveAttribute('data-empty', 'true');
 
     // ...and the book's thread is still there when the reader comes back
+    await waitForTurn(page);
     await page.locator('#recipe-book-header').click();
+    await waitForTurn(page);
     await expect(page.locator('.index-title')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('#page-margin .margin-note')).toHaveCount(1);
     await expect(page.locator('#page-margin')).toContainText('mock assistant');
@@ -224,7 +223,9 @@ test.describe('Notes scoped to their recipe', () => {
     await expect(notesThread(page)).toHaveAttribute('data-empty', 'true');
 
     // The announcement is waiting where the reader was standing when they wrote it
+    await waitForTurn(page);
     await page.locator('#recipe-book-header').click();
+    await waitForTurn(page);
     await expect(page.locator('.index-title')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('#page-margin')).toContainText('here is the one I made');
   });

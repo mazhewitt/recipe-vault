@@ -112,18 +112,43 @@ export async function loadPrevRecipe() {
     const idx = findIndexById(list, state.currentRecipeId);
     if (idx === -1) {
         // Current recipe not found, return to index
-        await animatePageTurn('backward', () => state.showIndex());
+        await turnToContents();
         return;
     }
     if (idx > 0) {
         await animatePageTurn('backward', () => state.fetchAndDisplayRecipe(list[idx - 1].id));
     } else {
         // At first recipe, return to index
-        await animatePageTurn('backward', () => state.showIndex());
+        await turnToContents();
     }
 }
 
-export async function showIndex() {
+/**
+ * The "Recipe Book" header: one backward page turn to the contents while a
+ * recipe or a meal plan is open, then one list refresh. On the contents it
+ * does nothing.
+ */
+export async function returnToContents() {
+    if (state.viewMode === 'index' || isAnimating()) return;
+    await turnToContents();
+}
+
+/**
+ * A backward turn to the contents (the header, and "previous" from the first
+ * recipe). The pages are drawn from the held list inside the turn; the list is
+ * refreshed once the turn has finished.
+ */
+async function turnToContents() {
+    let generation = null;
+    await animatePageTurn('backward', () => { generation = showIndex(); });
+    if (generation != null) await state.refreshContents(generation);
+}
+
+/**
+ * Shows the contents, drawn synchronously from the list already held.
+ * @returns {number} the spread generation of the draw, for state.refreshContents
+ */
+export function showIndex() {
     state.viewMode = 'index';
     // Nothing is being cooked from the contents: let the screen sleep
     releaseWakeLock();
@@ -133,21 +158,17 @@ export async function showIndex() {
     // reverts to the filters (the view-mode change above has already swapped the
     // button sets; this presses the right one). force: showIndex is reached from
     // the back arrow inside a page turn, and the lock exists to reject the
-    // reader's tab clicks, not this.
-    setSpreadMode('contents', { force: true });
+    // reader's tab clicks, not this. render: false, because the draw below is
+    // this function's: the mode change and the pages land in one task, so the
+    // turn never uncovers a left page emptied while a list request is in flight.
+    setSpreadMode('contents', { force: true, render: false });
     // The contents page is page 1
     setNotePageNumber(null);
-    // The redraw belongs to renderContents, not to this function. Rendering the
-    // index here would be a second write of both pages after an await, and an
-    // unguarded one: a reader who reaches for the note input while the recipe
-    // list is in flight is in notes mode by the time it lands, and the two-page
-    // split would drop on top of the thread the mode change had just put on the
-    // left page. renderContents stamps itself with the spread generation, so
-    // whichever call decided the pages last is the one that gets to write them.
-    // Awaited because showIndex runs inside a page turn, which must not uncover
-    // the pages before they are drawn.
-    await state.renderContents();
+    // Stamped with the spread generation, so a reader who picks another mode
+    // before the refresh lands keeps it (state.refreshContents checks it).
+    const generation = state.drawHeldContents();
     updateNavigationState();
+    return generation;
 }
 
 // Guard so initFooterNav can be called more than once without stacking listeners

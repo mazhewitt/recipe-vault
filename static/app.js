@@ -125,6 +125,8 @@ const sharedState = {
     // it is the one contents render that carries the spread generation, so a
     // mode the reader picks while the recipe list is in flight still wins.
     renderContents: () => renderContents(),
+    drawHeldContents: () => drawHeldContents(),
+    refreshContents: (generation) => refreshContents(generation),
     fetchAndDisplayRecipe: RecipeDisplay.fetchAndDisplayRecipe,
     updateNavigationState: Navigation.updateNavigationState,
     showIndex: Navigation.showIndex,
@@ -314,7 +316,7 @@ function setupNavigationButtons() {
 
     if (prevBtn) prevBtn.addEventListener('click', Navigation.loadPrevRecipe);
     if (nextBtn) nextBtn.addEventListener('click', Navigation.loadNextRecipe);
-    if (header) header.addEventListener('click', Navigation.showIndex);
+    if (header) header.addEventListener('click', Navigation.returnToContents);
 
     // Delegated click listener for recipe photos. Click only, for mouse and
     // touch alike: a tap's click has pointerType 'touch' (and none at all on
@@ -568,6 +570,13 @@ async function renderContents(mode = effectiveSpreadMode()) {
     // asked for them next.
     if (generation !== spreadGeneration) return;
 
+    drawContents(list, mode);
+}
+
+/**
+ * Writes the contents arrangement for `mode` from `list`, synchronously.
+ */
+function drawContents(list, mode) {
     if (viewMode === 'index') {
         // In notes mode the thread holds the left page, so the contents go on
         // the right as one column instead of splitting across the spread.
@@ -582,6 +591,36 @@ async function renderContents(mode = effectiveSpreadMode()) {
         // A recipe (or a meal plan) holds the right page; the contents stay on the left
         RecipeDisplay.renderIndex(list, { currentRecipeId, singleColumn: true, filter: contentsFilter });
     }
+}
+
+/**
+ * The return to the contents, drawn in the same task as the mode change from
+ * the list already held, so a page turn uncovers finished pages and no frame
+ * shows the left page emptied. Takes the ingredients off the left page first,
+ * as renderSpread does. Nothing held yet (only before the first load) leaves
+ * the drawing to refreshContents.
+ *
+ * @returns {number} the spread generation the draw was made under, for
+ *          refreshContents
+ */
+function drawHeldContents() {
+    const generation = ++spreadGeneration;
+    stowIngredientsPanel();
+    if (recipeListCache) drawContents(recipeListCache, effectiveSpreadMode());
+    return generation;
+}
+
+/**
+ * Refreshes the list once after a drawHeldContents, and re-draws in place only
+ * if it changed and nothing has decided the pages since.
+ *
+ * @param {number} generation - what drawHeldContents returned
+ */
+async function refreshContents(generation) {
+    const before = recipeListCache ? JSON.stringify(recipeListCache) : null;
+    const list = await fetchRecipeList(true);
+    if (generation !== spreadGeneration || viewMode !== 'index') return;
+    if (JSON.stringify(list) !== before) drawContents(list, effectiveSpreadMode());
 }
 
 /**

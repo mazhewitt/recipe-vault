@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, openRecipe, isPhone, isTablet, useContentsMode, Recipe } from './helpers';
+import { authenticate, createRecipe, openRecipe, isPhone, isTablet, useContentsMode, Recipe, waitForTurn } from './helpers';
 
 const RECIPE: Recipe = {
   title: 'Responsive Test Recipe',
@@ -146,6 +146,7 @@ test.describe('Responsive Layout (book only)', () => {
     await expect(page.locator('.edge-tabs')).toBeVisible();
 
     await page.locator('#recipe-book-header').click();
+    await waitForTurn(page);
     await expect(page.locator('.index-title')).toBeVisible();
 
     await expect(page.locator('.edge-tabs')).toBeHidden();

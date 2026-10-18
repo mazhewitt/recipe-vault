@@ -146,6 +146,21 @@ body::before {
     text-shadow: 0 0 10px rgba(255,255,255,0.3);
 }
 
+/* The way back to the contents. Its hit area is the label, not the wood beside
+   it: as wide as the text plus 22px a side, and 44px tall with the text centred
+   on that line. The extra 9px of height goes upward, into the space above the
+   book, so the book stays where it was and the gap the timer pill overhangs
+   (12px) stays clear of the box. */
+#recipe-book-header {
+    display: block;
+    width: fit-content;
+    margin-inline: auto;
+    padding: 0 22px;
+    min-height: 44px;
+    line-height: 44px;
+    margin-top: -9px;
+}
+
 /* ==================== TIMER WIDGET ==================== */
 /* Cream pill clipped to the top edge of the book cover, centred over the
    spine. Positioned relative to .recipe-book (position: relative) so it
@@ -2273,12 +2288,17 @@ body[data-feature-meals] .contents-tab-meals {
     #recipe-book-header {
         display: block;
         position: absolute;
-        top: 12px;
-        left: 14px;
+        /* A 44px-tall line from the top of the 40px strip, the text where it
+           was (14px in, centred on the strip); its foot stays clear of the
+           .page-tabs row about 60px down */
+        top: 0;
+        left: 2px;
+        padding: 0 12px;
+        min-height: 44px;
         z-index: 11; /* level with the timer pill */
         margin: 0;
         font-size: 16px;
-        line-height: 1;
+        line-height: 44px;
         letter-spacing: 0;
         text-align: left;
     }

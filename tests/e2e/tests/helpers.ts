@@ -634,3 +634,16 @@ export function recordRequests(page: Page): RecordedRequests {
   });
   return rec;
 }
+
+/**
+ * Waits until no page turn or tab crossfade holds the shared animation lock.
+ * The header, the arrows and the tabs all ignore a click while it is held, and
+ * a backward turn's overlay carries a copy of the outgoing left page.
+ */
+export async function waitForTurn(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(async () => {
+    // @ts-ignore - browser-side module import
+    const M = await import('/static/page-transitions.js');
+    return M.isAnimating();
+  }), { timeout: 5000 }).toBe(false);
+}

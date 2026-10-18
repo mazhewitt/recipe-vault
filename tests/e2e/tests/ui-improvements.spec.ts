@@ -160,6 +160,173 @@ test.describe('UI Improvements', () => {
 });
 
 /**
+ * The header return is one backward page turn whose incoming pages are drawn
+ * from the list already held, with one list refresh after it; its hit area is
+ * the label, not the wood beside it.
+ */
+test.describe('Recipe Book header: one page turn back to the contents', () => {
+  test.beforeEach(async ({ page }) => {
+    await authenticate(page);
+  });
+
+  const header = (page: Page) => page.locator('#recipe-book-header');
+
+  async function isAnimating(page: Page): Promise<boolean> {
+    return page.evaluate(async () => {
+      // @ts-ignore - browser-side module import
+      const M = await import('/static/page-transitions.js');
+      return M.isAnimating();
+    });
+  }
+
+  async function openSettled(page: Page) {
+    const recipeId = await createRecipe(page, {
+      title: `Header Turn ${Date.now()}`,
+      ingredients: [{ name: 'flour', quantity: 2, unit: 'cups' }],
+      steps: [{ step_number: 1, instruction: 'Mix ingredients' }],
+      difficulty: 2,
+      tags: ['main'],
+    });
+    await navigateToRecipe(page, recipeId);
+    await expect.poll(() => isAnimating(page)).toBe(false);
+    // Let the open's own follow-ups (prefetch, list checks) finish first
+    await page.waitForTimeout(300);
+  }
+
+  /** Records the page-turn overlays and html[data-nav-direction] values from now on. */
+  async function watchTurns(page: Page) {
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__overlays = [];
+      w.__navDirections = [];
+      new MutationObserver((records) => {
+        for (const r of records) {
+          r.addedNodes.forEach((n) => {
+            if (n instanceof Element && n.classList.contains('page-turn-overlay')) w.__overlays.push(n.className);
+          });
+        }
+      }).observe(document.querySelector('.pages-container')!, { childList: true });
+      new MutationObserver(() => {
+        const v = document.documentElement.getAttribute('data-nav-direction');
+        if (v) w.__navDirections.push(v);
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-nav-direction'] });
+    });
+  }
+  const turns = (page: Page) => page.evaluate(() => ({
+    overlays: (window as any).__overlays as string[],
+    directions: (window as any).__navDirections as string[],
+  }));
+
+  function countListRequests(page: Page) {
+    const seen: number[] = [];
+    page.on('request', (req) => {
+      if (req.method() === 'GET' && new URL(req.url()).pathname === '/api/recipes') seen.push(Date.now());
+    });
+    return seen;
+  }
+
+  test('the header turns the page backward', async ({ page }) => {
+    await openSettled(page);
+    await watchTurns(page);
+    await header(page).click();
+    await expect(page.locator('.index-title').first()).toBeVisible();
+    await expect.poll(() => isAnimating(page)).toBe(false);
+    const seen = await turns(page);
+    if (isPhone(page)) {
+      expect(seen.directions).toContain('backward');
+    } else {
+      expect(seen.overlays.some(c => c.includes('turn-backward'))).toBe(true);
+    }
+  });
+
+  test('no frame shows an emptied left page or the ingredients on the right', async ({ page }) => {
+    test.skip(isPhone(page), 'the phone shows one page; its turn is a view transition');
+    await openSettled(page);
+    await page.route(/\/api\/recipes$/, async (route) => {
+      await new Promise(r => setTimeout(r, 400));
+      await route.continue();
+    });
+
+    const frames = await page.evaluate(() => new Promise<Array<{ t: number; leftEmpty: boolean; rightIngredients: boolean; title: boolean }>>((resolve) => {
+      const out: Array<{ t: number; leftEmpty: boolean; rightIngredients: boolean; title: boolean }> = [];
+      const left = document.getElementById('page-left-content')!;
+      const right = document.getElementById('page-right-content')!;
+      const t0 = performance.now();
+      (document.getElementById('recipe-book-header') as HTMLElement).click();
+      const sample = () => {
+        const t = performance.now() - t0;
+        out.push({
+          t,
+          leftEmpty: left.childElementCount === 0,
+          rightIngredients: right.querySelector('.tab-panel[data-tab="ingredients"]') !== null,
+          title: document.querySelector('#page-left-content .index-title') !== null,
+        });
+        if (t < 900) requestAnimationFrame(sample); else resolve(out);
+      };
+      sample();
+    }));
+
+    expect(frames.filter(f => f.leftEmpty).map(f => Math.round(f.t)), 'frames with #page-left-content empty').toEqual([]);
+    expect(frames.filter(f => f.rightIngredients).map(f => Math.round(f.t)), 'frames with the ingredients on the right page').toEqual([]);
+    const firstTitle = frames.find(f => f.title);
+    expect(firstTitle, '.index-title never appeared').toBeTruthy();
+    expect(firstTitle!.t).toBeLessThan(150);
+  });
+
+  test('exactly one list request is made for the return', async ({ page }) => {
+    await openSettled(page);
+    const seen = countListRequests(page);
+    await header(page).click();
+    await expect(page.locator('.index-title').first()).toBeVisible();
+    await expect.poll(() => isAnimating(page)).toBe(false);
+    await expect.poll(() => seen.length, { timeout: 5000 }).toBe(1);
+    await page.waitForTimeout(500);
+    expect(seen).toHaveLength(1);
+  });
+
+  test('a header click on the contents does nothing', async ({ page }) => {
+    await page.goto('/chat');
+    await expect(page.locator('.index-title').first()).toBeVisible();
+    await page.waitForTimeout(300);
+    await watchTurns(page);
+    const seen = countListRequests(page);
+    await header(page).click();
+    await page.waitForTimeout(600);
+    expect(seen).toHaveLength(0);
+    const t = await turns(page);
+    expect(t.overlays).toEqual([]);
+    expect(t.directions).toEqual([]);
+  });
+
+  test('the hit area is the label, at least 44px tall', async ({ page }) => {
+    await openSettled(page);
+    const m = await header(page).evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const text = range.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      return { textWidth: text.width, width: box.width, height: box.height };
+    });
+    expect(m.height).toBeGreaterThanOrEqual(44);
+    expect(m.width).toBeLessThanOrEqual(m.textWidth + 44 + 0.5);
+  });
+
+  test('a click on the wood beside the label keeps the recipe open', async ({ page }) => {
+    await openSettled(page);
+    const pt = await header(page).evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const text = range.getBoundingClientRect();
+      return { x: text.right + 60, y: text.top + text.height / 2 };
+    });
+    await page.mouse.click(pt.x, pt.y);
+    await page.waitForTimeout(600);
+    await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'recipe');
+    await expect(page.locator('#page-right-content .recipe-title')).toHaveCount(1);
+  });
+});
+
+/**
  * The photo preview on a touch screen. locator.tap(), not click(): Playwright's
  * click() sends mouse events even on a touch project, which is how a tap that
  * never opened the preview went unnoticed.

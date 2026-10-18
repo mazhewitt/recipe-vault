@@ -74,6 +74,9 @@ export function getSpreadMode() {
  *        force — bypass the animation lock. Used for the programmatic
  *                transitions that happen around a page turn (opening a recipe
  *                selects cook mode while the turn is still animating).
+ *        render — false skips the registered renderer, for a caller that
+ *                 draws the pages itself in the same task (navigation.js
+ *                 showIndex).
  * @returns {boolean} true if the mode was applied, false if the call was
  *          ignored (unknown mode, cook mode over a meal plan, a phone viewport,
  *          or the animation lock was held without force).
@@ -96,7 +99,7 @@ export function setSpreadMode(mode, options = {}) {
 
     document.body.dataset.spreadMode = mode;
     syncStrip();
-    if (spreadRenderer) spreadRenderer(mode);
+    if (spreadRenderer && options.render !== false) spreadRenderer(mode);
 
     return true;
 }

@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone, line, openRecipe, touchGesture, useContentsMode } from './helpers';
+import { authenticate, createRecipe, isPhone, line, openRecipe, touchGesture, useContentsMode, waitForTurn } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -310,6 +310,7 @@ test.describe('Contents filter tabs', () => {
     // and it cannot be opened from the contents either, which is why it is
     // opened the way display_recipe and the navigation arrows do.
     await page.locator('#recipe-book-header').click();
+    await waitForTurn(page);
     await expect(page.locator('.index-title')).toBeVisible({ timeout: 10000 });
     await selectFilter(page, 'sweets');
     await expect(entry(page, beef)).toHaveCount(0);

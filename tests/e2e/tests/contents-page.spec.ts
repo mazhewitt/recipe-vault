@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone, openTab } from './helpers';
+import { authenticate, createRecipe, isPhone, openTab, waitForTurn } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -129,6 +129,8 @@ test.describe('Contents page (Journal 2.0)', () => {
 
     await page.locator(`.index-recipe-item[data-recipe-id="${target}"]`).click();
     await expect(page.locator('.recipe-title')).toContainText('Apple Pie');
+    // The open is a page turn, and the header ignores a click while one runs
+    await waitForTurn(page);
 
     // Back to the contents page: the header is hidden on phones, so use the gutter chevron there
     if (page.viewportSize()!.width <= 600) {
@@ -136,6 +138,7 @@ test.describe('Contents page (Journal 2.0)', () => {
     } else {
       await page.click('#recipe-book-header');
     }
+    await waitForTurn(page);
     await expect(page.locator('.index-title')).toBeVisible();
 
     const current = page.locator('.index-recipe-item.current');
