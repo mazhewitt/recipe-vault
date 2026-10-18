@@ -60,6 +60,7 @@ export function initializeState(appState) {
 // names never reach the page.
 const STATUS_LABELS = {
     start_timer: 'Setting a timer…',
+    set_servings: 'Adjusting the servings…',
     display_recipe: 'Opening the recipe…',
     update_recipe: 'Updating the recipe…',
     create_recipe: 'Writing it into the book…',
@@ -318,6 +319,11 @@ export async function sendMessage() {
                             if (parsed.duration_minutes !== undefined && parsed.label !== undefined) {
                                 state.startTimer(parsed.duration_minutes, parsed.label, parsed.step_number);
                             }
+                            break;
+
+                        case 'servings_set':
+                            // The page's stepper takes this once it exists (group 2)
+                            console.debug('servings_set', parsed);
                             break;
 
                         case 'done':

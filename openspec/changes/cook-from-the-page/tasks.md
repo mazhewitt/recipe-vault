@@ -29,28 +29,29 @@ Before/after measurement: the explorer folders `tests/usability/runs/audit-post-
 
 ## 1. The assistant scales the page (P2, P5)
 
-- [ ] 1.1 The `set_servings` tool.
+- [x] 1.1 The `set_servings` tool.
   - Files: `src/mcp/tools.rs`: add `set_servings_tool()` after `start_timer_tool()` in `get_all_tools()`, and `handle_set_servings(_client, params)`: `servings` required, an integer 1-24 (accept an integer-valued float, as `handle_start_timer` does for `step_number`), returning `{"servings": n, "message": …}`. No `ApiClient` call. `src/mcp/server.rs` (≈110): route `"set_servings"`.
   - Test first, in `tools.rs` tests: mcp-interface › Set the page's servings via MCP, every scenario (6 and 6.0 accepted; missing, 0, 25, -2, 2.5 and "6" rejected with invalid params), and `test_get_all_tools` updated to 7 tools with `set_servings` last.
   - Red-check: the new tests fail to compile before the functions exist; after, delete the upper-bound check and the 25 case goes red.
-- [ ] 1.2 The `servings_set` event.
+- [x] 1.2 The `servings_set` event.
   - Files: `src/ai/client.rs`: a `ServingsData { servings: u32 }` extracted in `execute_tool` like `TimerData`, and collected by `chat()`. Prefer adding a field to a small result struct over growing the 6-tuple again, but keep the change local; the callers are `src/handlers/chat.rs` and `tests/chat_test.rs`. `src/handlers/chat.rs`: `SseEvent::ServingsSet { servings, recipe_id }`, emitted after the timer loop and before the reply `chunk`, only when the request had `current_recipe` (its `recipe_id`).
   - Test first, in `tests/chat_test.rs`: a mock-agent test that a "halve" note with page servings 8 yields `ServingsData { servings: 4 }` and no `recipe_ids`; serialisation tests for `{"servings":4,"recipe_id":"R"}`; and a handler-level test (or a unit test on the function that builds the events) for web-chat › The servings_set event sets the page's stepper › No recipe, no event.
   - Red-check: remove the extraction branch in `execute_tool` and the mock-agent test goes red.
-- [ ] 1.3 The page's servings in the request and context.
+- [x] 1.3 The page's servings in the request and context.
   - Files: `src/handlers/chat.rs` `CurrentRecipeContext` (≈23): `#[serde(default)] servings: Option<u32>`; the context block (≈166-176) gains `page_servings: N` with a one-line explanation. `static/chat.js` (≈218-226): send `current_recipe.servings`, read from the displayed stepper (group 2 provides the getter; until then send nothing).
   - Test first: in `chat.rs` / `chat_test.rs`, web-chat › The page's servings reach the model, both scenarios (with and without the field; an old request body still deserialises).
   - Red-check: drop the `page_servings` push and the context test goes red.
-- [ ] 1.4 The mock separates scaling from saving.
+- [x] 1.4 The mock separates scaling from saving.
   - Files: `src/ai/llm.rs`: before the `"halve" || "update"` branch (≈457), a `"halve"` branch that reads `page_servings` from the current-recipe context (next to `mock_current_recipe_id`, ≈207) and calls `set_servings` with ceil(N ÷ 2), at least 1; text only if there is no value. The update branch keeps "update", adds "save", and no longer matches "halve". The post-tool-result text (≈387) gets a `set_servings` reply naming the servings.
   - Test first, in `llm.rs` tests: llm-mocking › Mock separates scaling from saving, every scenario (N = 8, 3, 1; no servings; "update", "save").
   - Red-check: let "halve" fall through to `update_recipe` again and the scenario tests go red.
-- [ ] 1.5 The prompt (P2, P5).
+- [x] 1.5 The prompt (P2, P5).
   - Files: `src/ai/prompts.rs`: the Guided Cooking Mode section (≈105-150): remove "Check servings: always ask…" (≈111) and "Scale intelligently … present the complete scaled ingredient list" (≈113-117); add the session-start rule (step 1 first, end with one line naming the page's servings, `set_servings` when given a number), the scaling rule (→ `set_servings`, reply says the page shows N and the saved recipe is unchanged) and the substitution rule (present, flag effects, end with "Want me to save this as a change to the recipe?", `update_recipe` only on yes or an explicit request), with the trigger phrases of design P2. Rewrite the Example Cooking Flow (≈138-150) to match. Add the two mappings to the tool-trigger list (≈50-60). `src/ai/client.rs` long-conversation reminder (≈667-674): replace "ask servings first, scale ingredients intelligently" with the new rules.
   - Test first, in `prompts.rs` tests (≈191): web-chat › Unified System Prompt (the two new mappings, the save offer wording), cooking-guidance › Cooking session initiation › Prompt rule for the session start, and cooking-guidance › Recipe scaling › Prompt replaces the scaled-list guidance (assert "ask how many people" and "Present the complete scaled ingredient list" are absent). In `client.rs`, a test on the reminder string (extract it to a `const` if needed): web-chat › Long-Conversation Reminder.
   - Red-check: restore the old "Check servings" line and the absence assertion goes red.
-- [ ] 1.6 Frontend stub. `static/chat.js`: `case 'servings_set'` logs `console.debug('servings_set', parsed)`; `STATUS_LABELS.set_servings = 'Adjusting the servings…'`. Update `reply-sticky.spec.ts`'s tool list (≈397-403) so the "no plumbing reaches the page" case covers `set_servings`.
-- [ ] 1.7 `cargo test`, `make lint`, then the full suite on port 3002. Expected reds at this point are only the e2e cases that send "halve" and rely on a save (fixed in 2.4); list them.
+- [x] 1.6 Frontend stub. `static/chat.js`: `case 'servings_set'` logs `console.debug('servings_set', parsed)`; `STATUS_LABELS.set_servings = 'Adjusting the servings…'`. Update `reply-sticky.spec.ts`'s tool list (≈397-403) so the "no plumbing reaches the page" case covers `set_servings`.
+- [x] 1.7 `cargo test`, `make lint`, then the full suite on port 3002. Expected reds at this point are only the e2e cases that send "halve" and rely on a save (fixed in 2.4); list them.
+  - Done: cargo test green, `make lint` clean, full suite 715 passed, 172 skipped, 13 failed, all "halve"-relies-on-save cases (the mock now answers "halve" with text only, since the page sends no servings until 2.2): `layout-stability.spec.ts:237` "refreshing the recipe" (3 projects), `refresh-in-place.spec.ts:107` (3) and `:121` (chromium, ipad), `margin-notes.spec.ts:315` (chromium, ipad), `reply-sticky.spec.ts:295` (3).
 
 ## 2. A servings stepper (P1)
 

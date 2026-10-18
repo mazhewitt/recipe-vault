@@ -108,6 +108,7 @@ fn handle_request(client: &ApiClient, request: JsonRpcRequest) -> Option<JsonRpc
                 "update_recipe" => tools::handle_update_recipe(client, arguments),
                 "delete_recipe" => tools::handle_delete_recipe(client, arguments),
                 "start_timer" => tools::handle_start_timer(client, arguments),
+                "set_servings" => tools::handle_set_servings(client, arguments),
                 _ => {
                     return Some(JsonRpcResponse::error(
                         request_id,

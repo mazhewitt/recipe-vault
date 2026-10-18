@@ -217,6 +217,21 @@ fn mock_current_recipe_id(messages: &[Message]) -> Option<String> {
     })
 }
 
+/// Extract the page's displayed servings (`page_servings: N`) from the
+/// `[Current recipe context]` block, for the mock provider.
+fn mock_page_servings(messages: &[Message]) -> Option<u32> {
+    messages.iter().rev().find_map(|m| match m {
+        Message::User { content } => content.iter().find_map(|block| match block {
+            ContentBlock::Text { text } => text
+                .lines()
+                .find_map(|line| line.strip_prefix("page_servings: "))
+                .and_then(|n| n.trim().parse().ok()),
+            _ => None,
+        }),
+        _ => None,
+    })
+}
+
 /// One usage line per Gemini response, for cost tracking. Counts and the
 /// finish reason only, never content; missing counts are 0.
 fn gemini_usage_line(model: &str, response: &serde_json::Value) -> String {
@@ -384,7 +399,22 @@ impl LlmProvider {
                 return LlmResponse::Text("Timer started for step 2.".to_string());
             }
 
-            if lower.contains("halve") || lower.contains("update") {
+            if let Some(servings) = tool_results
+                .iter()
+                .filter(|r| r.name.as_deref() == Some("set_servings") && !r.is_error)
+                .find_map(|r| {
+                    serde_json::from_str::<serde_json::Value>(&r.content)
+                        .ok()
+                        .and_then(|v| v.get("servings").and_then(|n| n.as_u64()))
+                })
+            {
+                return LlmResponse::Text(format!(
+                    "Showing {} servings on the page — the saved recipe is unchanged.",
+                    servings
+                ));
+            }
+
+            if lower.contains("update") || lower.contains("save") {
                 return LlmResponse::Text("Halved it — serves 2 now.".to_string());
             }
 
@@ -454,7 +484,22 @@ impl LlmProvider {
                 thought_signature: None,
                 synthetic_id: false,
             }])
-        } else if (lower_message.contains("halve") || lower_message.contains("update"))
+        } else if lower_message.contains("halve") {
+            // Scale the page for tonight, never the saved recipe: half the page's
+            // servings, rounded up, at least 1. Without a value, text only.
+            match mock_page_servings(messages) {
+                Some(n) => LlmResponse::ToolUse(vec![ToolCall {
+                    id: "toolu_mock_servings".to_string(),
+                    name: "set_servings".to_string(),
+                    arguments: serde_json::json!({ "servings": n.div_ceil(2).max(1) }),
+                    thought_signature: None,
+                    synthetic_id: false,
+                }]),
+                None => LlmResponse::Text(
+                    "Use the servings at the top of the recipe to halve it for tonight.".to_string(),
+                ),
+            }
+        } else if (lower_message.contains("update") || lower_message.contains("save"))
             && let Some(recipe_id) = mock_current_recipe_id(messages).or_else(|| self.mock_recipe_id.clone())
         {
             // Edit the active recipe so the margin-note refresh path is testable
@@ -1439,6 +1484,83 @@ mod tests {
         }))
         .unwrap();
         assert!(!call.synthetic_id);
+    }
+
+    // ---- llm-mocking: Mock separates scaling from saving ----
+
+    /// A user note followed by the chat handler's current-recipe block.
+    fn mock_note(note: &str, servings: Option<u32>) -> Vec<Message> {
+        let mut context = "[Current recipe context]\nrecipe_id: R\ntitle: Lasagne".to_string();
+        if let Some(n) = servings {
+            context.push_str(&format!("\npage_servings: {}\n(page_servings is what the page shows now and may differ from the saved recipe's servings.)", n));
+        }
+        context.push_str("\nInstruction: Treat this as the active recipe. Call get_recipe if you need full details.");
+        vec![Message::User {
+            content: vec![
+                ContentBlock::Text { text: note.to_string() },
+                ContentBlock::Text { text: context },
+            ],
+        }]
+    }
+
+    fn single_call(response: LlmResponse) -> ToolCall {
+        match response {
+            LlmResponse::ToolUse(mut calls) => {
+                assert_eq!(calls.len(), 1);
+                calls.remove(0)
+            }
+            other => panic!("expected one tool call, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_mock_halve_sets_half_the_page_servings_rounded_up() {
+        let mock = LlmProvider::mock(None);
+        for (n, half) in [(8, 4), (3, 2), (1, 1)] {
+            let call = single_call(mock.complete_mock(&mock_note("Halve it please", Some(n)), None));
+            assert_eq!(call.name, "set_servings", "N = {}", n);
+            assert_eq!(call.arguments, serde_json::json!({"servings": half}), "N = {}", n);
+        }
+    }
+
+    #[test]
+    fn test_mock_halve_reply_names_the_servings() {
+        let mock = LlmProvider::mock(None);
+        let mut messages = mock_note("halve this recipe", Some(8));
+        messages.push(Message::Tool {
+            tool_results: vec![ToolResult {
+                tool_use_id: "toolu_mock_servings".to_string(),
+                name: Some("set_servings".to_string()),
+                content: r#"{"servings":4,"message":"ok"}"#.to_string(),
+                is_error: false,
+            }],
+        });
+        match mock.complete_mock(&messages, None) {
+            LlmResponse::Text(text) => {
+                assert!(text.contains("4 servings"), "{}", text);
+                assert!(text.contains("saved recipe is unchanged"), "{}", text);
+            }
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_mock_halve_without_servings_replies_with_text_only() {
+        let mock = LlmProvider::mock(Some("R".to_string()));
+        assert!(matches!(
+            mock.complete_mock(&mock_note("halve this recipe", None), None),
+            LlmResponse::Text(_)
+        ));
+    }
+
+    #[test]
+    fn test_mock_update_or_save_still_saves() {
+        let mock = LlmProvider::mock(None);
+        for note in ["update this recipe", "save it with cream"] {
+            let call = single_call(mock.complete_mock(&mock_note(note, Some(8)), None));
+            assert_eq!(call.name, "update_recipe", "{}", note);
+            assert_eq!(call.arguments, serde_json::json!({"recipe_id": "R", "servings": 2}), "{}", note);
+        }
     }
 }
 

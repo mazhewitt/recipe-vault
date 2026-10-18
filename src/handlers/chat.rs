@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use uuid::Uuid;
 
-use crate::ai::{ContentBlock, ImageSource, Message, MealPlanEntry};
+use crate::ai::{ContentBlock, ImageSource, Message, MealPlanEntry, ServingsData};
 use crate::chat::{ChatError, ChatState, SessionStore};
 
 #[derive(Debug, Deserialize)]
@@ -24,6 +24,9 @@ pub struct CurrentRecipeContext {
     pub recipe_id: String,
     #[serde(default)]
     pub title: Option<String>,
+    /// The servings the page shows (the stepper's value), when the recipe has servings.
+    #[serde(default)]
+    pub servings: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +68,8 @@ pub enum SseEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         step_number: Option<u32>,
     },
+    #[serde(rename = "servings_set")]
+    ServingsSet { servings: u32, recipe_id: String },
     #[serde(rename = "done")]
     Done {
         conversation_id: String,
@@ -83,6 +88,41 @@ impl SseEvent {
             .and_then(|v| v.get("data").cloned())
             .map(|d| d.to_string())
             .unwrap_or_default()
+    }
+}
+
+/// The `[Current recipe context]` block appended to the user message.
+pub fn current_recipe_context_text(current_recipe: &CurrentRecipeContext) -> String {
+    let mut context_text = format!(
+        "[Current recipe context]\nrecipe_id: {}",
+        current_recipe.recipe_id
+    );
+    if let Some(title) = &current_recipe.title {
+        context_text.push_str(&format!("\ntitle: {}", title));
+    }
+    if let Some(servings) = current_recipe.servings {
+        context_text.push_str(&format!("\npage_servings: {}", servings));
+        context_text.push_str("\n(page_servings is what the page shows now and may differ from the saved recipe's servings.)");
+    }
+    context_text.push_str("\nInstruction: Treat this as the active recipe. Call get_recipe if you need full details.");
+    context_text
+}
+
+/// `servings_set` events for a turn's set_servings calls. They go to the recipe the
+/// request was sent from, so without a current recipe there is no event.
+pub fn servings_set_events(
+    current_recipe: Option<&CurrentRecipeContext>,
+    servings: &[ServingsData],
+) -> Vec<SseEvent> {
+    match current_recipe {
+        Some(recipe) => servings
+            .iter()
+            .map(|s| SseEvent::ServingsSet {
+                servings: s.servings,
+                recipe_id: recipe.recipe_id.clone(),
+            })
+            .collect(),
+        None => Vec::new(),
     }
 }
 
@@ -164,15 +204,9 @@ pub async fn chat(
     }
 
     if let Some(current_recipe) = &request.current_recipe {
-        let mut context_text = format!(
-            "[Current recipe context]\nrecipe_id: {}",
-            current_recipe.recipe_id
-        );
-        if let Some(title) = &current_recipe.title {
-            context_text.push_str(&format!("\ntitle: {}", title));
-        }
-        context_text.push_str("\nInstruction: Treat this as the active recipe. Call get_recipe if you need full details.");
-        content_blocks.push(ContentBlock::Text { text: context_text });
+        content_blocks.push(ContentBlock::Text {
+            text: current_recipe_context_text(current_recipe),
+        });
     }
 
     // Add user message to history and capture the conversation snapshot
@@ -195,7 +229,7 @@ pub async fn chat(
 
         // Get agent and process message
         match state.chat(&conversation).await {
-            Ok((response_text, tools_used, recipe_ids, timer_data, meal_plans, new_messages)) => {
+            Ok((response_text, tools_used, recipe_ids, page_events, meal_plans, new_messages)) => {
                     // Send tool use events
                     for tool in &tools_used {
                         yield Ok(Event::default()
@@ -225,7 +259,7 @@ pub async fn chat(
                     }
 
                     // Send timer_start events (for start_timer tool calls)
-                    for timer in &timer_data {
+                    for timer in &page_events.timers {
                         tracing::info!(
                             "Emitting timer_start event: duration={}, label={}, step={:?}",
                             timer.duration_minutes, timer.label, timer.step_number
@@ -237,6 +271,15 @@ pub async fn chat(
                         };
                         yield Ok(Event::default()
                             .event("timer_start")
+                            .data(event.data_json()));
+                    }
+
+                    // Send servings_set events (for set_servings tool calls), only
+                    // to the recipe the request was sent from
+                    for event in servings_set_events(request.current_recipe.as_ref(), &page_events.servings) {
+                        tracing::info!("Emitting servings_set event: {}", event.data_json());
+                        yield Ok(Event::default()
+                            .event("servings_set")
                             .data(event.data_json()));
                     }
 

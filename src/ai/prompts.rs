@@ -58,6 +58,9 @@ You MUST call the right tool for each user intent:
 - **Current recipe context**: If `current_recipe` is provided, treat it as the active recipe. Use `get_recipe` with its recipe_id when you need full details (e.g., scaling or substitutions).
 - **Updating recipe difficulty** ("make this recipe harder", "set difficulty to 3", "this should be easy"): Use `update_recipe` with the recipe_id and difficulty parameter (1-5 scale: 1=Easy, 2=Medium-Easy, 3=Medium, 4=Medium-Hard, 5=Hard). If difficulty is not specified when creating a recipe, the AI will automatically assess and assign it.
 - **Changing a recipe's tags** ("tag this as dessert", "mark it vegetarian", "this is a main"): Use `update_recipe` with the recipe_id and the full `tags` array. See ## Tags below.
+- **Scaling for tonight** ("make it for 6", "halve it", "just two of us"): MUST call `set_servings` with the number of servings. It changes what the page shows, never the saved recipe. Reply that the page now shows N servings and the saved recipe is unchanged. Use the `page_servings` in the current recipe context as the starting point (half of 8 is 4).
+- **Changing or saving the recipe** ("change the recipe to…", "save it with cream", "update the servings in the book"): only on an explicit request like these, call `update_recipe`.
+- **A substitution or other one-off change for tonight** ("can I use cream instead of coconut milk?"): present the adjusted ingredient(s) and method in the reply, flag notable effects (a 1:1 cream for coconut milk swap makes it much richer), and end with "Want me to save this as a change to the recipe?". Call `update_recipe` only after the cook says yes, or when they explicitly ask to change or save the recipe.
 
 ## Rules
 - NEVER output full ingredient lists or step-by-step instructions in chat. The side panel shows those.
@@ -108,13 +111,9 @@ When the user asks to cook, make, or prepare a recipe:
 
 1. **Get the recipe first**: If not already displayed, call `display_recipe` or `get_recipe`
 
-2. **Check servings**: Always ask how many people they're cooking for before proceeding
+2. **The first step first**: When the cook starts ("let's cook", "I'm at the stove, what first?"), open with step 1's instruction, before any question. End the reply with one line naming the servings the page shows (`page_servings`), for example "(Going by 8 servings, as the page shows; change it at the top if you're cooking for fewer.)"
 
-3. **Scale intelligently**:
-   - Calculate scaled ingredient quantities (you're good at math!)
-   - Handle unit conversions naturally (1.5 tsp becomes "1½ tsp or ½ tbsp")
-   - Round to practical measurements (0.33 cups becomes "⅓ cup")
-   - Present the complete scaled ingredient list clearly
+3. **Scale the page, not the book**: If the cook gives a number of servings at any point ("just two of us", "make it for 6"), call `set_servings` with it and carry on from where you were. The page rescales its own quantities, so do not write out a scaled ingredient list. Never call `update_recipe` to scale unless the cook asks to save the change to the recipe.
 
 4. **Guide in phases, not micro-steps**:
    - These are experienced cooks - they don't need hand-holding
@@ -136,14 +135,14 @@ When the user asks to cook, make, or prepare a recipe:
 
 ## Example Cooking Flow
 
-User: "Help me cook this"
-You: [Check current recipe, ask servings]
+User: "Help me cook this" (current recipe, page_servings: 8)
+You: "Step 1: mix the yoghurt, garlic and spices, then coat the chicken. Let me know when done. (Going by 8 servings, as the page shows; change it at the top if you're cooking for fewer.)"
 
-User: "2 people"
-You: [Scale all ingredients, present list, ask if they have everything]
+User: "Just two of us tonight"
+You: [Call set_servings(servings=2)] "The page now shows 2 servings; the saved recipe is unchanged. Carry on with step 1."
 
-User: "Got them"
-You: "Phase 1: Prep the marinade by mixing [ingredients]. Let me know when done."
+User: "Can I use cream instead of coconut milk?"
+You: "Yes: use the same amount of cream, stirred in off the heat so it doesn't split. It will be much richer. Want me to save this as a change to the recipe?"
 
 User: "Done"
 You: [Call start_timer if needed] "Great! Let that sit for 30 min. I've started a timer."
@@ -242,6 +241,49 @@ mod tests {
         assert!(
             CHAT_SYSTEM_PROMPT.contains("1. **Apple Pie**"),
             "system prompt should show a numbered recipe-list example"
+        );
+    }
+
+    #[test]
+    fn system_prompt_maps_scaling_to_set_servings_and_saving_to_update_recipe() {
+        // web-chat › Unified System Prompt › Prompt includes tool-use triggers
+        for phrase in [r#""make it for 6""#, r#""halve it""#, r#""just two of us""#] {
+            assert!(CHAT_SYSTEM_PROMPT.contains(phrase), "prompt should name the scaling phrase {}", phrase);
+        }
+        assert!(
+            CHAT_SYSTEM_PROMPT.contains("MUST call `set_servings`"),
+            "scaling for tonight should map to set_servings"
+        );
+        for phrase in [r#""change the recipe to…""#, r#""save it with cream""#, r#""update the servings in the book""#] {
+            assert!(CHAT_SYSTEM_PROMPT.contains(phrase), "prompt should name the save phrase {}", phrase);
+        }
+    }
+
+    #[test]
+    fn system_prompt_keeps_one_off_changes_off_the_saved_recipe() {
+        // web-chat › Unified System Prompt › Prompt keeps one-off changes off the saved recipe
+        assert!(CHAT_SYSTEM_PROMPT.contains("Want me to save this as a change to the recipe?"));
+        assert!(CHAT_SYSTEM_PROMPT.contains("only after the cook says yes"));
+        assert!(CHAT_SYSTEM_PROMPT.contains("the saved recipe is unchanged"));
+    }
+
+    #[test]
+    fn system_prompt_starts_a_cooking_session_with_step_one() {
+        // cooking-guidance › Cooking session initiation › Prompt rule for the session start
+        assert!(CHAT_SYSTEM_PROMPT.contains("open with step 1's instruction"));
+        assert!(CHAT_SYSTEM_PROMPT.contains("one line naming the servings the page shows"));
+        assert!(CHAT_SYSTEM_PROMPT.contains("(Going by 8 servings, as the page shows"));
+    }
+
+    #[test]
+    fn system_prompt_no_longer_asks_servings_first_or_lists_scaled_ingredients() {
+        // cooking-guidance › Recipe scaling › Prompt replaces the scaled-list guidance
+        let lower = CHAT_SYSTEM_PROMPT.to_lowercase();
+        assert!(!lower.contains("ask how many people"), "prompt must not ask servings first");
+        assert!(!lower.contains("ask servings"), "prompt must not ask servings first");
+        assert!(
+            !lower.contains("present the complete scaled ingredient list"),
+            "prompt must not present a scaled list in chat"
         );
     }
 }

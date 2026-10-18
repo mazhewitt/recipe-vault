@@ -394,13 +394,14 @@ test.describe('A turn in progress', () => {
   test('statusLabelFor speaks the cook\'s language', async ({ page }) => {
     const labels = await page.evaluate(async () => {
       const chat = await import('/static/chat.js');
-      const tools = ['start_timer', 'display_recipe', 'update_recipe', 'create_recipe', 'list_recipes', 'get_recipe',
+      const tools = ['start_timer', 'set_servings', 'display_recipe', 'update_recipe', 'create_recipe', 'list_recipes', 'get_recipe',
         'display_meal_plan', 'fetch', 'jina_fetch', 'duckduckgo_search', 'duckduckgo_news_search', 'search',
         'delete_recipe', 'something_new'];
       return Object.fromEntries(tools.map(t => [t, chat.statusLabelFor(t)]));
     });
     expect(labels).toEqual({
       start_timer: 'Setting a timer…',
+      set_servings: 'Adjusting the servings…',
       display_recipe: 'Opening the recipe…',
       update_recipe: 'Updating the recipe…',
       create_recipe: 'Writing it into the book…',
