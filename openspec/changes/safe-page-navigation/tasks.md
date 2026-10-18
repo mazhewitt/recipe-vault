@@ -15,8 +15,10 @@ Each group ends with a gate. A group is done when its gate is green.
 
 ## 1. Baseline
 
-- [ ] 1.1 Confirm `steady-cooking-spread`'s tasks are complete on this branch and `make lint` and `make test-e2e` are green. Record the pass/skip counts here.
-- [ ] 1.2 Capture "before" numbers on the post-steady build: `tests/usability/run-all.sh before-safe-nav find manage cook`. Use a `PORT_BASE` that avoids 3001. Group 10 compares against this run, not against the 2026-10-17 baseline, because steady-cooking-spread has already moved some numbers.
+- [x] 1.1 Confirm `steady-cooking-spread`'s tasks are complete on this branch and `make lint` and `make test-e2e` are green. Record the pass/skip counts here.
+  - Recorded from steady-cooking-spread's own verification on this exact commit (e35a58c), not re-run: `make lint` clean; `make test-e2e` 476 passed, 85 skipped, 0 failed, 0 flaky. Its open tasks are 9.7 (this hand-off) and 9.8 (deployment), neither an implementation step.
+- [x] 1.2 Capture "before" numbers on the post-steady build: `tests/usability/run-all.sh before-safe-nav find manage cook`. Use a `PORT_BASE` that avoids 3001. Group 10 compares against this run, not against the 2026-10-17 baseline, because steady-cooking-spread has already moved some numbers.
+  - Not re-run: steady-cooking-spread's verification already ran `run-all.sh after-steady-spread` on this exact build (e35a58c). Its `find.txt`, `manage.txt` and `cook.txt` were copied to `tests/usability/runs/before-safe-nav/` and are the "before" numbers (the runs directory is git-ignored, so the copies are local only).
 
 ## 2. A swipe must be unmistakably sideways (design N2)
 
