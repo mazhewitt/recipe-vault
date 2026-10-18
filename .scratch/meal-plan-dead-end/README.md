@@ -27,3 +27,19 @@ Already handled elsewhere: steady-cooking-spread D1 keeps the note input on a me
 - Keep the last meal plan in session state. Offer a "back to the meal plan" link on a recipe opened from it.
 - Re-measure the phone layout shift once steady-cooking-spread lands. Its fixed `.app-container` width (D5) may remove most of it.
 - Context: `planned-ideas/meal-planning-epic.md`, in particular RV-107 (persisting meal plans).
+
+## 2026-10-18 re-check
+
+Fresh-eyes re-check of the post-steady build (`e35a58c`), ask explorer (`tests/usability/runs/audit-post-steady/ask/`, finding `meal-plan-stale-sticky`, new):
+
+- Ask "show me the lasagne" from the contents, then ask for a meal plan from the lasagne. The plan opens, but the sticky above the input shows the earlier book-level reply ("I've pulled up the recipe in the side panel for you!…"). The plan's own reply ("I've assembled your meal plan") was filed under the lasagne and is not shown.
+- The slip still reads "p. 7", the lasagne's page, on the plan.
+- Asking for a plan from cook mode also switches the left page to the contents.
+- Evidence: `remeasure.cjs meal-plan-stale-sticky`: tablet viewMode=meal, sticky=["I've pulled up the recipe in the side panel for yo"], slip page number "p. 7". `x-flow.cjs` gives the same at tablet, landscape and phone, with spread modes [meal, contents]. Shots: `ask/shots/flow-D-meal-tablet.png`, `flow-D-meal-phone.png`.
+- Likely cause:
+  - `static/chat.js` ≈168-170 files the turn under the recipe on screen when the note was sent.
+  - `static/margin-notes.js` ≈123-126 `displayedRecipeId()` returns `null` (the book thread) for a meal plan, so `latestReply()` (≈144-150) picks the newest book-thread reply, however old.
+  - `static/meal-plan-display.js` ≈26-32 never calls `setNotePageNumber` (`static/recipe-display.js` ≈165).
+- Fix direction: show the in-flight turn's reply on whichever page it opened (see `notes-thread-gaps` item 3). At minimum, never show a book-thread reply older than the current view on a freshly opened plan. Set the slip's page number to blank or "plan" in `renderMealPlan`.
+- Still present from the first audit: 3 disabled action buttons and 0 routes back to the plan (`meal-plan-dead-end`).
+- Not taken up by `openspec/changes/glanceable-cooking` (its proposal's Non-goals).

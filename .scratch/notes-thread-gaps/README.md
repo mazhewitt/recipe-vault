@@ -40,3 +40,12 @@ Notes sent from the phone's contents page are filed on the book thread. The cont
 - Item 2: a Notes paper tab, or a button, on the phone's contents page that renders `renderThread()` for the book thread.
 - Item 3: show the in-flight turn's reply on the page it opened, while still filing it under the turn's recipe. Give meal plans their own thread id: open decision 5 in `.scratch/book-spread-modes-follow-ups/02-open-decisions.md`, tied to RV-107.
 - Items 1 and 3 change web-chat ("Notes are scoped to the recipe they were written under" needs an exception for the in-flight turn), so this probably becomes an OpenSpec change.
+
+## 2026-10-18 re-check
+
+Fresh-eyes re-check of the post-steady build (`e35a58c`), ask explorer (`tests/usability/runs/audit-post-steady/ask/`). All three items are still present after steady-cooking-spread. None is taken up by `openspec/changes/glanceable-cooking` (its proposal's Non-goals).
+
+- **Item 1, `thread-lost-on-reload` (still present).** On the phone, thread entries drop to 0 after a reload (`remeasure-now.txt`). Cause: the module-scoped thread array, `static/margin-notes.js` ≈32, is never persisted. Fix direction: `sessionStorage`, as `place-keeping.js` does.
+- **Item 2, `phone-book-thread-unreachable` (still present).** The phone contents page has 4 book entries, 1 shown, and no visible Notes tab (`remeasure-now.txt`). Cause: the phone block shows `.page-tabs` only on `body[data-view-mode="recipe"]`, and `static/spread-modes.js` ≈91 refuses modes on the phone.
+- **Item 3, `reply-filed-out-of-sight` (still present).** "show me the lasagne" from the contents: the sticky shows "Opening the recipe…", the recipe opens, and the sticky is then empty, on phone, tablet, landscape and desktop (`remeasure-now.txt`, `x-flow.cjs` A). Cause: `static/chat.js` ≈168-170 captures `turnRecipeId` before the turn, and `static/margin-notes.js` ≈123-131 filters the sticky by the displayed recipe. The meal-plan half now shows a stale reply instead of nothing: see `meal-plan-dead-end` "2026-10-18 re-check" (`meal-plan-stale-sticky`).
+- New since steady-cooking-spread, and fixed by `glanceable-cooking` G8: in Notes mode the thread did not scroll to new replies (`notes-thread-no-autoscroll`).

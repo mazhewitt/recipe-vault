@@ -68,8 +68,8 @@ file-backed database too (`SQLITE_BUSY`, 4 of 4 creates).
 - `meal-plan-dead-end/` — three disabled buttons, and no way back to the plan.
 - `first-paint-stability/` — the Google Fonts swap reflows the recipe,
   unpinned `marked@latest` blocks paint, and the placeholder jumps on load.
-- `timer-pill-and-duration-chips/` — the running pill does not lead back to
-  its step, and the "4 min" chips look tappable but are not.
+- `timer-pill-and-duration-chips/` — promoted 2026-10-18 to
+  `openspec/changes/glanceable-cooking` (G6, G7); archive with that change.
 - `note-input-rough-edges/` — the image chip grows the slip and cannot
   re-attach the same file, an empty send is silent, and send keeps its hover
   colour on touch.
@@ -79,6 +79,12 @@ file-backed database too (`SQLITE_BUSY`, 4 of 4 creates).
   beside an 18px method.
 
 ## Waiting on a human decision (`ready-for-human` / `needs-info`)
+
+- `cook-header-takes-a-third-of-the-screen/` — 27-42% of the screen sits
+  above step 1 (title, polaroid, a 3-4 row meta line, share and add-photo),
+  and ingredient rows are 29-31px, so ticks land on the neighbour. Both trade
+  space against D9 and list length; three options for the owner. Left out of
+  `glanceable-cooking` on purpose.
 
 - `book-spread-modes-follow-ups/01-deploy-and-purge-cache.md` — the spread-modes
   work is implemented, tested and archived but unshipped: merge, tag a release,
