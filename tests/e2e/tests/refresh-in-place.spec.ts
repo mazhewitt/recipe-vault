@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import {
-  authenticate, createRecipe, createCookingRecipe, openRecipe, openTab, sendNote, isPhone, useContentsMode,
+  authenticate, createRecipe, createCookingRecipe, difficultySlot, openRecipe, openTab, sendNote, isPhone, useContentsMode,
 } from './helpers';
 
 /**
@@ -190,9 +190,11 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
       });
       await openRecipe(page, recipe.id);
 
-      // The slot is in the "⋯" popover, there and empty
+      // The slot (the "⋯" popover on the phone, the Ingredients heading above
+      // 600px) is there and empty
       await expect(page.locator('#page-right-content .recipe-meta-line .meta-difficulty')).toHaveCount(0);
-      const slot = page.locator('#page-right-content .recipe-more-panel .meta-difficulty');
+      const slot = difficultySlot(page);
+      const more = page.locator('#page-right-content .recipe-more-panel');
       await expect(slot).toHaveCount(1);
       await expect(slot.locator('.difficulty-dot')).toHaveCount(0);
       // On the phone the Method tab first: a tap on a tab with the popover open
@@ -200,7 +202,7 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
       if (isPhone(page)) await openTab(page, 'method');
       if (popover === 'open') {
         await page.locator('#page-right-content button.recipe-more').click();
-        await expect(slot).toBeVisible();
+        await expect(more).toBeVisible();
       }
       const scroll = await scrollToMidMethod(page, { tab: false });
 
@@ -213,7 +215,8 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
         return {
           title: box(right.querySelector('.recipe-title-row')!),
           line: box(right.querySelector('.recipe-meta-line')!),
-          slot: box(right.querySelector('.recipe-more-panel .meta-difficulty')!),
+          slot: box(document.querySelector('.meta-difficulty')!),
+          heading: box(document.querySelector('.tab-panel[data-tab="ingredients"] > .section-header')!),
           steps: Array.from(right.querySelectorAll('.prep-step')).map(box),
         };
       });
@@ -229,10 +232,11 @@ test.describe('Refreshing the open recipe keeps the reader\'s place', () => {
       expect(delta(after.title, before.title), 'title line box').toBeLessThanOrEqual(1);
       expect(delta(after.line, before.line), 'meta line box').toBeLessThanOrEqual(1);
       expect(delta(after.slot, before.slot), 'difficulty slot box').toBeLessThanOrEqual(1);
+      expect(delta(after.heading, before.heading), 'Ingredients heading box').toBeLessThanOrEqual(1);
       after.steps.forEach((b, i) => expect(delta(b, before.steps[i]), `step ${i + 1}`).toBeLessThanOrEqual(1));
       // A refresh keeps the popover as the cook left it
-      if (popover === 'open') await expect(slot).toBeVisible();
-      else await expect(slot).toBeHidden();
+      if (popover === 'open') await expect(more).toBeVisible();
+      else await expect(more).toBeHidden();
     });
   }
 

@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Locator, Page, expect } from '@playwright/test';
 
 export interface Ingredient {
   name: string;
@@ -189,6 +189,17 @@ export function isTablet(page: Page): boolean {
  * names them).
  */
 export const CLEAR_TICKS_ROW = '.tab-panel[data-tab="ingredients"] :is(.section-header, .recipe-meta-line):has(.clear-ticks):visible';
+
+/**
+ * The difficulty's slot: the end of the Ingredients heading above 600px (in
+ * cook mode, the left page), the "⋯" popover on the phone, which has no
+ * heading.
+ */
+export function difficultySlot(page: Page): Locator {
+  return page.locator(isPhone(page)
+    ? '#page-right-content .recipe-more-panel .meta-difficulty'
+    : '.tab-panel[data-tab="ingredients"] > .section-header .meta-difficulty');
+}
 
 /**
  * A desk: above the phone breakpoint with a mouse or trackpad (the `chromium`

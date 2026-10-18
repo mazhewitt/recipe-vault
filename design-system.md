@@ -91,8 +91,8 @@ Load via Google Fonts: `Kalam:wght@300;400;700` and `Libre+Baskerville:ital,wght
 | Contents Entry | Libre Baskerville | 15px | 400 | 1.35 | ink-dark |
 | Notes Thread | Kalam | 15px (16px on the notes spread) | 400 | 1.5 | ink-dark |
 | Note Input | Kalam | 16px | 400 | 1.4 | ink-dark |
-| Meta Line | Libre Baskerville, `tabular-nums` | 15px: serves − N + · total (the − / + in Kalam 18px). The breakdown (12px), difficulty and tags (Kalam 12px chips) are in the "⋯" popover | 400 | 1.2 | ink-medium |
-| Ingredients | Libre Baskerville | 18px in cook mode (the left page); 14px in the packed list nowhere else on screen | 400 | 1.45 in a row; rows 38px (36px on the phone) from padding | ink-dark |
+| Meta Line | Libre Baskerville, `tabular-nums` | 15px: serves − N + · total (the − / + in Kalam 18px). The breakdown (12px) and tags (Kalam 12px chips) are in the "⋯" popover; the difficulty ends the Ingredients heading (in the popover on the phone) | 400 | 1.2 | ink-medium |
+| Ingredients | Libre Baskerville | 18px in cook mode (the left page); 14px in the packed list nowhere else on screen | 400 | 1.45 in a row; rows 38px (34px at the desk, 36px on the phone) from padding | ink-dark |
 | Method Steps | Libre Baskerville | 18px, in every spread mode | 400 | 1.65 | ink-dark |
 | Step Duration | Libre Baskerville, with a 0.8em clock before the time | 15px | 400 | inherit | ink-medium |
 | Reply Sticky | Kalam | 15px | 400 | 1.45 | biro |
@@ -107,11 +107,12 @@ Load via Google Fonts: `Kalam:wght@300;400;700` and `Libre+Baskerville:ital,wght
 
 ### At the Desk
 
-A mouse or trackpad means a desk: the book is read from a chair, not across a counter. On `(min-width: 601px) and (hover: hover) and (pointer: fine)` the type is about 90% of the counter sizes (the owner's "one zoom level smaller" on the Mac, 2026-10-18). It is done with font sizes, not CSS `zoom`, because `zoom` puts `getBoundingClientRect()` and `scrollTop` in different coordinate spaces, and the sticky, the scroll-to-section and the page turn all mix the two. Boxes keep their sizes: every hit area stays 44px, and the timer pill keeps its 26px time.
+A mouse or trackpad means a desk: the book is read from a chair, not across a counter. On `(min-width: 601px) and (hover: hover) and (pointer: fine)` the type is about 90% of the counter sizes (the owner's "one zoom level smaller" on the Mac, 2026-10-18). It is done with font sizes, not CSS `zoom`, because `zoom` puts `getBoundingClientRect()` and `scrollTop` in different coordinate spaces, and the sticky, the scroll-to-section and the page turn all mix the two. Boxes keep their sizes: every hit area stays 44px, and the timer pill keeps its 26px time. The one exception is the ingredient row: 38px is for a fingertip, and a pointer lands where it is aimed, so at the desk the rows close up to 34px.
 
 | Element | Counter | Desk |
 |---------|---------|------|
-| Ingredients (cook mode), Method Steps, Step Number | 18px | 16px |
+| Method Steps, Step Number | 18px | 16px |
+| Ingredients (cook mode) | 18px | 15px (a size under the method, the owner's "a point smaller") |
 | Step Duration | 15px | 14px |
 | Recipe Title | 27px | 24px |
 | Section Header | 19px | 17px |
@@ -124,7 +125,7 @@ A mouse or trackpad means a desk: the book is read from a chair, not across a co
 
 ### Ingredient Rows
 
-One ingredient per row, no bullets. A row is `--ingredient-row` tall (38px; 36px on the phone) at any type size: `line-height: 1.45` and `padding: calc((var(--ingredient-row) - 1.45em) / 2) 0`. `.ingredient-line` has no margin, so rows touch: the pitch is even, the whole row is the tap target, and a wrapped ingredient's lines sit closer together than its neighbouring rows. (`renderIngredients` still packs short items into one `.ingredient-line`. Every layout now shows one per row, so the packing has no visible effect.)
+One ingredient per row, no bullets. A row is `--ingredient-row` tall (38px; 34px at the desk, set on the cook-mode `.ingredients-list`; 36px on the phone) at any type size: `line-height: 1.45` and `padding: calc((var(--ingredient-row) - 1.45em) / 2) 0`. `.ingredient-line` has no margin, so rows touch: the pitch is even, the whole row is the tap target, and a wrapped ingredient's lines sit closer together than its neighbouring rows. (`renderIngredients` still packs short items into one `.ingredient-line`. Every layout now shows one per row, so the packing has no visible effect.)
 
 ### Mobile Type Adjustments
 
@@ -272,8 +273,9 @@ The same in contents, cook and notes mode.
 
 - **Wide, line 1:** the title (wraps by words), a 44 × 44px tilted polaroid thumbnail (`.recipe-polaroid`, opens the full-window preview) and a "⋯" button (`button.recipe-more`, `aria-expanded`, `aria-haspopup="dialog"`).
 - **Wide, line 2:** `serves − N +` (`.meta-serves`) · total time. Then `method:`.
-- **Phone:** one line above the tabs (title ellipsised, thumbnail, "⋯"); the stepper line is the first row of the Ingredients tab; total time goes in the popover. The panels carry no section header (the paper tab names them), so "clear ticks" ends the stepper line, in its flow, 46px in from the end: off the page's right edge, its hit area clear of "⋯" just above. `placeMetaLine` moves it there and back into the Ingredients header above 600px. The first ingredient sits at 254px at 390 × 844.
-- **"⋯" popover** (`.recipe-more-panel`, `role="dialog"`, `--color-paper-cream`, Kalam 15px; its times, the breakdown and the phone's total, in the serif with tabular figures like the meta line): overlaid under the button, so opening it moves nothing. It holds the difficulty dots (their reserved slot, so a late difficulty never moves the page), the tag chips, the prep/cook split, share and add-photo. It closes on an outside tap, Escape, a page turn or mode change, and once share or add-photo starts.
+- **Wide, the Ingredients heading:** `Ingredients … clear ticks  difficulty ●●○○○`. The difficulty (`.meta-difficulty`, Kalam 15px, 14px at the desk, ink-medium) ends the heading in a fixed slot (`--difficulty-slot`, 116px), with "clear ticks" left of it. Both are absolutely placed, so neither grows the heading, and both sit on the heading's baseline (6px and 11px up from the line's foot; 10px at the desk for "clear ticks"). In contents and notes mode the ingredients, and so the difficulty, are off the page.
+- **Phone:** one line above the tabs (title ellipsised, thumbnail, "⋯"); the stepper line is the first row of the Ingredients tab; total time goes in the popover. The panels carry no section header (the paper tab names them), so "clear ticks" ends the stepper line, in its flow, 46px in from the end: off the page's right edge, its hit area clear of "⋯" just above. `placeMetaLine` moves it there and back into the Ingredients header above 600px, and moves the difficulty into the popover and back the same way. The first ingredient sits at 254px at 390 × 844.
+- **"⋯" popover** (`.recipe-more-panel`, `role="dialog"`, `--color-paper-cream`, Kalam 15px; its times, the breakdown and the phone's total, in the serif with tabular figures like the meta line): overlaid under the button, so opening it moves nothing. It holds the tag chips, the prep/cook split, share and add-photo, and on the phone the difficulty dots. It closes on an outside tap, Escape, a page turn or mode change, and once share or add-photo starts.
 
 ### The Servings Stepper
 
@@ -849,7 +851,7 @@ Known gaps, owned elsewhere: the A-Z letters (`scratch:contents-page-rough-edges
 
 ### Nothing Moves Unless the Cook Acted on It
 
-The layout contract behind all of the above (`tests/e2e/tests/layout-stability.spec.ts`, 1px tolerance, every project): opening a recipe, switching spread mode, sending a note, a reply arriving, refreshing the recipe (`update_recipe`, a photo upload, a late difficulty), a timer starting, ticking and finishing, and ticking an ingredient or marking a step leave the slip, the textarea, the right page's content top, a mid-method step, the next arrow and the timer pill where they were. A refresh of the recipe already displayed shows no skeleton and restores both pages' scroll positions and the phone tab; the difficulty dots have a reserved, fixed-width slot (`.meta-difficulty`) inside the "⋯" popover, off the page.
+The layout contract behind all of the above (`tests/e2e/tests/layout-stability.spec.ts`, 1px tolerance, every project): opening a recipe, switching spread mode, sending a note, a reply arriving, refreshing the recipe (`update_recipe`, a photo upload, a late difficulty), a timer starting, ticking and finishing, and ticking an ingredient or marking a step leave the slip, the textarea, the right page's content top, a mid-method step, the next arrow and the timer pill where they were. A refresh of the recipe already displayed shows no skeleton and restores both pages' scroll positions and the phone tab; the difficulty dots have a reserved, fixed-width slot (`.meta-difficulty`), absolutely placed at the end of the Ingredients heading (inside the "⋯" popover on the phone), so a late difficulty moves nothing.
 
 ### Gestures (Mobile)
 

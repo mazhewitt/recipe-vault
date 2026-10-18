@@ -84,7 +84,7 @@ test.describe('Readable and tappable from the counter', () => {
 
     if (!isPhone(page)) {
       await selectCook(page);
-      expect(await fontSize(page, '#page-left-content .ingredient-item')).toBe(big);
+      expect(await fontSize(page, '#page-left-content .ingredient-item')).toBe(desk ? 15 : big);
       expect(await fontSize(page, '#page-right-content .prep-step .step-text')).toBe(big);
     }
   });

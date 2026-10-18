@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createCookingRecipe, createRecipe, expectHitArea, openRecipe, openTab, useContentsMode, isPhone, isDesk } from './helpers';
+import { authenticate, createCookingRecipe, createRecipe, difficultySlot, expectHitArea, openRecipe, openTab, useContentsMode, isPhone, isDesk } from './helpers';
 
 test.describe('Recipe Display', () => {
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -298,9 +298,14 @@ test.describe('The compact header', () => {
     await expectHitArea(page, '#page-right-content button.recipe-more');
     await openMore(page);
     const p = panel(page);
-    await expect(p.locator('.meta-difficulty .difficulty-dot')).toHaveCount(5);
-    await expect(p.locator('.meta-difficulty .difficulty-dot.filled')).toHaveCount(2);
-    await expect(p.locator('.meta-difficulty')).toContainText('difficulty');
+    // The difficulty is here on the phone only; above 600px it ends the
+    // Ingredients heading
+    await expect(p.locator('.meta-difficulty')).toHaveCount(isPhone(page) ? 1 : 0);
+    const slot = difficultySlot(page);
+    await expect(slot).toBeVisible();
+    await expect(slot.locator('.difficulty-dot')).toHaveCount(5);
+    await expect(slot.locator('.difficulty-dot.filled')).toHaveCount(2);
+    await expect(slot).toContainText('difficulty');
     await expect(p.locator('.recipe-tags .recipe-tag')).toHaveCount(3);
     await expect(p.locator('.meta-breakdown')).toHaveText('(10m prep · 55m cook)');
     await expect(p.locator('.share-btn')).toBeVisible();
@@ -402,20 +407,60 @@ test.describe('The compact header', () => {
     await expectClosed(page);
   });
 
-  test('the difficulty slot is reserved in the popover', async ({ page }) => {
+  test('the difficulty slot is reserved', async ({ page }) => {
     const known = await createHeaderRecipe(page, { difficulty: 5 });
     await openRecipe(page, known.id);
-    await openMore(page);
-    const full = (await panel(page).locator('.meta-difficulty').boundingBox())!;
+    if (isPhone(page)) await openMore(page);
+    const full = (await difficultySlot(page).boundingBox())!;
 
     const pending = await createHeaderRecipe(page, { difficulty: null });
     await openRecipe(page, pending.id);
     await expect(page.locator('#page-right-content .recipe-title')).toHaveText(pending.title);
-    await openMore(page);
-    const slot = panel(page).locator('.meta-difficulty');
+    if (isPhone(page)) await openMore(page);
+    const slot = difficultySlot(page);
     await expect(slot.locator('.difficulty-dot')).toHaveCount(0);
     const empty = (await slot.boundingBox())!;
     expect(Math.abs(empty.width - full.width), 'empty slot as wide as a full one').toBeLessThanOrEqual(1);
+  });
+
+  test('above 600px the difficulty ends the Ingredients heading, on its line', async ({ page }) => {
+    test.skip(isPhone(page), 'the phone has no Ingredients heading: the difficulty is in the popover');
+    const { id } = await createHeaderRecipe(page);
+    await openRecipe(page, id);
+    await selectMode(page, 'cook');
+    await settled(page);
+    const heading = page.locator('#page-left-content .tab-panel[data-tab="ingredients"] > .section-header');
+    const before = (await heading.boundingBox())!;
+    // A tick shows "clear ticks", which stands left of the difficulty
+    await page.locator('#page-left-content .ingredient-item[data-index]').first().click();
+    await expect(heading.locator('.clear-ticks')).toBeVisible();
+    const m = await heading.evaluate(h => {
+      // A line's baseline: the foot of a zero-size inline-block set on it
+      const baseline = (el: Element, at: Node | null = null) => {
+        const s = document.createElement('span');
+        s.style.cssText = 'display:inline-block;width:0;height:0';
+        el.insertBefore(s, at);
+        const y = s.getBoundingClientRect().bottom;
+        s.remove();
+        return y;
+      };
+      const slot = h.querySelector('.meta-difficulty')!.getBoundingClientRect();
+      const clear = h.querySelector('.clear-ticks')!;
+      return {
+        heading: baseline(h, h.firstChild!.nextSibling),
+        label: baseline(h.querySelector('.meta-label')!),
+        clear: baseline(clear),
+        slotLeft: slot.left,
+        slotRight: slot.right,
+        clearRight: clear.getBoundingClientRect().right,
+        headingRight: h.getBoundingClientRect().right - parseFloat(getComputedStyle(h).paddingRight),
+      };
+    });
+    expect(Math.abs(m.slotRight - m.headingRight), 'ends the heading').toBeLessThanOrEqual(1);
+    expect(m.clearRight, 'clear ticks left of the difficulty').toBeLessThanOrEqual(m.slotLeft);
+    expect(Math.abs(m.label - m.heading), 'difficulty on the heading\'s baseline').toBeLessThanOrEqual(1);
+    expect(Math.abs(m.clear - m.heading), 'clear ticks on the heading\'s baseline').toBeLessThanOrEqual(1);
+    expect(Math.abs((await heading.boundingBox())!.height - before.height), 'heading height').toBeLessThanOrEqual(0.5);
   });
 
   test('the same header in every mode', async ({ page }) => {
@@ -531,7 +576,7 @@ test.describe('Ingredient rows are tall enough to tick', () => {
     await authenticate(page);
   });
 
-  test('every row is 38px (36px on the phone) from padding, edge to edge with no gap', async ({ page }) => {
+  test('every row is 38px (34px at the desk, 36px on the phone) from padding, edge to edge with no gap', async ({ page }) => {
     const r = await createCookingRecipe(page);
     await openRecipe(page, r.id);
     if (!isPhone(page)) await selectMode(page, 'cook');
@@ -542,7 +587,9 @@ test.describe('Ingredient rows are tall enough to tick', () => {
       return { top: b.top, bottom: b.bottom, h: b.height, mt: cs.marginTop, mb: cs.marginBottom, pt: parseFloat(cs.paddingTop), pb: parseFloat(cs.paddingBottom) };
     }));
     expect(rows.length).toBeGreaterThan(10);
-    const min = isPhone(page) ? 36 : 38;
+    const min = isPhone(page) ? 36 : (await isDesk(page)) ? 34 : 38;
+    // A one-line row is exactly the row, no taller
+    expect(Math.min(...rows.map(row => row.h)), 'one-line row height').toBeLessThanOrEqual(min + 1);
     rows.forEach((row, i) => {
       expect(row.h, `row ${i} height`).toBeGreaterThanOrEqual(min);
       expect(row.mt, `row ${i} margin-top`).toBe('0px');

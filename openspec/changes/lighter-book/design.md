@@ -16,7 +16,8 @@ Safari's zoom semantics differ again. Instead, a media block `(min-width: 601px)
 The desk is identified by its pointer, not its width. A propped iPad in landscape (1080px wide, coarse pointer) keeps the counter sizes. A Mac window of any width gets the desk sizes.
 
 Sizes (counter → desk):
-- method and cook-mode ingredients 18 → 16;
+- method 18 → 16;
+- cook-mode ingredients 18 → 15 (16 at first; the owner asked for "a point smaller", 2026-10-18);
 - durations 15 → 14;
 - title 27 → 24;
 - section headers 19 → 17;
@@ -33,10 +34,12 @@ Sizes (counter → desk):
 
 Boxes, hit areas and the timer pill's type are unchanged. The 44px rule is about fingers, and the timer is read across the room.
 
+The one box that changes is the ingredient row. On the Mac the owner found the list "a little" loose at 38px. A row that tall is for a fingertip, and a pointer lands where it is aimed, so at the desk `--ingredient-row` is 34px (set on the cook-mode `.ingredients-list`). The tablet keeps 38px and the phone 36px. lighter-book carries a MODIFIED copy of cook-from-the-page's "Ingredient rows are tall enough to tick" for this.
+
 ### L2. Rows by padding around a tight line-height
 
 `padding: calc((var(--ingredient-row) - 1.45em) / 2) 0` with `line-height: 1.45`.
-- `--ingredient-row` is 38px (36px on the phone), so a one-line row is the same height at 18, 17 or 16px type.
+- `--ingredient-row` is 38px (34px at the desk, 36px on the phone), so a one-line row has the same height at any type size.
 - A wrapped row grows by one 1.45 line.
 - `.ingredient-line` has no margin, so rows touch: the whole row is the tap target and the pitch is even.
 
@@ -107,6 +110,15 @@ The CSS keeps one rule for each overlap:
 - **Thumbnail:** `position: relative` for the tape, and `flex: none` in the title row.
 - **Popover times:** the times in the popover are serif too.
 - **Tick:** on the left page the pencil ✓ moves into the margin, left of the rule. At cook-from-the-page's −16px it sat on the rule.
+
+### The difficulty on the Ingredients line (owner, 2026-10-18)
+
+The owner asked for the difficulty "on the right on the same line as ingredients". cook-from-the-page had put it in the "⋯" popover.
+- **One node, moved.** The slot ends the Ingredients heading above 600px. On the phone there is no Ingredients heading (the owner's choice at the merge), so the slot goes back into the popover's row. `placeMetaLine` moves it, as it moves "clear ticks", so a resize across 600px needs no re-render.
+- **Absolutely placed.** Like "clear ticks", the slot cannot grow the heading, and it keeps its fixed width (`--difficulty-slot`, 116px) whether or not the difficulty is known. "clear ticks" stands left of it.
+- **One baseline.** Kalam's baseline is about 0.53em above the line's foot, so the label sits 6px up and "clear ticks" 11px (10px at the desk). Measured: all three within 0.2px at the desk and the tablet. Before, "clear ticks" sat 6px below "Ingredients".
+- **Set as in the popover:** Kalam, 15px (14px at the desk), ink-medium.
+- **Not shown in Contents or Notes mode above 600px.** The ingredients are not on the page there, and the slot goes with them; one tap on Cook shows it.
 
 ## Risks
 

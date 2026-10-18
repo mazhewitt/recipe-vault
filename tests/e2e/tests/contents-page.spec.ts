@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isDesk, isPhone, openTab, waitForTurn } from './helpers';
+import { authenticate, createRecipe, difficultySlot, isDesk, isPhone, openTab, waitForTurn } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -257,9 +257,11 @@ test.describe('Recipe typography and meta line (Journal 2.0)', () => {
     await expect(meta.locator('.meta-serves')).toHaveCount(0);
     await page.locator('#page-right-content button.recipe-more').click();
     await expect(panel.locator('.meta-breakdown')).toHaveText('(1h 15m cook)');
-    // The difficulty is not assessed yet, so its slot in the popover is there and empty
+    // The difficulty is not assessed yet, so its slot (the popover on the
+    // phone, the Ingredients heading above 600px) is there and empty
     await expect(meta.locator('.meta-difficulty')).toHaveCount(0);
-    await expect(panel.locator('.meta-difficulty')).toHaveCount(1);
-    await expect(panel.locator('.meta-difficulty')).toBeEmpty();
+    await expect(page.locator('.meta-difficulty')).toHaveCount(1);
+    await expect(difficultySlot(page)).toHaveCount(1);
+    await expect(difficultySlot(page)).toBeEmpty();
   });
 });

@@ -109,7 +109,8 @@ test.describe('A lighter book', () => {
     expect(desk).toBe(test.info().project.name === 'chromium');
 
     expect(await fontSize(page, '#page-right-content .prep-step .step-text')).toBe(desk ? 16 : 18);
-    expect(await fontSize(page, '#page-left-content .ingredient-item')).toBe(desk ? 16 : 18);
+    // The ingredients a size under the method at the desk
+    expect(await fontSize(page, '#page-left-content .ingredient-item')).toBe(desk ? 15 : 18);
     expect(await fontSize(page, '#page-right-content .step-duration')).toBe(desk ? 14 : 15);
     expect(await fontSize(page, '.recipe-title')).toBe(desk ? 24 : 27);
     const method = await page.locator('#page-right-content .prep-list').evaluate(el => {

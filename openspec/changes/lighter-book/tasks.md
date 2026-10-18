@@ -34,3 +34,11 @@
 - [x] 4.4 Popover times (`.meta-breakdown`, `.more-total`) in the serif
 - [x] 4.5 Full e2e green on the merge: 858 passed, 183 skipped, 0 failed; `cargo test` and `make lint` clean
 - [x] 4.6 Owner's choice for the phone: the panels carry no heading (the paper tab names them), "clear ticks" ends the meta line; the phone target restated to 260px (cook-from-the-page verification.md)
+
+## 5. Owner's Mac trial, second round (2026-10-18)
+
+- [x] 5.1 At the desk the cook-mode ingredients are 15px (a size under the 16px method) in 34px rows; the tablet keeps 38px and the phone 36px. MODIFIED copy of "Ingredient rows are tall enough to tick" with the desk rows
+- [x] 5.2 Tests: desk ingredient size in `lighter-book` and `counter-readability`; the row test pins 34px at the desk and a one-line row at most 1px over its row
+- [x] 5.3 `design-system.md`: desk sizes and rows
+- [x] 5.4 The difficulty ends the Ingredients heading above 600px, on its baseline, with "clear ticks" left of it; on the phone it stays in the popover (`placeMetaLine` moves the one slot). "Recipe metadata displays with icons" re-stated
+- [x] 5.5 Tests: `difficultySlot` helper; the popover, slot, tag-order, late-difficulty (plus the heading's box) and meta-format cases follow the slot; new case "above 600px the difficulty ends the Ingredients heading, on its line". Red-checks: slot back in the popover → 7 cases red; old offsets → the new case red; both restored byte-identical

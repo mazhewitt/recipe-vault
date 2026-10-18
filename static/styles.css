@@ -1122,6 +1122,27 @@ body::before {
    cannot grow the header */
 .tab-panel[data-tab="ingredients"] .section-header {
     position: relative;
+    --difficulty-slot: 116px;
+}
+
+/* The difficulty ends the Ingredients heading above 600px (the phone has no
+   heading, so there it is in the "⋯" popover). Absolutely, like "clear
+   ticks", in a slot of one width known or not, so it grows and moves
+   nothing; "clear ticks" stands left of it. Both sit on the heading's
+   baseline (measured: Kalam's baseline is about 0.53em above the line's foot). */
+.section-header .meta-difficulty {
+    position: absolute;
+    right: 0;
+    bottom: 6px;
+    width: var(--difficulty-slot);
+    justify-content: flex-end;
+    font-size: 15px;
+    color: var(--color-ink-medium);
+}
+
+.section-header .clear-ticks {
+    right: calc(var(--difficulty-slot) + 12px);
+    bottom: 11px;
 }
 
 /* On the phone it ends the meta line instead (placeMetaLine), in the line's
@@ -3003,7 +3024,9 @@ html[data-nav-direction="backward"]::view-transition-new(page-content) {
    A mouse means a desk: the book is read from a chair, not across a counter,
    so the type is about 90% of the counter sizes (the owner's "one zoom level
    smaller" on the Mac). Boxes keep their sizes, so every hit area stays 44px
-   and the timer pill, read across the kitchen, keeps its type. */
+   and the timer pill, read across the kitchen, keeps its type. The one
+   exception is the ingredient row, sized for a fingertip: a pointer lands
+   where it is aimed, so at the desk the rows close up. */
 @media (min-width: 601px) and (hover: hover) and (pointer: fine) {
     .section-label {
         font-size: 20px;
@@ -3021,10 +3044,24 @@ html[data-nav-direction="backward"]::view-transition-new(page-content) {
         font-size: 17px;
     }
 
+    .section-header .meta-difficulty {
+        font-size: 14px;
+    }
+
+    .section-header .clear-ticks {
+        bottom: 10px;
+    }
+
     .prep-list,
-    .step-number,
-    body[data-spread-mode="cook"] #page-left-content .ingredients-list {
+    .step-number {
         font-size: 16px;
+    }
+
+    /* The ingredients a size under the method (the owner's "a point
+       smaller", 2026-10-18), in closer rows */
+    body[data-spread-mode="cook"] #page-left-content .ingredients-list {
+        --ingredient-row: 34px;
+        font-size: 15px;
     }
 
     .step-duration {

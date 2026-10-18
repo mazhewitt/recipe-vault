@@ -558,7 +558,8 @@ export function closeMorePanel() {
  * 600px, the first row of the Ingredients tab on the phone. One node, moved.
  * "clear ticks" goes with it: the phone's panels carry no heading (the paper
  * tab names them), so there it sits at the end of the meta line, and above
- * 600px it goes back into the Ingredients heading.
+ * 600px it goes back into the Ingredients heading. So does the difficulty,
+ * which ends that heading above 600px and is in the "⋯" popover on the phone.
  */
 export function placeMetaLine(root = document.getElementById('page-right-content')) {
     const meta = root?.querySelector('.recipe-meta-line') || document.querySelector('.recipe-meta-line');
@@ -566,15 +567,19 @@ export function placeMetaLine(root = document.getElementById('page-right-content
     const panel = root?.querySelector('.tab-panel[data-tab="ingredients"]')
         || document.querySelector('.tab-panel[data-tab="ingredients"]');
     const heading = panel?.querySelector('.section-header');
+    const moreRow = root?.querySelector('.more-difficulty') || document.querySelector('.more-difficulty');
+    const difficulty = heading?.querySelector('.meta-difficulty') || moreRow?.querySelector('.meta-difficulty');
     if (isMobile()) {
         if (panel && panel.firstElementChild !== meta) panel.prepend(meta);
         const clear = heading?.querySelector('.clear-ticks');
         if (clear) meta.append(clear);
+        if (difficulty && moreRow) moreRow.append(difficulty);
     } else {
         const header = document.querySelector('#page-right-content .recipe-header');
         if (header && header.nextElementSibling !== meta) header.after(meta);
         const clear = meta.querySelector('.clear-ticks');
         if (clear && heading) heading.append(clear);
+        if (difficulty && heading) heading.append(difficulty);
     }
 }
 
@@ -797,10 +802,10 @@ export function renderRecipe(recipe, options = {}) {
     const metaLine = `<div class="recipe-meta-line">${metaParts.join('<span class="meta-sep">·</span>')}</div>`;
 
     // The "⋯" popover, overlaid under its button so opening it moves nothing.
-    // A late difficulty lands in its reserved slot here, never on the page.
+    // On the phone the difficulty's slot is moved into its row (placeMetaLine).
     const morePanel = `<div class="recipe-more-panel" role="dialog" aria-label="More about this recipe" hidden>
             ${totalHtml ? `<div class="more-row more-total">${totalHtml}</div>` : ''}
-            <div class="more-row">${difficultyHtml}</div>
+            <div class="more-row more-difficulty"></div>
             ${tagsHtml ? `<div class="more-row">${tagsHtml}</div>` : ''}
             ${breakdown.length ? `<div class="more-row"><span class="meta-breakdown">(${breakdown.join(' · ')})</span></div>` : ''}
             <div class="more-row more-actions">${shareIcon}${addPhotoIcon}</div>
@@ -825,7 +830,7 @@ export function renderRecipe(recipe, options = {}) {
         ${metaLine}
 
         <section class="tab-panel" data-tab="ingredients">
-            <div class="section-header">Ingredients <button type="button" class="clear-ticks" hidden>clear ticks</button></div>
+            <div class="section-header">Ingredients <button type="button" class="clear-ticks" hidden>clear ticks</button>${difficultyHtml}</div>
             ${servings ? '<div class="servings-note"></div>' : ''}
             <div class="ingredients-list">
                 ${ingredientsList}

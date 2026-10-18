@@ -27,7 +27,7 @@ The interface SHALL display the recipe book alone, filling the available width, 
 
 ### Requirement: Recipe text is sized for reading from the counter
 
-While a recipe is displayed, ingredient lines and method step text SHALL render at 18px on viewports wider than 600px and at 17px on viewports 600px wide or narrower, and step durations at 15px. The exception is the desk: on a viewport wider than 600px whose primary pointer is fine and can hover (`(hover: hover) and (pointer: fine)`, a mouse or trackpad), the book is read from a chair. There, ingredient lines and method step text SHALL render at 16px and step durations at 14px, the rest of the book's type at about 90% of its counter size, and every box and hit area at its counter size. Ingredient lines SHALL be one per row at an even pitch. The contents page and the Notes thread keep their own sizes.
+While a recipe is displayed, ingredient lines and method step text SHALL render at 18px on viewports wider than 600px and at 17px on viewports 600px wide or narrower, and step durations at 15px. The exception is the desk: on a viewport wider than 600px whose primary pointer is fine and can hover (`(hover: hover) and (pointer: fine)`, a mouse or trackpad), the book is read from a chair. There, method step text SHALL render at 16px, ingredient lines a size under it at 15px and step durations at 14px, the rest of the book's type at about 90% of its counter size, and every box and hit area at its counter size, except the ingredient rows ("Ingredient rows are tall enough to tick"). Ingredient lines SHALL be one per row at an even pitch. The contents page and the Notes thread keep their own sizes.
 
 #### Scenario: Tablet
 
@@ -39,7 +39,7 @@ While a recipe is displayed, ingredient lines and method step text SHALL render 
 #### Scenario: At the desk
 
 - **WHEN** a recipe is displayed on a viewport wider than 600px whose primary pointer is fine and can hover
-- **THEN** `.ingredient-item` on the left page in `cook` mode, and `.prep-step .step-text` in every spread mode, have a computed font-size of 16px
+- **THEN** `.prep-step .step-text` in every spread mode has a computed font-size of 16px, and `.ingredient-item` on the left page in `cook` mode 15px
 - **AND** `.step-duration` has a computed font-size of 14px and `.recipe-title` 24px
 - **AND** the computed line-height of the method list is at least 1.6 times its font-size
 - **AND** every control still passes the hit-area test of "Every control the cook taps has a 44px hit area", and `.timer-time` keeps its 26px
@@ -144,7 +144,7 @@ The recipe book SHALL render as an open book with a red leather cover frame cont
 
 ### Requirement: Recipe metadata displays with icons
 
-The recipe header SHALL be compact and the same in every spread mode: a title line holding the title, a small tilted photo thumbnail and a "⋯" button, and beneath it one meta line, set in the serif, holding the servings stepper and the total time. The difficulty dots, the tag chips, the prep/cook split, share and add-photo SHALL be in a popover the "⋯" button opens. The difficulty SHALL occupy a fixed-width slot inside that popover that is present before its value is known.
+The recipe header SHALL be compact and the same in every spread mode: a title line holding the title, a small tilted photo thumbnail and a "⋯" button, and beneath it one meta line, set in the serif, holding the servings stepper and the total time. The tag chips, the prep/cook split, share and add-photo SHALL be in a popover the "⋯" button opens. The difficulty dots SHALL end the Ingredients heading on viewports wider than 600px, on the heading's line, and be in the popover on the phone, which has no Ingredients heading. The difficulty SHALL occupy a fixed-width slot that is present before its value is known.
 
 #### Scenario: The title line
 
@@ -168,8 +168,11 @@ The recipe header SHALL be compact and the same in every spread mode: a title li
 
 #### Scenario: Difficulty renders as filled dots
 
-- **WHEN** a recipe with difficulty level 2 is displayed and the cook opens the "⋯" popover
-- **THEN** `.recipe-more-panel .meta-difficulty` shows a "difficulty" label followed by 2 filled dots and 3 empty dots
+- **WHEN** a recipe with difficulty level 2 is displayed in `cook` mode on a viewport wider than 600px
+- **THEN** the Ingredients panel's `.section-header` ends with `.meta-difficulty`, showing a "difficulty" label followed by 2 filled dots and 3 empty dots
+- **AND** the slot's right edge is the heading's right edge, and the label's baseline is the heading's baseline (tolerance 1px)
+- **AND** when "clear ticks" shows, it stands left of the slot, on the same baseline (tolerance 1px), and the heading's height does not change
+- **AND** on a viewport 600px wide or narrower, when the cook opens the "⋯" popover, `.recipe-more-panel .meta-difficulty` shows the same label and dots
 
 #### Scenario: Time values display with clock icons
 
@@ -192,7 +195,7 @@ The recipe header SHALL be compact and the same in every spread mode: a title li
 
 - **WHEN** the cook taps `button.recipe-more`
 - **THEN** `.recipe-more-panel[role="dialog"]` is shown, anchored under the button, and the button has `aria-expanded="true"`
-- **AND** the panel holds `.meta-difficulty`, `.recipe-tags` with up to three tag chips, `.meta-breakdown`, `.share-btn` and `.add-photo-btn`, and on the phone also the total time
+- **AND** the panel holds `.recipe-tags` with up to three tag chips, `.meta-breakdown`, `.share-btn` and `.add-photo-btn`, and on the phone also the total time and `.meta-difficulty` (above 600px the panel holds no `.meta-difficulty`)
 - **AND** `.share-btn`, `.add-photo-btn` and `button.recipe-more` each pass the hit-area test of "Every control the cook taps has a 44px hit area"
 
 #### Scenario: Opening the popover moves nothing
@@ -209,8 +212,8 @@ The recipe header SHALL be compact and the same in every spread mode: a title li
 #### Scenario: The difficulty slot is reserved
 
 - **WHEN** a recipe whose difficulty is not yet known is displayed
-- **THEN** `.recipe-more-panel .meta-difficulty` is present, shows no dots, and is as wide as it is when it holds the label and five dots
-- **AND** when the difficulty arrives later, with the popover open or closed, only the slot's contents change: the title line, the meta line and every `.prep-step` keep their bounding boxes (tolerance 1px)
+- **THEN** `.meta-difficulty` is present in its place (the Ingredients heading above 600px, the popover on the phone), shows no dots, and is as wide as it is when it holds the label and five dots
+- **AND** when the difficulty arrives later, with the popover open or closed, only the slot's contents change: the title line, the meta line, the Ingredients heading, the slot and every `.prep-step` keep their bounding boxes (tolerance 1px)
 
 #### Scenario: The same header in every mode
 
@@ -251,6 +254,34 @@ A control passes the hit-area test when, for a 5×5 grid of points spread evenly
 - **WHEN** the book is displayed on a viewport wider than 600px
 - **THEN** the right page's edge holds no strip, so there is no `.edge-tabs` or `.edge-tab` to exempt (the ribbons were removed with "Right page edge ribbons")
 - **AND** if a future state puts tabs on the right edge again, each must pass the hit-area test
+
+### Requirement: Ingredient rows are tall enough to tick
+
+Each ingredient row SHALL be tall enough that a fingertip lands on the row it is aimed at, and a ticked row SHALL stay easy to read, so a wrong tick is easy to spot at arm's length. At the desk (a fine pointer that can hover) a pointer lands where it is aimed, so the rows SHALL close up there.
+
+#### Scenario: Row height
+
+- **WHEN** a recipe is displayed in `cook` mode on a viewport wider than 600px
+- **THEN** every `.ingredient-item` has a rendered height of at least 38px, made by vertical padding (computed `margin-top` and `margin-bottom` of 0), with its text vertically centred
+- **AND** at the desk every `.ingredient-item` is at least 34px tall, and a one-line item at most 35px, likewise from padding
+- **AND** on a viewport 600px wide or narrower every `.ingredient-item` on the Ingredients tab is at least 36px tall, likewise from padding
+
+#### Scenario: The whole row is the tap target
+
+- **WHEN** the cook taps a point inside an `.ingredient-item`'s bounding box, 2px inside its top or bottom edge
+- **THEN** `document.elementFromPoint` there returns that item or a descendant, and the tap ticks that item
+- **AND** consecutive rows leave no vertical gap: the next item's top equals this item's bottom (tolerance 1px)
+
+#### Scenario: A fingertip lands on its row
+
+- **WHEN** `tests/usability/runs/audit-post-steady/cook/remeasure.cjs ingredient-rows-tight-for-ticking` runs
+- **THEN** of a 44px vertical sweep's five samples (the centre, ±11px, ±22px), the centre and both ±11px samples land on the row aimed at, at tablet and on the phone
+- **AND** only the ±22px samples, which reach past a 38px row by design, may land on a neighbour: at most 2 times in 5
+
+#### Scenario: A long list still fits
+
+- **WHEN** Granny's Beef Lasagne (19 ingredients) is open in `cook` mode at 810×1080
+- **THEN** `#page-left`'s `scrollHeight` does not exceed its `clientHeight`
 
 ## ADDED Requirements
 

@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticate, createRecipe, isPhone, line, openRecipe, touchGesture, useContentsMode, waitForTurn } from './helpers';
+import { authenticate, createRecipe, difficultySlot, isPhone, line, openRecipe, touchGesture, useContentsMode, waitForTurn } from './helpers';
 
 const API_HEADERS = { 'X-API-Key': 'test-api-key-for-playwright' };
 
@@ -397,12 +397,18 @@ test.describe('Recipe tag chips', () => {
     await expect(chips.nth(0)).toHaveText('main');
     await expect(chips.nth(0)).toBeVisible();
 
-    // The chips follow the difficulty dots, and share and add-photo follow them
+    // Share and add-photo follow the chips. On the phone the difficulty dots
+    // come first; above 600px they end the Ingredients heading instead.
     const order = await panel.evaluate(el => {
       const at = (sel: string) => el.querySelector(sel)!;
       const following = (a: string, b: string) => (at(a).compareDocumentPosition(at(b)) & 4) === 4; // Node.DOCUMENT_POSITION_FOLLOWING
-      return { tagsAfterDots: following('.meta-difficulty', '.recipe-tags'), shareAfterTags: following('.recipe-tags', '.share-btn'), photoLast: following('.share-btn', '.add-photo-btn') };
+      return {
+        tagsAfterDots: el.querySelector('.meta-difficulty') ? following('.meta-difficulty', '.recipe-tags') : null,
+        shareAfterTags: following('.recipe-tags', '.share-btn'),
+        photoLast: following('.share-btn', '.add-photo-btn'),
+      };
     });
-    expect(order).toEqual({ tagsAfterDots: true, shareAfterTags: true, photoLast: true });
+    expect(order).toEqual({ tagsAfterDots: isPhone(page) ? true : null, shareAfterTags: true, photoLast: true });
+    await expect(difficultySlot(page)).toHaveCount(1);
   });
 });
