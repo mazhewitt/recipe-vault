@@ -108,12 +108,12 @@ Stop the server you started (`kill $(cat tests/usability/runs/3036/server.pid)`)
 
 ## 4. Verification
 
-- [ ] 4.1 After merging groups 1-3 on `glanceable-cooking`, re-run the three explorer scripts on port 3036, each on a fresh server (see "Before you start"). Write the output to `tests/usability/runs/audit-post-steady/{cook,ask,counter}/remeasure-after.txt` and compare it with the "before" files. Record before → after in the commit body for each check:
+- [x] 4.1 After merging groups 1-3 on `glanceable-cooking`, re-run the three explorer scripts on port 3036, each on a fresh server (see "Before you start"). Write the output to `tests/usability/runs/audit-post-steady/{cook,ask,counter}/remeasure-after.txt` and compare it with the "before" files. Record before → after in the commit body for each check:
   - cook: `sticky-hides-last-ingredients`, `left-scroll-leaks-across-modes`, `tablet-note-textarea-narrow`, `timer-pill-text-cramped`, `timer-done-easy-to-miss`, `duration-chip-no-timer`, `clear-ticks-small-and-destructive`, `timer-pill-width-jitter`
   - ask: `sticky-covers-ingredients`, `sticky-covers-contents`, `phone-open-shifts-book`, `slip-textarea-narrow`, `notes-thread-no-autoscroll`, `inflight-send-silent`
   - counter: `sticky-hides-last-ingredients`, `phone-sticky-covers-footer-nav`, `phone-book-jumps-on-open`, `narrow-note-textarea`, `timer-small-at-distance`, `duration-chip-toggles-mark`, `clear-ticks-small-and-clears-mark`, `ribbons-look-like-tabs`
   - Every check that was fixed by steady-cooking-spread must still print its fixed value. A check that prints `ERROR` usually relies on a selector this change altered (`#timer-text`'s children, `span.step-duration`, the ribbon text). Fix the check and say so, rather than reading the error as a pass.
-- [ ] 4.2 Revert-and-fail. Revert each line below, name the test that goes red, then restore it and confirm `git diff` is byte-identical to before:
+- [x] 4.2 Revert-and-fail. Revert each line below, name the test that goes red, then restore it and confirm `git diff` is byte-identical to before:
   - the `--sticky-clearance` padding term
   - the clearance's no-shrink rule
   - the phone `.user-info` out-of-flow rule
@@ -130,7 +130,7 @@ Stop the server you started (`kill $(cat tests/usability/runs/3036/server.pid)`)
   - the undo restore
   - `.note-send[aria-disabled]` opacity
   - the ribbon `active` removal
-- [ ] 4.3 `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts` lists nothing this change added. `make lint`, then the full suite on port 3002, green on chromium, mobile-chrome and ipad. If a case fails in a timing-looking way, re-run that spec alone and report both runs.
-- [ ] 4.4 `design-system.md`: update the timer pill (size, the label and time split, fixed width, the Done fill and pulse, the chime repeats), the duration buttons, the step mark and clear ticks with undo, the reply sticky's foot clearance, the dimmed send state, the plain ribbons, the tablet slip without a page number and the phone user chip.
-- [ ] 4.5 Hand-off to the lead: list the regions of `styles.css`, `chat.html`, `app.js` and `helpers.ts` this change edited, for the merge with `safe-page-navigation` into `cooking-ux-loop`. Archive order: steady-cooking-spread, safe-page-navigation, then this change.
+- [x] 4.3 `grep -n "test.fail\|test.fixme" tests/e2e/tests/*.spec.ts` lists nothing this change added. `make lint`, then the full suite on port 3002, green on chromium, mobile-chrome and ipad. If a case fails in a timing-looking way, re-run that spec alone and report both runs.
+- [x] 4.4 `design-system.md`: update the timer pill (size, the label and time split, fixed width, the Done fill and pulse, the chime repeats), the duration buttons, the step mark and clear ticks with undo, the reply sticky's foot clearance, the dimmed send state, the plain ribbons, the tablet slip without a page number and the phone user chip.
+- [x] 4.5 Hand-off to the lead: list the regions of `styles.css`, `chat.html`, `app.js` and `helpers.ts` this change edited, for the merge with `safe-page-navigation` into `cooking-ux-loop`. Archive order: steady-cooking-spread, safe-page-navigation, then this change.
 - [ ] 4.6 Deployment is not an implementation step. Static assets only: tag a release and purge the Cloudflare cache (CLAUDE.md).
