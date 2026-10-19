@@ -2492,6 +2492,10 @@ body[data-feature-meals] .contents-tab-meals {
         flex-direction: column;
         height: 100vh;
         height: 100dvh;
+        /* Not the base 100vh: on Android Chrome that is the screen with the
+           address bar hidden, it outranks the height above, and it put the
+           note bar below the screen of a page that cannot scroll */
+        min-height: 0;
         overflow: hidden;
     }
 
