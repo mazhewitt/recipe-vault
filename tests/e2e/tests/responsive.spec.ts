@@ -48,14 +48,8 @@ test.describe('Responsive Layout (book only)', () => {
     const input = (await page.locator('.note-input').boundingBox())!;
     expect(input.y).toBeGreaterThanOrEqual(book.y + book.height - 1);
     expect(input.width).toBeGreaterThan(page.viewportSize()!.width * 0.9);
-    // ...and wholly on screen. The page is as tall as the visible area
-    // (100dvh) and does not scroll, so nothing may hold it taller: a
-    // min-height in vh is the screen with the address bar hidden on Android
-    // Chrome, and it put the bar below the screen (v2.10.0, a Galaxy phone:
-    // 740px of page in 688px of screen). An emulator has no address bar, so
-    // vh and dvh agree here, and the min-height is checked itself.
+    // ...and wholly on screen (under an address bar too: address-bar.spec.ts)
     expect(input.y + input.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
-    expect(await page.evaluate(() => getComputedStyle(document.body).minHeight)).toBe('0px');
 
     // 44px touch targets on the send and attach buttons
     for (const sel of ['#send-button', '#clipboard-button']) {

@@ -189,6 +189,10 @@ There is one column: the recipe book. Chat is not a second panel — it is a sin
 
 CSS follows the same three bands: `@media (max-width: 1024px)` is tablet-and-below, `@media (max-width: 600px)` is the phone (it comes later in `styles.css` and therefore wins), and everything outside a media query is the desktop base. JS uses one predicate everywhere — `window.matchMedia('(max-width: 600px)').matches`. No module reads `window.innerWidth` or invents a second breakpoint.
 
+### Screen height: `dvh`, never `vh` alone
+
+Size anything to the screen's height in `dvh` (the screen actually visible), with a `vh` line before it only as the fallback for browsers without `dvh`. On Android Chrome `vh` is the screen with the address bar hidden, so a page sized in `vh` runs about 56px under the bar: in v2.10.0 the phone's `body { min-height: 100vh }` put the note bar below the screen of a page that cannot scroll, and the book's foot ran under the bar on tablets. Emulators have no address bar, so ordinary tests cannot see this. `tests/e2e/tests/address-bar.spec.ts` serves the stylesheet as Android Chrome reads it (`helpers.simulateAddressBar`) and checks the note input and the book's foot are on the visible screen, on the phone and the tablet.
+
 ### View Modes
 
 `body[data-view-mode]` mirrors the app's `viewMode` state and is what the layout keys off:

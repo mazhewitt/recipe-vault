@@ -14,7 +14,8 @@ grep -rl "^Status: ready-for-agent" .scratch --include="*.md" | grep -v /archive
 
 ## Ready for an agent (`ready-for-agent`)
 
-- _(nothing right now)_
+- `phone-tab-tap-on-current-tab/` — tapping the tab already showing runs a
+  200ms crossfade that swallows a quick tap on another tab.
 
 ## Needs triage (`needs-triage`)
 

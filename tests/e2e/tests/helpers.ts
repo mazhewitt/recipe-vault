@@ -202,6 +202,30 @@ export function difficultySlot(page: Page): Locator {
 }
 
 /**
+ * Android Chrome's address bar, as CSS sees it. While the bar shows, `vh` and
+ * `lvh` are the screen with the bar hidden, and `dvh` and `svh` the area that
+ * is actually visible. An emulator has no address bar, so the two agree, and a
+ * layout sized in `vh` passes every test and still runs off a real phone
+ * (v2.10.0's note bar sat below a Galaxy's screen). Call before the page
+ * loads: the stylesheet is served with `vh`/`lvh` resolved to a screen `bar`
+ * px taller than the viewport. Returns how many values it rewrote, so a test
+ * can tell it is in effect.
+ */
+export async function simulateAddressBar(page: Page, bar = 56): Promise<() => number> {
+  const large = page.viewportSize()!.height + bar;
+  let rewritten = 0;
+  await page.route('**/static/*.css*', async (route) => {
+    const response = await route.fetch();
+    const css = (await response.text()).replace(/(\d*\.?\d+)l?vh\b/g, (_, n: string) => {
+      rewritten += 1;
+      return `calc(${n} * ${large / 100}px)`;
+    });
+    await route.fulfill({ response, body: css });
+  });
+  return () => rewritten;
+}
+
+/**
  * A desk: above the phone breakpoint with a mouse or trackpad (the `chromium`
  * project), where the book's type is about 90% of its counter size
  * (lighter-book L1). The `ipad` project is a touch screen at counter size.
